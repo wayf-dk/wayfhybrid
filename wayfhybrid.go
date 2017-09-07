@@ -163,7 +163,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	hub_md, _ := hub.MDQ(hybrid["hubentityid"])
 	fmt.Println("md:", sp_md, hub_md)
 	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), sp_md, hub_md)
-	u, _ := gosaml.SAMLRequest2Url(newrequest, "", "", "") // not signed so blank key, pw and algo
+	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
 	q.Set("idpentityid", "https://birk.wayf.dk/birk.php/wayf.ait.dtu.dk/saml2/idp/metadata.php")
 	u.RawQuery = q.Encode()
@@ -173,13 +173,14 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, _, err := gosaml.ReceiveSAMLResponse(r, hub, internal)
+	response, _, _, relayState, err := gosaml.ReceiveSAMLResponse(r, hub, internal)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("RelayState: " + relayState + "\n"))
 	w.Write([]byte(response.PP()))
 	log.Println(response.Doc.Dump(true))
 	return
