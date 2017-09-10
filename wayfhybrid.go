@@ -10,6 +10,7 @@ import (
 	"github.com/wayf-dk/gohybrid"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
+	"github.com/wayf-dk/godiscoveryservice"
 	"log"
 	"net/http"
 	"regexp"
@@ -75,6 +76,7 @@ func Main() {
 		Hub:                    hub,
 		SecureCookieHashKey:    hybrid["securecookiehashkey"],
 		PostFormTemplate:       hybrid["postformtemplate"],
+		AttributeReleaseTemplate:       hybrid["attributereleasetemplate"],
 		Basic2uri:              basic2uri,
 		StdTiming:              stdtiming,
 		ElementsToSign:         []string{"/samlp:Response/saml:Assertion"},
@@ -83,6 +85,11 @@ func Main() {
 
 	gohybrid.Config(config)
 
+	godiscoveryservice.Config = godiscoveryservice.Conf{
+        DiscoMetaData: hybrid["discometadata"],
+		SpMetaData: hybrid["discospmetadata"],
+	}
+
 	//http.HandleFunc("/status", statushandler)
 	//http.Handle(config["hybrid_public_prefix"], http.FileServer(http.Dir(config["hybrid_public"])))
 	http.Handle(hybrid["sso_service"], appHandler(gohybrid.SsoService))
@@ -90,6 +97,9 @@ func Main() {
 	http.Handle(hybrid["nemlogin_acs"], appHandler(gohybrid.AcsService))
 	http.Handle(hybrid["birk"], appHandler(gohybrid.BirkService))
 	http.Handle(hybrid["krib"], appHandler(gohybrid.KribService))
+	http.Handle(hybrid["discoroute"], appHandler(godiscoveryservice.DSBackend))
+	http.Handle(hybrid["public"], http.FileServer(http.Dir(hybrid["discopublicpath"])))
+
 	http.Handle(hybrid["testsp_acs"], appHandler(testSPACService))
 	http.Handle(hybrid["testsp"]+"/", appHandler(testSPService)) // need a root "/" for routing
 	http.Handle(hybrid["testsp"]+"/favicon.ico", http.NotFoundHandler())
@@ -165,7 +175,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), sp_md, hub_md)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
-	q.Set("idpentityid", "https://birk.wayf.dk/birk.php/wayf.ait.dtu.dk/saml2/idp/metadata.php")
+	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/wayf.ait.dtu.dk/saml2/idp/metadata.php")
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
@@ -186,7 +196,8 @@ func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error) {
+func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error, values map[string][]string) {
+	values = make(map[string][]string)
 	idp := response.Query1(nil, "/samlp:Response/saml:Issuer")
 
 	if idp == "https://saml.nemlog-in.dk" {
@@ -197,7 +208,8 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error)
     commonFeds := sp_md.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`)
     fmt.Println("adhoc feds", `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`, commonFeds)
     if len(commonFeds) == 0 {
-        return fmt.Errorf("no common federations")
+        err =fmt.Errorf("no common federations")
+        return
     }
 
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
@@ -235,6 +247,7 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error)
 		attr := response.QueryDashP(destinationAttributes, `saml:Attribute[@Name="`+name+`"]`, "", nil)
 		attr.(types.Element).SetAttribute("FriendlyName", friendlyName)
 		attr.(types.Element).SetAttribute("NameFormat", gosaml.Uri)
+
 		index := 1
 		for _, node := range attributesValues {
 			value := node.NodeValue()
@@ -243,6 +256,7 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error)
 				value = string(v)
 			}
 			response.QueryDashP(attr, "saml:AttributeValue["+strconv.Itoa(index)+"]", value, nil)
+			values[friendlyName] = append(values[friendlyName], value)
 			index++
 		}
 	}
