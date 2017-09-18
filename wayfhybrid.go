@@ -2,16 +2,18 @@ package wayfhybrid
 
 import (
 	"crypto"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	_ "github.com/mattn/go-sqlite3"
 	toml "github.com/pelletier/go-toml"
 	//"github.com/spf13/viper"
 	"github.com/wayf-dk/go-libxml2/types"
+	"github.com/wayf-dk/godiscoveryservice"
 	"github.com/wayf-dk/gohybrid"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
-	"github.com/wayf-dk/godiscoveryservice"
 	"log"
 	"net/http"
 	"regexp"
@@ -26,90 +28,96 @@ type (
 	md struct {
 		entities map[string]*goxml.Xp
 	}
+
+	mddb struct {
+		db, table string
+	}
+
+	metadata struct {
+		Hub, Internal, External string
+	}
+
+	tomlConfig struct {
+		Hybrid                                                                                                                                                          gohybrid.Conf
+		Metadata                                                                                                                                                        metadata
+		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
+		Testsp, Testsp_Acs, Nemlogin_Acs, Certpath, Samlschema                                                                                                          string
+	}
 )
 
 var (
-	hybrid                                                          map[string]interface{}
+	config                                                          tomlConfig
 	certpath, samlSchema, postformtemplate, hubfrequestedattributes string
-	hub, internal, external                                         md
+	hub, external, internal                                         mddb
 	idp_md, idp_md_birk, sp_md, sp_md_krib, hub_md                  *goxml.Xp
 	stdtiming                                                       = gosaml.IdAndTiming{time.Now(), 4 * time.Minute, 4 * time.Hour, "", ""}
 	basic2uri                                                       map[string]string
 )
 
 func Main() {
-    toml, err := toml.LoadFile("hybrid-config/hybrid-config.toml")
+	theConfig, err := toml.LoadFile("hybrid-config/hybrid-config.toml")
 
-	if err != nil {             // Handle errors reading the config file
+	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s \n", err))
 	}
-	tomlmap := toml.ToMap()
 
-	hybrid = tomlmap["hybrid"].(map[string]interface{})
-	metadata := tomlmap["metadata"].(map[string]interface{})
-
-    fmt.Println(metadata["hub"].(string))
+	config = tomlConfig{}
+	theConfig.Unmarshal(&config)
 
 	//elementsToSign := []string{"/samlp:Response/saml:Assertion"}
 	basic2uri = make(map[string]string)
 
-	hub = md{entities: make(map[string]*goxml.Xp)}
-	prepareMetadata(metadata["hub"].(string), &hub)
+	//	hub = md{entities: make(map[string]*goxml.Xp)}
+	//	prepareMetadata(config.Metadata.Hub, &hub)
+	//	internal = md{entities: make(map[string]*goxml.Xp)}
+	//	prepareMetadata(config.Metadata.Internal, &internal)
+	//	external = md{entities: make(map[string]*goxml.Xp)}
+	//	prepareMetadata(config.Metadata.External, &external)
 
-	internal = md{entities: make(map[string]*goxml.Xp)}
-	prepareMetadata(metadata["internal"].(string), &internal)
+	hub = mddb{db: "../hybrid-metadata-test.mddb", table: "WAYF_HUB_PUBLIC"}
+	internal = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_INTERNAL"}
+	external = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL"}
 
-	external = md{entities: make(map[string]*goxml.Xp)}
-	prepareMetadata(metadata["external"].(string), &external)
-
-	attrs := goxml.NewXp(hybrid["hubrequestedattributes"].(string))
+	attrs := goxml.NewXp(config.Hubrequestedattributes)
 	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
 		friendlyName, _ := attr.(types.Element).GetAttribute("FriendlyName")
 		name, _ := attr.(types.Element).GetAttribute("Name")
 		basic2uri[friendlyName.NodeValue()] = name.NodeValue()
 	}
 
-	config := gohybrid.Conf{
-		DiscoveryService:       hybrid["discoveryservice"].(string),
-		Domain:                 hybrid["domain"].(string),
-		HubEntityID:            hybrid["hubentityid"].(string),
-		EptidSalt:              hybrid["eptidsalt"].(string),
-		HubRequestedAttributes: attrs,
-		Internal:               internal,
-		External:               external,
-		Hub:                    hub,
-		SecureCookieHashKey:    hybrid["securecookiehashkey"].(string),
-		PostFormTemplate:       hybrid["postformtemplate"].(string),
-		AttributeReleaseTemplate:       hybrid["attributereleasetemplate"].(string),
-		Basic2uri:              basic2uri,
-		StdTiming:              stdtiming,
-		ElementsToSign:         []string{"/samlp:Response/saml:Assertion"},
-		AttributeHandler:       WayfAttributeHandler,
-	}
+	config.Hybrid.HubRequestedAttributes = attrs
+	config.Hybrid.Internal = internal
+	config.Hybrid.External = external
+	config.Hybrid.Hub = hub
+	config.Hybrid.Basic2uri = basic2uri
+	config.Hybrid.StdTiming = stdtiming
+	config.Hybrid.ElementsToSign = []string{"/samlp:Response/saml:Assertion"}
+	config.Hybrid.AttributeHandler = WayfAttributeHandler
 
-	gohybrid.Config(config)
+	gohybrid.Config(config.Hybrid)
 
 	godiscoveryservice.Config = godiscoveryservice.Conf{
-        DiscoMetaData: hybrid["discometadata"].(string),
-		SpMetaData: hybrid["discospmetadata"].(string),
+		DiscoMetaData: config.Discometadata,
+		SpMetaData:    config.Discospmetadata,
 	}
 
 	//http.HandleFunc("/status", statushandler)
 	//http.Handle(config["hybrid_public_prefix"], http.FileServer(http.Dir(config["hybrid_public"])))
-	http.Handle(hybrid["sso_service"].(string), appHandler(gohybrid.SsoService))
-	http.Handle(hybrid["acs"].(string), appHandler(gohybrid.AcsService))
-	http.Handle(hybrid["nemlogin_acs"].(string), appHandler(gohybrid.AcsService))
-	http.Handle(hybrid["birk"].(string), appHandler(gohybrid.BirkService))
-	http.Handle(hybrid["krib"].(string), appHandler(gohybrid.KribService))
-	http.Handle(hybrid["discoroute"].(string), appHandler(godiscoveryservice.DSBackend))
-	http.Handle(hybrid["public"].(string), http.FileServer(http.Dir(hybrid["discopublicpath"].(string))))
+	http.Handle(config.Sso_Service, appHandler(gohybrid.SsoService))
+	http.Handle(config.Acs, appHandler(gohybrid.AcsService))
+	http.Handle(config.Nemlogin_Acs, appHandler(gohybrid.AcsService))
+	http.Handle(config.Birk, appHandler(gohybrid.BirkService))
+	http.Handle(config.Krib, appHandler(gohybrid.KribService))
+	http.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
+	http.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
+	http.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
-	http.Handle(hybrid["testsp_acs"].(string), appHandler(testSPACService))
-	http.Handle(hybrid["testsp"].(string)+"/", appHandler(testSPService)) // need a root "/" for routing
-	http.Handle(hybrid["testsp"].(string)+"/favicon.ico", http.NotFoundHandler())
+	http.Handle(config.Testsp_Acs, appHandler(testSPACService))
+	http.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
+	http.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
 
-	log.Println("listening on ", hybrid["interface"].(string))
-	err = http.ListenAndServeTLS(hybrid["interface"].(string), hybrid["https_cert"].(string), hybrid["https_key"].(string), nil)
+	log.Println("listening on ", config.Intf)
+	err = http.ListenAndServeTLS(config.Intf, config.Https_Cert, config.Https_Key, nil)
 	if err != nil {
 		log.Printf("main(): %s\n", err)
 	}
@@ -145,6 +153,31 @@ func (m md) MDQ(key string) (xp *goxml.Xp, err error) {
 	return
 }
 
+func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
+	db, err := sql.Open("sqlite3", m.db)
+	if err != nil {
+		return
+	}
+	defer db.Close()
+	ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key))
+	var md string
+	var query = "select e.md md from entity_" + m.table + " e, lookup_" + m.table + " l where l.hash = ? and l.entity_id_fk = e.id"
+	fmt.Println("md query:", query, ent, key)
+	err = db.QueryRow(query, ent).Scan(&md)
+	if err != nil {
+		return
+	}
+	md = string(gosaml.Inflate([]byte(md)))
+	xp = goxml.NewXp(md)
+	return
+}
+
+func (m mddb) Open(db, table string) (err error) {
+	m.db = db
+	m.table = table
+	return
+}
+
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	/*	ctx := make(map[string]string)
 		contextmutex.Lock()
@@ -173,9 +206,8 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	sp_md, _ := internal.MDQ("https://" + hybrid["testsp"].(string))
-	hub_md, _ := hub.MDQ(hybrid["hubentityid"].(string))
-	fmt.Println("md:", sp_md, hub_md)
+	sp_md, _ := internal.MDQ("https://" + config.Testsp)
+	hub_md, _ := hub.MDQ(config.Hybrid.HubEntityID)
 	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), sp_md, hub_md)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
@@ -196,25 +228,25 @@ func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("RelayState: " + relayState + "\n"))
 	w.Write([]byte(response.PP()))
-	log.Println(response.Doc.Dump(true))
+	//log.Println(response.Doc.Dump(true))
 	return
 }
 
-func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error, values map[string][]string) {
-	values = make(map[string][]string)
+func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error, ard gohybrid.AttributeReleaseData) {
+	ard = gohybrid.AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := response.Query1(nil, "/samlp:Response/saml:Issuer")
 
 	if idp == "https://saml.nemlog-in.dk" {
 		nemloginAttributeHandler(response)
 	}
 
-    idpFeds := strings.Join(idp_md.QueryMulti(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation"), "\" or .=\"")
-    commonFeds := sp_md.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`)
-    fmt.Println("adhoc feds", `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`, commonFeds)
-    if len(commonFeds) == 0 {
-        err =fmt.Errorf("no common federations")
-        return
-    }
+	idpFeds := strings.Join(idp_md.QueryMulti(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation"), "\" or .=\"")
+	commonFeds := sp_md.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`)
+	fmt.Println("adhoc feds", `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`, commonFeds)
+	if len(commonFeds) == 0 {
+		err = fmt.Errorf("no common federations")
+		return
+	}
 
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
 	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
@@ -260,7 +292,7 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 				value = string(v)
 			}
 			response.QueryDashP(attr, "saml:AttributeValue["+strconv.Itoa(index)+"]", value, nil)
-			values[friendlyName] = append(values[friendlyName], value)
+			//ard.Values[friendlyName] = append(ard.Values[friendlyName], value)
 			index++
 		}
 	}
@@ -301,11 +333,11 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 
 	sp := sp_md.Query1(nil, "@entityID")
 
-	uidhashbase := "uidhashbase" + hybrid["eptidsalt"].(string)
+	uidhashbase := "uidhashbase" + config.Hybrid.EptidSalt
 	uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
 	uidhashbase += strconv.Itoa(len(sp)) + ":" + sp
 	uidhashbase += strconv.Itoa(len(eppn)) + ":" + eppn
-	uidhashbase += hybrid["eptidsalt"].(string)
+	uidhashbase += config.Hybrid.EptidSalt
 	eptid := "WAYF-DK-" + hex.EncodeToString(goxml.Hash(crypto.SHA1, uidhashbase))
 
 	setAttribute("eduPersonTargetedID", eptid, response, destinationAttributes)
@@ -374,33 +406,64 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 		}
 		response.QueryDashP(newattribute, `saml:AttributeValue[`+strconv.Itoa(i)+`]`, epa+"@"+securitydomain, nil)
 		i += 1
-
 	}
-	return
 	// legal affiliations 'student', 'faculty', 'staff', 'affiliate', 'alum', 'employee', 'library-walk-in', 'member'
 	// affiliations => scopedaffiliations
+
+	// Fill out the info needed for AttributeReleaseData
+	// We repeat the ARP filtering here for the attributes shown to the user
+	// to-do add value filtering
+	arp := sp_md.QueryMulti(nil, "md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute/@Name")
+	arpmap := make(map[string]bool)
+	for _, attrName := range arp {
+		arpmap[attrName] = true
+	}
+	for _, attrvalue := range response.Query(destinationAttributes, `saml:Attribute/saml:AttributeValue`) {
+		parent, _ := attrvalue.ParentNode()
+		friendlyName, _ := parent.(types.Element).GetAttribute("FriendlyName")
+		name, _ := parent.(types.Element).GetAttribute("Name")
+		if !arpmap[name.NodeValue()] {
+			continue
+		}
+		ard.Values[friendlyName.NodeValue()] = append(ard.Values[friendlyName.NodeValue()], attrvalue.NodeValue())
+	}
+
+	ard.IdPDisplayName["en"] = idp_md.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
+	ard.IdPDisplayName["da"] = idp_md.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
+	ard.IdPLogo = idp_md.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
+	ard.SPDisplayName["en"] = sp_md.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
+	ard.SPDisplayName["da"] = sp_md.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
+	ard.SPDescription["en"] = sp_md.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`)
+	ard.SPDescription["da"] = sp_md.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`)
+	ard.SPLogo = sp_md.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
+	ard.SPEntityID = sp_md.Query1(nil, "@entityID")
+	ard.Key = eppn
+	ard.Hash = eppn + ard.SPEntityID
+	return
 }
 
 // 2408586234
 func yearfromyearandcifferseven(year, c7 int) int {
 
-	cpr2year := map[int]map[int]int{
-		3: {99: 1900},
-		4: {36: 2000, 99: 1900},
-		8: {57: 2000, 99: 1800},
-		9: {36: 2000, 99: 1900},
+	cpr2year := []map[int]int{
+		 [{99: 1900},
+		 {99: 1900},
+		 {99: 1900},
+		 {99: 1900},
+		 {36: 2000, 99: 1900},
+		 {36: 2000, 99: 1900},
+		 {36: 2000, 99: 1900},
+		 {36: 2000, 99: 1900},
+		 {57: 2000, 99: 1800},
+		 {36: 2000, 99: 1900}]
 	}
 
-	for x7, years := range cpr2year {
-		if c7 <= x7 {
-			for y, century := range years {
-				if year <= y {
-					year += century
-					return year
-				}
-			}
-		}
-	}
+    for y, century := range cpr2year[c7] {
+        if year <= y {
+            year += century
+            return year
+        }
+    }
 	return 0
 }
 
@@ -436,8 +499,4 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 func b64ToString(enc string) string {
 	dec, _ := base64.StdEncoding.DecodeString(enc)
 	return string(dec)
-}
-
-func attributeReleaseMetadata(idp_md, sp_md, response *goxml.Xp) {
-
 }
