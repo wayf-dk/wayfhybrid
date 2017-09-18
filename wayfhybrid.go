@@ -41,7 +41,7 @@ type (
 		Hybrid                                                                                                                                                          gohybrid.Conf
 		Metadata                                                                                                                                                        metadata
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
-		Testsp, Testsp_Acs, Nemlogin_Acs, Certpath, Samlschema                                                                                                          string
+		Testsp, Testsp_Acs, Nemlogin_Acs, Certpath, SamlSchema                                                                                                          string
 	}
 )
 
@@ -55,7 +55,7 @@ var (
 )
 
 func Main() {
-	theConfig, err := toml.LoadFile("hybrid-config/hybrid-config.toml")
+	theConfig, err := toml.LoadFile("../hybrid-config/hybrid-config.toml")
 
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s \n", err))
@@ -99,6 +99,10 @@ func Main() {
 	godiscoveryservice.Config = godiscoveryservice.Conf{
 		DiscoMetaData: config.Discometadata,
 		SpMetaData:    config.Discospmetadata,
+	}
+
+	gosaml.Config = gosaml.Conf{
+		SamlSchema: config.SamlSchema,
 	}
 
 	//http.HandleFunc("/status", statushandler)
@@ -446,24 +450,24 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 func yearfromyearandcifferseven(year, c7 int) int {
 
 	cpr2year := []map[int]int{
-		 {99: 1900},
-		 {99: 1900},
-		 {99: 1900},
-		 {99: 1900},
-		 {36: 2000, 99: 1900},
-		 {36: 2000, 99: 1900},
-		 {36: 2000, 99: 1900},
-		 {36: 2000, 99: 1900},
-		 {57: 2000, 99: 1800},
-		 {36: 2000, 99: 1900},
+		{99: 1900},
+		{99: 1900},
+		{99: 1900},
+		{99: 1900},
+		{36: 2000, 99: 1900},
+		{36: 2000, 99: 1900},
+		{36: 2000, 99: 1900},
+		{36: 2000, 99: 1900},
+		{57: 2000, 99: 1800},
+		{36: 2000, 99: 1900},
 	}
 
-    for y, century := range cpr2year[c7] {
-        if year <= y {
-            year += century
-            return year
-        }
-    }
+	for y, century := range cpr2year[c7] {
+		if year <= y {
+			year += century
+			return year
+		}
+	}
 	return 0
 }
 
