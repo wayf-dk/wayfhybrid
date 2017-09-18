@@ -446,7 +446,7 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 func yearfromyearandcifferseven(year, c7 int) int {
 
 	cpr2year := []map[int]int{
-		 [{99: 1900},
+		 {99: 1900},
 		 {99: 1900},
 		 {99: 1900},
 		 {99: 1900},
@@ -455,7 +455,7 @@ func yearfromyearandcifferseven(year, c7 int) int {
 		 {36: 2000, 99: 1900},
 		 {36: 2000, 99: 1900},
 		 {57: 2000, 99: 1800},
-		 {36: 2000, 99: 1900}]
+		 {36: 2000, 99: 1900},
 	}
 
     for y, century := range cpr2year[c7] {
