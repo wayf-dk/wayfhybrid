@@ -65,7 +65,6 @@ func Main() {
 	theConfig.Unmarshal(&config)
 
 	//elementsToSign := []string{"/samlp:Response/saml:Assertion"}
-	basic2uri = make(map[string]string)
 
 	//	hub = md{entities: make(map[string]*goxml.Xp)}
 	//	prepareMetadata(config.Metadata.Hub, &hub)
@@ -79,11 +78,7 @@ func Main() {
 	external = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL"}
 
 	attrs := goxml.NewXp(config.Hubrequestedattributes)
-	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
-		friendlyName, _ := attr.(types.Element).GetAttribute("FriendlyName")
-		name, _ := attr.(types.Element).GetAttribute("Name")
-		basic2uri[friendlyName.NodeValue()] = name.NodeValue()
-	}
+	prepareTables(attrs)
 
 	config.Hybrid.HubRequestedAttributes = attrs
 	config.Hybrid.Internal = internal
@@ -127,6 +122,15 @@ func Main() {
 	}
 }
 
+func prepareTables(attrs *goxml.Xp) {
+	basic2uri = make(map[string]string)
+	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
+		friendlyName, _ := attr.(types.Element).GetAttribute("FriendlyName")
+		name, _ := attr.(types.Element).GetAttribute("Name")
+		basic2uri[friendlyName.NodeValue()] = name.NodeValue()
+	}
+}
+
 func prepareMetadata(metadata string, index *md) {
 	indextargets := []string{
 		"./md:IDPSSODescriptor/md:SingleSignOnService[@Binding='urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect']/@Location",
@@ -166,7 +170,6 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key))
 	var md string
 	var query = "select e.md md from entity_" + m.table + " e, lookup_" + m.table + " l where l.hash = ? and l.entity_id_fk = e.id"
-	fmt.Println("md query:", query, ent, key)
 	err = db.QueryRow(query, ent).Scan(&md)
 	if err != nil {
 		return
@@ -246,7 +249,6 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 
 	idpFeds := strings.Join(idp_md.QueryMulti(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation"), "\" or .=\"")
 	commonFeds := sp_md.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`)
-	fmt.Println("adhoc feds", `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`, commonFeds)
 	if len(commonFeds) == 0 {
 		err = fmt.Errorf("no common federations")
 		return
@@ -309,7 +311,6 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 	eppn := response.Query1(destinationAttributes, "saml:Attribute[@Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.6']/saml:AttributeValue")
 	eppnregexp := regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9\.-]+)$`)
 	matches := eppnregexp.FindStringSubmatch(eppn)
-	fmt.Println("eppn", eppn, matches)
 	if len(matches) != 2 {
 		err = fmt.Errorf("eppn does not seem to be an eppn: %s", eppn)
 		return
@@ -415,21 +416,24 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 	// affiliations => scopedaffiliations
 
 	// Fill out the info needed for AttributeReleaseData
-	// We repeat the ARP filtering here for the attributes shown to the user
 	// to-do add value filtering
 	arp := sp_md.QueryMulti(nil, "md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute/@Name")
 	arpmap := make(map[string]bool)
 	for _, attrName := range arp {
 		arpmap[attrName] = true
 	}
-	for _, attrvalue := range response.Query(destinationAttributes, `saml:Attribute/saml:AttributeValue`) {
-		parent, _ := attrvalue.ParentNode()
-		friendlyName, _ := parent.(types.Element).GetAttribute("FriendlyName")
-		name, _ := parent.(types.Element).GetAttribute("Name")
+	for _, attrNode := range response.Query(destinationAttributes, `saml:Attribute`) {
+		friendlyName, _ := attrNode.(types.Element).GetAttribute("FriendlyName")
+		name, _ := attrNode.(types.Element).GetAttribute("Name")
 		if !arpmap[name.NodeValue()] {
+			// the real ARP filtering is done i gosaml
+			//attrStmt, _ := attrNode.ParentNode()
+			//attrStmt.RemoveChild(attrNode)
 			continue
 		}
-		ard.Values[friendlyName.NodeValue()] = append(ard.Values[friendlyName.NodeValue()], attrvalue.NodeValue())
+		for _, attrValue := range response.Query(attrNode, "saml:AttributeValue") {
+			ard.Values[friendlyName.NodeValue()] = append(ard.Values[friendlyName.NodeValue()], attrValue.NodeValue())
+		}
 	}
 
 	ard.IdPDisplayName["en"] = idp_md.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
@@ -448,27 +452,25 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 
 // 2408586234
 func yearfromyearandcifferseven(year, c7 int) int {
-
-	cpr2year := []map[int]int{
-		{99: 1900},
-		{99: 1900},
-		{99: 1900},
-		{99: 1900},
-		{36: 2000, 99: 1900},
-		{36: 2000, 99: 1900},
-		{36: 2000, 99: 1900},
-		{36: 2000, 99: 1900},
-		{57: 2000, 99: 1800},
-		{36: 2000, 99: 1900},
+	cpr2year := [][]int{
+		{99, 1900},
+		{99, 1900},
+		{99, 1900},
+		{99, 1900},
+		{36, 2000, 1900},
+		{36, 2000, 1900},
+		{36, 2000, 1900},
+		{36, 2000, 1900},
+		{57, 2000, 1800},
+		{36, 2000, 1900},
 	}
-
-	for y, century := range cpr2year[c7] {
-		if year <= y {
-			year += century
-			return year
-		}
+	century := cpr2year[c7]
+	if year <= century[0] {
+		year += century[1]
+	} else {
+		year += century[2]
 	}
-	return 0
+	return year
 }
 
 func nemloginAttributeHandler(response *goxml.Xp) {
