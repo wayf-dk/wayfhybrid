@@ -3,6 +3,8 @@
   <md:Extensions xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata">
     <wayf:wayf xmlns:wayf="http://wayf.dk/2014/08/wayf">
       <wayf:federation>WAYF</wayf:federation>
+      <wayf:wayf_schacHomeOrganization>sikker-adgang.dk</wayf:wayf_schacHomeOrganization>
+      <wayf:wayf_schacHomeOrganizationType>urn:mace:terena.org:schac:homeOrganizationType:int:other</wayf:wayf_schacHomeOrganizationType>
     </wayf:wayf>
   </md:Extensions>
  <IDPSSODescriptor  xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">

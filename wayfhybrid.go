@@ -48,7 +48,7 @@ type (
 var (
 	config                                                          tomlConfig
 	certpath, samlSchema, postformtemplate, hubfrequestedattributes string
-	hub, external, internal                                         mddb
+	hub, external, internal                                         md // mddb
 	idp_md, idp_md_birk, sp_md, sp_md_krib, hub_md                  *goxml.Xp
 	stdtiming                                                       = gosaml.IdAndTiming{time.Now(), 4 * time.Minute, 4 * time.Hour, "", ""}
 	basic2uri                                                       map[string]string
@@ -66,16 +66,22 @@ func Main() {
 
 	//elementsToSign := []string{"/samlp:Response/saml:Assertion"}
 
-	//	hub = md{entities: make(map[string]*goxml.Xp)}
-	//	prepareMetadata(config.Metadata.Hub, &hub)
-	//	internal = md{entities: make(map[string]*goxml.Xp)}
-	//	prepareMetadata(config.Metadata.Internal, &internal)
-	//	external = md{entities: make(map[string]*goxml.Xp)}
-	//	prepareMetadata(config.Metadata.External, &external)
+	hub = md{entities: make(map[string]*goxml.Xp)}
+	prepareMetadata(config.Metadata.Hub, &hub)
+	internal = md{entities: make(map[string]*goxml.Xp)}
+	prepareMetadata(config.Metadata.Internal, &internal)
+	external = md{entities: make(map[string]*goxml.Xp)}
+	prepareMetadata(config.Metadata.External, &external)
 
-	hub = mddb{db: "../hybrid-metadata-test.mddb", table: "WAYF_HUB_PUBLIC"}
-	internal = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_INTERNAL"}
-	external = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL"}
+	fmt.Println("hub", hub)
+	fmt.Println("internal", internal)
+	fmt.Println("external", external)
+
+	/*
+		hub = mddb{db: "../hybrid-metadata-test.mddb", table: "WAYF_HUB_PUBLIC"}
+		internal = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_INTERNAL"}
+		external = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL"}
+	*/
 
 	attrs := goxml.NewXp(config.Hubrequestedattributes)
 	prepareTables(attrs)
@@ -218,6 +224,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), sp_md, hub_md)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
+	q.Set("idpentityid", "https://birk.wayf.dk/birk.php/idp.testshib.org/idp/shibboleth")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/wayf.ait.dtu.dk/saml2/idp/metadata.php")
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), http.StatusFound)
@@ -298,7 +305,6 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 				value = string(v)
 			}
 			response.QueryDashP(attr, "saml:AttributeValue["+strconv.Itoa(index)+"]", value, nil)
-			//ard.Values[friendlyName] = append(ard.Values[friendlyName], value)
 			index++
 		}
 	}
