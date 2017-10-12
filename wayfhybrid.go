@@ -2,13 +2,12 @@ package wayfhybrid
 
 import (
 	"crypto"
-	"database/sql"
+	//"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
+	//"github.com/mattn/go-sqlite3"
 	toml "github.com/pelletier/go-toml"
-	//"github.com/spf13/viper"
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/godiscoveryservice"
 	"github.com/wayf-dk/gohybrid"
@@ -43,6 +42,11 @@ type (
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Nemlogin_Acs, Certpath, SamlSchema                                                                                                          string
 	}
+
+	idpsppair struct {
+		idp string
+		sp  string
+	}
 )
 
 var (
@@ -52,6 +56,13 @@ var (
 	idp_md, idp_md_birk, sp_md, sp_md_krib, hub_md                  *goxml.Xp
 	stdtiming                                                       = gosaml.IdAndTiming{time.Now(), 4 * time.Minute, 4 * time.Hour, "", ""}
 	basic2uri                                                       map[string]string
+	remap                                                           = map[string]idpsppair{
+		//		"https://nemlogin.wayf.dk": idpsppair{"https://saml.nemlog-in.dk", "https://nemlogin.wayf.dk"},
+		"https://nemlogin.wayf.dk": idpsppair{"https://saml.test-nemlog-in.dk/", "https://saml.nemlogin.wayf.dk"},
+	}
+
+	bify   = regexp.MustCompile("^(https?://)(.*)$")
+	debify = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk|krib)\\.php/)(.+)$")
 )
 
 func Main() {
@@ -73,10 +84,6 @@ func Main() {
 	external = md{entities: make(map[string]*goxml.Xp)}
 	prepareMetadata(config.Metadata.External, &external)
 
-	fmt.Println("hub", hub)
-	fmt.Println("internal", internal)
-	fmt.Println("external", external)
-
 	/*
 		hub = mddb{db: "../hybrid-metadata-test.mddb", table: "WAYF_HUB_PUBLIC"}
 		internal = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_INTERNAL"}
@@ -93,6 +100,8 @@ func Main() {
 	config.Hybrid.Basic2uri = basic2uri
 	config.Hybrid.StdTiming = stdtiming
 	config.Hybrid.ElementsToSign = []string{"/samlp:Response/saml:Assertion"}
+	config.Hybrid.SSOServiceHandler = WayfSSOServiceHandler
+	config.Hybrid.BirkHandler = WayfBirkHandler
 	config.Hybrid.AttributeHandler = WayfAttributeHandler
 
 	gohybrid.Config(config.Hybrid)
@@ -162,11 +171,13 @@ func prepareMetadata(metadata string, index *md) {
 func (m md) MDQ(key string) (xp *goxml.Xp, err error) {
 	xp = m.entities[key]
 	if xp == nil {
-		err = fmt.Errorf("Not found: " + key)
+		log.Panicf("Not found: " + key)
+		//err = fmt.Errorf("Not found: " + key)
 	}
 	return
 }
 
+/*
 func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	db, err := sql.Open("sqlite3", m.db)
 	if err != nil {
@@ -190,6 +201,7 @@ func (m mddb) Open(db, table string) (err error) {
 	m.table = table
 	return
 }
+*/
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	/*	ctx := make(map[string]string)
@@ -224,7 +236,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), sp_md, hub_md)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
-	q.Set("idpentityid", "https://birk.wayf.dk/birk.php/idp.testshib.org/idp/shibboleth")
+	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/nemlogin.wayf.dk")
+	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/idp.testshib.org/idp/shibboleth")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/wayf.ait.dtu.dk/saml2/idp/metadata.php")
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), http.StatusFound)
@@ -246,18 +259,77 @@ func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error, ard gohybrid.AttributeReleaseData) {
+func checkForCommonFederations(idp_md, sp_md *goxml.Xp) (err error) {
+	idpFeds := idp_md.QueryMulti(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation")
+	tmp := idpFeds[:0]
+	for _, federation := range idpFeds {
+		tmp = append(tmp, strings.TrimSpace(federation))
+	}
+	fmt.Println("common feds", idpFeds, idp_md.PP(), sp_md.PP())
+	idpFedsQuery := strings.Join(idpFeds, "\" or .=\"")
+	commonFeds := sp_md.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFedsQuery+`"]`)
+	if len(commonFeds) == 0 {
+		err = fmt.Errorf("no common federations")
+		return
+	}
+	return
+}
+
+func WayfSSOServiceHandler(request, mdsp, mdhub, mdidp *goxml.Xp) (kribID, acsurl string, err error) {
+	entityID := mdsp.Query1(nil, "@entityID")
+
+	kribID = bify.ReplaceAllString(entityID, "${1}krib.wayf.dk/krib.php/$2")
+	if kribID == entityID {
+		kribID = "urn:oid:1.3.6.1.4.1.39153:42:" + entityID
+	}
+
+	acs := request.Query1(nil, "@AssertionConsumerServiceURL")
+	acsurl = bify.ReplaceAllString(acs, "${1}krib.wayf.dk/krib.php/$2")
+
+	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
+		return
+	}
+	return
+}
+
+func WayfBirkHandler(request, mdsp, mdbirkidp *goxml.Xp) (mdhub, mdidp *goxml.Xp, err error) {
+	idp := debify.ReplaceAllString(mdbirkidp.Query1(nil, "@entityID"), "$1$2")
+
+	if rm, ok := remap[idp]; ok {
+		mdidp, err = internal.MDQ(rm.idp)
+		if err != nil {
+			return
+		}
+		mdhub, err = hub.MDQ(rm.sp)
+		if err != nil {
+			return
+		}
+	} else {
+		mdidp, err = internal.MDQ(idp)
+		if err != nil {
+			return
+		}
+		mdhub, err = hub.MDQ(config.Hybrid.HubEntityID)
+		if err != nil {
+			return
+		}
+	}
+	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
+		return
+	}
+
+	return
+}
+
+func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (ard gohybrid.AttributeReleaseData, err error) {
 	ard = gohybrid.AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := response.Query1(nil, "/samlp:Response/saml:Issuer")
 
-	if idp == "https://saml.nemlog-in.dk" {
+	if idp == "https://saml.nemlog-in.dk" || idp == "https://saml.test-nemlog-in.dk/" {
 		nemloginAttributeHandler(response)
 	}
 
-	idpFeds := strings.Join(idp_md.QueryMulti(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation"), "\" or .=\"")
-	commonFeds := sp_md.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFeds+`"]`)
-	if len(commonFeds) == 0 {
-		err = fmt.Errorf("no common federations")
+	if err = checkForCommonFederations(idp_md, sp_md); err != nil {
 		return
 	}
 
@@ -342,6 +414,7 @@ func WayfAttributeHandler(idp_md, hub_md, sp_md, response *goxml.Xp) (err error,
 		}
 	}
 
+	// Use kribified?, use birkified?
 	sp := sp_md.Query1(nil, "@entityID")
 
 	uidhashbase := "uidhashbase" + config.Hybrid.EptidSalt
