@@ -265,7 +265,6 @@ func checkForCommonFederations(idp_md, sp_md *goxml.Xp) (err error) {
 	for _, federation := range idpFeds {
 		tmp = append(tmp, strings.TrimSpace(federation))
 	}
-	fmt.Println("common feds", idpFeds, idp_md.PP(), sp_md.PP())
 	idpFedsQuery := strings.Join(idpFeds, "\" or .=\"")
 	commonFeds := sp_md.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:federation[.="`+idpFedsQuery+`"]`)
 	if len(commonFeds) == 0 {
