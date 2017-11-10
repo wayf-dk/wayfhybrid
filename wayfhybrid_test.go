@@ -6,6 +6,7 @@ import (
 	"github.com/wayf-dk/goxml"
 	"io/ioutil"
 	"log"
+	"os"
 )
 
 var (
@@ -72,8 +73,8 @@ func ExampleWayfAttributeHandler() {
 	sp_md := xpFromFile("testdata/sp_md.xml")
 	prepareTables(hub_md)
 
-	WayfAttributeHandler(idp_md, hub_md, sp_md, sourceResponse)
-	gosaml.AttributeCanonicalDump(sourceResponse)
+	WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, sourceResponse)
+	gosaml.AttributeCanonicalDump(os.Stdout, sourceResponse)
 
 	// output:
 	// cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
@@ -121,12 +122,12 @@ func ExampleNemLoginAttributeHandler() {
 	sp_md := xpFromFile("testdata/sp_md.xml")
 	prepareTables(hub_md)
 
-	_, _ = WayfAttributeHandler(idp_md, hub_md, sp_md, nemloginResponse)
+	_, err := WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, nemloginResponse)
+	log.Println("err", err)
 
-	gosaml.AttributeCanonicalDump(nemloginResponse)
+	gosaml.AttributeCanonicalDump(os.Stdout, nemloginResponse)
 	// output:
 	// cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     Anton Banton Cantonsen
 	//     Anton Banton Cantonsen
 	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Anton Banton Cantonsen
@@ -141,7 +142,6 @@ func ExampleNemLoginAttributeHandler() {
 	// gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Anton Banton
 	// mail urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     someone@example.com
 	//     someone@example.com
 	// organizationName urn:oid:2.5.4.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Ingen organisatorisk tilknytning
