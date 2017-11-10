@@ -8,6 +8,7 @@
       <wayf:eduGAIN/>
       <wayf:eid>279</wayf:eid>
       <wayf:env>prod</wayf:env>
+      <wayf:feds>WAYF</wayf:feds>
       <wayf:federation>WAYF</wayf:federation>
       <wayf:federation>nemlog-in.dk</wayf:federation>
       <wayf:federation>qa.kmd.dk</wayf:federation>

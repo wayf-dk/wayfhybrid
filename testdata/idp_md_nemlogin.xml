@@ -3,6 +3,7 @@
   <md:Extensions xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata">
     <wayf:wayf xmlns:wayf="http://wayf.dk/2014/08/wayf">
       <wayf:federation>WAYF</wayf:federation>
+      <wayf:feds>WAYF</wayf:feds>
       <wayf:wayf_schacHomeOrganization>sikker-adgang.dk</wayf:wayf_schacHomeOrganization>
       <wayf:wayf_schacHomeOrganizationType>urn:mace:terena.org:schac:homeOrganizationType:int:other</wayf:wayf_schacHomeOrganizationType>
     </wayf:wayf>

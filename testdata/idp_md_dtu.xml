@@ -13,6 +13,7 @@
       <wayf:eduGAIN>Yes</wayf:eduGAIN>
       <wayf:eid>527</wayf:eid>
       <wayf:env>prod</wayf:env>
+      <wayf:feds>WAYF</wayf:feds>
       <wayf:federation>WAYF</wayf:federation>
       <wayf:federation>HUBIDP</wayf:federation>
       <wayf:icon>1328169026_dtu-janus.png</wayf:icon>
