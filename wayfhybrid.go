@@ -241,7 +241,7 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 		return
 	}
 	defer db.Close()
-	ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key)) + "x"
+	ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key))
 	var md string
 	var query = "select e.md md from entity_" + m.table + " e, lookup_" + m.table + " l where l.hash = ? and l.entity_id_fk = e.id"
 	err = db.QueryRow(query, ent).Scan(&md)
@@ -299,15 +299,17 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	sp_md, err := internal.MDQ("https://" + config.Testsp)
 	if err != nil {
-		return Wrap(err, "zzz:sikke noget lort", "anton:banton", "zzz:sikke noget lort")
+		return err
 	}
 	hub_md, err := hub.MDQ(config.Hybrid.HubEntityID)
 	if err != nil {
 		return err
 	}
+
+	fmt.Println(sp_md.PP())
 	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), nil, sp_md, hub_md)
 	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
-	newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
+	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/nemlogin.wayf.dk")
@@ -320,12 +322,14 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	//response, _, _, relayState, err := gosaml.ReceiveSAMLResponse(r, hub, internal)
-	response, issuermd, destinationmd, relayState, err := gosaml.ReceiveSAMLResponse(r, externalIdP, externalSP)
+	// try to decode SAML message to ourselves or just another SP
+	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, hub, internal, "SAMLResponse")
 	if err != nil {
-		if !strings.HasPrefix(err.Error(), "destination:") { // we can receive anything for testing
+	    response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, externalIdP, externalSP, "SAMLResponse")
+	}
+	// don't do destination check - we accept and dumps anything ...
+	if err != nil {
 			return
-		}
 	}
 	err = gosaml.CheckSAMLResponse(response, issuermd, destinationmd)
 	var errStr string
@@ -608,7 +612,7 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	ard.Key = eppn
 	ard.Hash = eppn + ard.SPEntityID
 	ard.ConsentAsAService = config.ConsentAsAService
-	fmt.Println("ard", ard)
+	//fmt.Println("ard", ard)
 	return
 }
 
@@ -619,7 +623,7 @@ func WayfKribHandler(response, birkmd, kribmd *goxml.Xp) (destination string, er
 		return
 	}
 
-	destination = config.ConsentAsAService
+	destination = "https://" + config.ConsentAsAService
 	return
 }
 

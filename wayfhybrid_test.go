@@ -160,3 +160,10 @@ func ExampleNemLoginAttributeHandler() {
 	//
 	//     Cantonsen
 }
+
+func ExampleSamlError() {
+	nemloginResponse := xpFromFile("testdata/samlerror.xml")
+	fmt.Println(nemloginResponse.PP())
+	// output:
+	// hi
+}
