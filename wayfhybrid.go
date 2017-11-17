@@ -325,11 +325,11 @@ func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	// try to decode SAML message to ourselves or just another SP
 	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, hub, internal, "SAMLResponse")
 	if err != nil {
-	    response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, externalIdP, externalSP, "SAMLResponse")
+		response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, externalIdP, externalSP, "SAMLResponse")
 	}
 	// don't do destination check - we accept and dumps anything ...
 	if err != nil {
-			return
+		return
 	}
 	err = gosaml.CheckSAMLResponse(response, issuermd, destinationmd)
 	var errStr string
