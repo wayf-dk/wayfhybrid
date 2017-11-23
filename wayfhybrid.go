@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	//"github.com/mattn/go-sqlite3"
 	toml "github.com/pelletier/go-toml"
@@ -42,7 +43,8 @@ type (
 		Hybrid                                                                                                                                                          gohybrid.Conf
 		Metadata                                                                                                                                                        metadata
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
-		Testsp, Testsp_Acs, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                                                                                       string
+		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                                                                           string
+		Idpslo, Birkslo, Spslo, Kribslo                                                                                                                                 string
 		NameIDFormats                                                                                                                                                   []string
 	}
 
@@ -141,7 +143,7 @@ func Main() {
 	hub = mddb{db: "../hybrid-metadata-test.mddb", table: "WAYF_HUB_PUBLIC"}
 	internal = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_INTERNAL"}
 	externalIdP = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL_IDP"}
-	externalSP = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL_SP"}
+	externalSP = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_EXTERNAL_SP"}
 
 	attrs := goxml.NewXp(config.Hubrequestedattributes)
 	prepareTables(attrs)
@@ -175,6 +177,11 @@ func Main() {
 	//http.HandleFunc("/status", statushandler)
 	//http.Handle(config["hybrid_public_prefix"], http.FileServer(http.Dir(config["hybrid_public"])))
 	http.Handle(config.Sso_Service, appHandler(gohybrid.SSOService))
+	http.Handle(config.Idpslo, appHandler(gohybrid.IdPSLOService))
+	http.Handle(config.Birkslo, appHandler(gohybrid.BirkSLOService))
+	http.Handle(config.Spslo, appHandler(gohybrid.SPSLOService))
+	http.Handle(config.Kribslo, appHandler(gohybrid.KribSLOService))
+
 	http.Handle(config.Acs, appHandler(gohybrid.ACSService))
 	http.Handle(config.Nemlogin_Acs, appHandler(gohybrid.ACSService))
 	http.Handle(config.Birk, appHandler(gohybrid.BirkService))
@@ -183,6 +190,7 @@ func Main() {
 	http.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 	http.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
+	http.Handle(config.Testsp_Slo, appHandler(testSPACService))
 	http.Handle(config.Testsp_Acs, appHandler(testSPACService))
 	http.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
 	http.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
@@ -236,7 +244,6 @@ func (m md) MDQ(key string) (xp *goxml.Xp, err error) {
 
 func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	db, err := sql.Open("sqlite3", m.db)
-	fmt.Println("MDQ", m.table, key)
 	if err != nil {
 		return
 	}
@@ -245,7 +252,6 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	var md string
 	var query = "select e.md md from entity_" + m.table + " e, lookup_" + m.table + " l where l.hash = ? and l.entity_id_fk = e.id"
 	err = db.QueryRow(query, ent).Scan(&md)
-	fmt.Println("entid", key, ent, m, err)
 	switch {
 	case err == sql.ErrNoRows:
 		err = New("err:Metadata not found", "key:"+key, "table:"+m.table)
@@ -306,7 +312,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	fmt.Println(sp_md.PP())
 	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), nil, sp_md, hub_md)
 	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
@@ -315,6 +320,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/nemlogin.wayf.dk")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/idp.testshib.org/idp/shibboleth")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/wayf.ait.dtu.dk/saml2/idp/metadata.php")
+	q.Set("idpentityid", "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
@@ -323,29 +329,58 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	// try to decode SAML message to ourselves or just another SP
-	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, hub, internal, "SAMLResponse")
+	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, hub, internal, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
 	if err != nil {
-		response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, externalIdP, externalSP, "SAMLResponse")
+		response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, externalIdP, externalSP, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
 	}
 	// don't do destination check - we accept and dumps anything ...
 	if err != nil {
 		return
 	}
-	err = gosaml.CheckSAMLResponse(response, issuermd, destinationmd)
 	var errStr string
 	if err != nil {
 		errStr = err.Error()
 	}
 
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8") // normal header
+	w.Header().Set("Content-Type", "text/html; charset=utf-8") // normal header
 	w.WriteHeader(http.StatusOK)
+
+	slo := makeSloUrl(response, destinationmd, issuermd)
+	w.Write([]byte("<pre>SLO: <a href=\"" + slo + "\">SLO</a>\n"))
 	w.Write([]byte("RelayState: " + relayState + "\n"))
 	w.Write([]byte("Error: " + errStr + "\n"))
 
 	gosaml.AttributeCanonicalDump(w, response)
-	w.Write([]byte(response.PP()))
+	xml.EscapeText(w, []byte(response.PP()))
+	//	w.Write([]byte(response.PP()))
 	//log.Println(response.Doc.Dump(true))
 	return
+}
+
+func makeSloUrl(response, issuer, destination *goxml.Xp) string {
+	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                     xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                     ID=""
+                     Version="2.0"
+                     IssueInstant=""
+                     Destination=""
+                     >
+    <saml:Issuer></saml:Issuer>
+    <saml:NameID>
+    </saml:NameID>
+</samlp:LogoutRequest>
+`
+	request := goxml.NewXp(template)
+	slo := destination.Query1(nil, `./md:IDPSSODescriptor/md:SingleLogoutService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
+	request.QueryDashP(nil, "./@IssueInstant", time.Now().Format(gosaml.XsDateTime), nil)
+	request.QueryDashP(nil, "./@ID", gosaml.Id(), nil)
+	request.QueryDashP(nil, "./@Destination", slo, nil)
+	request.QueryDashP(nil, "./saml:Issuer", issuer.Query1(nil, `/md:EntityDescriptor/@entityID`), nil)
+	request.QueryDashP(nil, "./saml:NameID/@SPNameQualifier", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@SPNameQualifier"), nil)
+	request.QueryDashP(nil, "./saml:NameID/@Format", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@Format"), nil)
+	request.QueryDashP(nil, "./saml:NameID", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID"), nil)
+	u, _ := gosaml.SAMLRequest2Url(request, "", "", "", "")
+	return u.String()
 }
 
 func checkForCommonFederations(idp_md, sp_md *goxml.Xp) (err error) {
@@ -623,7 +658,7 @@ func WayfKribHandler(response, birkmd, kribmd *goxml.Xp) (destination string, er
 		return
 	}
 
-	destination = "https://" + config.ConsentAsAService
+	//	destination = "https://" + config.ConsentAsAService
 	return
 }
 
