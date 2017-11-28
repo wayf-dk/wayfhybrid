@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	//"github.com/mattn/go-sqlite3"
@@ -18,7 +17,6 @@ import (
 	"log"
 	"net/http"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -44,7 +42,7 @@ type (
 		Metadata                                                                                                                                                        metadata
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                                                                           string
-		Idpslo, Birkslo, Spslo, Kribslo                                                                                                                                 string
+		Idpslo, Birkslo, Spslo, Kribslo, SaltForHashedEppn                                                                                                              string
 		NameIDFormats                                                                                                                                                   []string
 	}
 
@@ -53,9 +51,7 @@ type (
 		sp  string
 	}
 
-	Werror struct {
-		C  []string
-		PC []uintptr `json:"-"`
+	logWriter struct {
 	}
 )
 
@@ -75,48 +71,18 @@ var (
 	debify = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
 )
 
-func New(ctx ...string) error {
-	x := Werror{C: ctx}
-	x.PC = make([]uintptr, 32)
-	n := runtime.Callers(2, x.PC)
-	x.PC = x.PC[:n]
-	return x
+func (writer logWriter) Write(bytes []byte) (int, error) {
+	return fmt.Print(time.Now().UTC().Format("Jan _2 15:04:05 ") + string(bytes))
 }
 
-func Wrap(err error, ctx ...string) error {
-	switch x := err.(type) {
-	case Werror:
-		x.C = append(x.C, ctx...)
-		return x
-	}
-	return err
-}
-
-func (e Werror) Error() (err string) {
-	errjson, _ := json.Marshal(e.C)
-	err = string(errjson)
-	return
-}
-
-func (e Werror) Stack(depth int) (st string) {
-	n := len(e.PC)
-	if n > 0 && depth < n {
-		pcs := e.PC[:n-depth]
-		frames := runtime.CallersFrames(pcs)
-		for {
-			frame, more := frames.Next()
-			function := frame.Function
-			file := strings.Split(frame.File, "/")
-			st += fmt.Sprintf("%s %s %d\n", function, file[len(file)-1:][0], frame.Line)
-			if !more {
-				break
-			}
-		}
-	}
-	return
+func legacyStatLog(server, tag, idp, sp, hash string) {
+	log.Printf("%s ssp-wayf[%s]: 5 STAT [%d] %s %s %s %s\n", server, "007", time.Now().UnixNano(), tag, idp, sp, hash)
 }
 
 func Main() {
+
+	log.SetFlags(0) // no predefined time
+	log.SetOutput(new(logWriter))
 
 	theConfig, err := toml.LoadFile("../hybrid-config/hybrid-config.toml")
 
@@ -160,6 +126,7 @@ func Main() {
 	config.Hybrid.BirkHandler = WayfBirkHandler
 	config.Hybrid.ACSServiceHandler = WayfACSServiceHandler
 	config.Hybrid.KribServiceHandler = WayfKribHandler
+	config.Hybrid.DeKribify = DeKribify
 
 	gohybrid.Config(config.Hybrid)
 
@@ -254,7 +221,7 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	err = db.QueryRow(query, ent).Scan(&md)
 	switch {
 	case err == sql.ErrNoRows:
-		err = New("err:Metadata not found", "key:"+key, "table:"+m.table)
+		err = goxml.Wrap(err, "err:Metadata not found", "key:"+key, "table:"+m.table)
 		return
 	case err != nil:
 		return
@@ -270,6 +237,28 @@ func (m mddb) Open(db, table string) (err error) {
 	m.table = table
 	return
 }
+
+/* how to get the status ...
+type statusLoggingResponseWriter struct {
+   status int
+   http.ResponseWriter
+}
+
+func (w *statusLoggingResponseWriter) WriteHeader(code int) {
+  w.status = code
+  w.ResponseWriter.WriteHeader(code)
+}
+
+type WrapHTTPHandler struct {
+	m *http.Handler
+}
+
+func (h *WrapHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+        myW := StatusLoggingResponseWriter{-1, w}
+	h.m.ServeHTTP(myW, r)
+	log.Printf("[%s] %s %d\n", r.RemoteAddr, r.URL, w.status)
+}
+*/
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	/*	ctx := make(map[string]string)
@@ -291,7 +280,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("%s %s %s %+v %1.3f %d %s", r.RemoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
 	switch x := err.(type) {
-	case Werror:
+	case goxml.Werror:
 		log.Print(x.Stack(7))
 	}
 
@@ -398,16 +387,20 @@ func checkForCommonFederations(idp_md, sp_md *goxml.Xp) (err error) {
 	return
 }
 
-func WayfSSOServiceHandler(request, mdsp, mdhub, mdidp *goxml.Xp) (kribID, acsurl string, err error) {
+func WayfSSOServiceHandler(request, mdsp, mdhub, mdidp *goxml.Xp) (kribID, acsurl, ssourl string, err error) {
 	kribID = mdsp.Query1(nil, "@entityID")
 
+	ssourl = mdidp.Query1(nil, "./md:IDPSSODescriptor/md:SingleSignOnService[1]/@Location")
+
+	acsurl = request.Query1(nil, "@AssertionConsumerServiceURL")
 	hashedKribID := fmt.Sprintf("%x", goxml.Hash(crypto.SHA1, kribID))
-	acs := request.Query1(nil, "@AssertionConsumerServiceURL")
-	acsurl = bify.ReplaceAllString(acs, "${1}krib.wayf.dk/"+hashedKribID+"/$2")
+	acsurl = bify.ReplaceAllString(acsurl, "${1}krib.wayf.dk/"+hashedKribID+"/$2")
 
 	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
 		return
 	}
+
+	legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 	return
 }
 
@@ -436,6 +429,8 @@ func WayfBirkHandler(request, mdsp, mdbirkidp *goxml.Xp) (mdhub, mdidp *goxml.Xp
 	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
 		return
 	}
+
+	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
 	return
 }
@@ -648,18 +643,48 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	ard.Hash = eppn + ard.SPEntityID
 	ard.ConsentAsAService = config.ConsentAsAService
 	//fmt.Println("ard", ard)
+
+	hashedEppn := fmt.Sprintf("%x", goxml.Hash(crypto.SHA256, config.SaltForHashedEppn+eppn))
+	legacyStatLog("birk-99", "saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
 	return
 }
 
+func DeKribify(dest string) string {
+	return debify.ReplaceAllString(dest, "$1$2")
+}
+
 func WayfKribHandler(response, birkmd, kribmd *goxml.Xp) (destination string, err error) {
-	destination = debify.ReplaceAllString(response.Query1(nil, "@Destination"), "$1$2")
+	destination = DeKribify(response.Query1(nil, "@Destination"))
 
 	if err = checkForCommonFederations(birkmd, kribmd); err != nil {
 		return
 	}
 
+	legacyStatLog("krib-99", "saml20-idp-SSO", kribmd.Query1(nil, "@entityID"), birkmd.Query1(nil, "@entityID"), "na")
+
 	//	destination = "https://" + config.ConsentAsAService
 	return
+}
+
+func nemloginAttributeHandler(response *goxml.Xp) {
+	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0].(types.Element)
+	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.3"]/saml:AttributeValue`)
+	names := strings.Split(value, " ")
+	l := len(names) - 1
+	//setAttribute("cn", value, response, sourceAttributes) // already there
+	setAttribute("gn", strings.Join(names[0:l], " "), response, sourceAttributes)
+	setAttribute("sn", names[l], response, sourceAttributes)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.1"]/saml:AttributeValue`)
+	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
+	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
+	//setAttribute("mail", value, response, sourceAttributes)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
+	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
+	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
+	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
+	//setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
+	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
 }
 
 func yearfromyearandcifferseven(year, c7 int) int {
@@ -682,27 +707,6 @@ func yearfromyearandcifferseven(year, c7 int) int {
 		year += century[2]
 	}
 	return year
-}
-
-func nemloginAttributeHandler(response *goxml.Xp) {
-	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0].(types.Element)
-	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.3"]/saml:AttributeValue`)
-	names := strings.Split(value, " ")
-	l := len(names) - 1
-	//setAttribute("cn", value, response, sourceAttributes) // already there
-	setAttribute("gn", strings.Join(names[0:l], " "), response, sourceAttributes)
-	setAttribute("sn", names[l], response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.1"]/saml:AttributeValue`)
-	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
-	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
-	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
-	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
-	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
-	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
-	//setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
-	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
 }
 
 func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
