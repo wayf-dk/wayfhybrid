@@ -14,6 +14,7 @@ import (
 	"github.com/wayf-dk/gohybrid"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
@@ -25,7 +26,7 @@ import (
 type (
 	appHandler func(http.ResponseWriter, *http.Request) error
 
-	md struct {
+	simplemd struct {
 		entities map[string]*goxml.Xp
 	}
 
@@ -96,14 +97,9 @@ func Main() {
 	//elementsToSign := []string{"/samlp:Response/saml:Assertion"}
 
 	/*
-		hub = md{entities: make(map[string]*goxml.Xp)}
-		prepareMetadata(config.Metadata.Hub, &hub)
-		internal = md{entities: make(map[string]*goxml.Xp)}
-		prepareMetadata(config.Metadata.Internal, &internal)
-		externalIdP = md{entities: make(map[string]*goxml.Xp)}
-		prepareMetadata(config.Metadata.External, &externalIdP)
-		externalSP = md{entities: make(map[string]*goxml.Xp)}
-		prepareMetadata(config.Metadata.External, &externalSP)
+	   hub = SimplePrepareMD("testdata/hub.xml")
+	   internal = SimplePrepareMD("testdata/internal.xml")
+	   external = SimplePrepareMD("testdata/external.xml")
 	*/
 
 	hub = mddb{db: "../hybrid-metadata-test.mddb", table: "WAYF_HUB_PUBLIC"}
@@ -178,13 +174,15 @@ func prepareTables(attrs *goxml.Xp) {
 	}
 }
 
-func prepareMetadata(metadata string, index *md) {
+func SimplePrepareMD(file string) *simplemd {
 	indextargets := []string{
 		"./md:IDPSSODescriptor/md:SingleSignOnService[@Binding='urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect']/@Location",
 		"./md:SPSSODescriptor/md:AssertionConsumerService[@Binding='urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']/@Location",
 	}
 
-	x := goxml.NewXp(metadata)
+	metadata, _ := ioutil.ReadFile(file)
+	index := simplemd{entities: make(map[string]*goxml.Xp)}
+	x := goxml.NewXp(string(metadata))
 	entities := x.Query(nil, "md:EntityDescriptor")
 
 	for _, entity := range entities {
@@ -198,9 +196,10 @@ func prepareMetadata(metadata string, index *md) {
 			}
 		}
 	}
+	return &index
 }
 
-func (m md) MDQ(key string) (xp *goxml.Xp, err error) {
+func (m simplemd) MDQ(key string) (xp *goxml.Xp, err error) {
 	xp = m.entities[key]
 	if xp == nil {
 		log.Panicf("Not found: " + key)
@@ -301,7 +300,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	newrequest := gosaml.NewAuthnRequest(stdtiming.Refresh(), nil, sp_md, hub_md)
+	newrequest, _ := gosaml.NewAuthnRequest(stdtiming.Refresh(), nil, sp_md, hub_md)
 	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
