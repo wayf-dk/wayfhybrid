@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	//"github.com/mattn/go-sqlite3"
+	"github.com/gorilla/securecookie"
 	toml "github.com/pelletier/go-toml"
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/godiscoveryservice"
@@ -54,6 +56,8 @@ type (
 
 	logWriter struct {
 	}
+
+	SLOInfoCookie struct{}
 )
 
 var (
@@ -68,9 +72,33 @@ var (
 		"https://nemlogin.wayf.dk": idpsppair{"https://saml.test-nemlog-in.dk/", "https://saml.nemlogin.wayf.dk"},
 	}
 
-	bify   = regexp.MustCompile("^(https?://)(.*)$")
-	debify = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
+	bify      = regexp.MustCompile("^(https?://)(.*)$")
+	debify    = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
+	SLOStore  = SLOInfoCookie{}
+	seccookie *securecookie.SecureCookie
 )
+
+func (s SLOInfoCookie) PutSLOInfo(w http.ResponseWriter, r *http.Request, id string, sloinfo *gosaml.SLOInfo) {
+	cookieBytes, _ := json.Marshal(sloinfo)
+	cookieValue, _ := seccookie.Encode(id, gosaml.Deflate(string(cookieBytes)))
+	http.SetCookie(w, &http.Cookie{Name: id, Domain: "wayf.dk", Value: cookieValue, Path: "/", Secure: true, HttpOnly: true, MaxAge: 8 * 3600})
+}
+
+func (s SLOInfoCookie) GetSLOInfo(w http.ResponseWriter, r *http.Request, id string) (sloinfo *gosaml.SLOInfo) {
+	sloinfo = &gosaml.SLOInfo{}
+	slocookie, err := r.Cookie(id)
+	if err == nil && slocookie.Value != "" {
+		sloInfoJson := []byte{}
+		if err = seccookie.Decode(id, slocookie.Value, &sloInfoJson); err != nil {
+			return
+		}
+		if err = json.Unmarshal(gosaml.Inflate(sloInfoJson), &sloinfo); err != nil {
+			return
+		}
+	}
+	http.SetCookie(w, &http.Cookie{Name: id, Domain: "wayf.dk", Value: "", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
+	return
+}
 
 func (writer logWriter) Write(bytes []byte) (int, error) {
 	return fmt.Print(time.Now().UTC().Format("Jan _2 15:04:05 ") + string(bytes))
@@ -123,6 +151,7 @@ func Main() {
 	config.Hybrid.ACSServiceHandler = WayfACSServiceHandler
 	config.Hybrid.KribServiceHandler = WayfKribHandler
 	config.Hybrid.DeKribify = DeKribify
+	config.Hybrid.SLOStore = SLOStore
 
 	gohybrid.Config(config.Hybrid)
 
@@ -136,6 +165,9 @@ func Main() {
 		CertPath:      config.CertPath,
 		NameIDFormats: config.NameIDFormats,
 	}
+
+	hashKey, _ := hex.DecodeString(config.Hybrid.SecureCookieHashKey)
+	seccookie = securecookie.New(hashKey, nil)
 
 	//http.HandleFunc("/status", statushandler)
 	//http.Handle(config["hybrid_public_prefix"], http.FileServer(http.Dir(config["hybrid_public"])))
