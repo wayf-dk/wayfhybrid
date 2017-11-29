@@ -58,6 +58,8 @@ type (
 	}
 
 	SLOInfoCookie struct{}
+
+	Session struct{}
 )
 
 var (
@@ -75,28 +77,48 @@ var (
 	bify      = regexp.MustCompile("^(https?://)(.*)$")
 	debify    = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
 	SLOStore  = SLOInfoCookie{}
+	SessionStore = Session{}
+
 	seccookie *securecookie.SecureCookie
 )
 
+func (s Session) Set(w http.ResponseWriter, r *http.Request, id string, data[]byte) (err error) {
+	cookie, err := seccookie.Encode(id, gosaml.Deflate(string(data)))
+	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Hybrid.Domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: 8 * 3600})
+	return
+}
+
+func (s Session) Get(w http.ResponseWriter, r *http.Request, id string) (data []byte, err error) {
+	cookie, err := r.Cookie(id)
+	if err == nil && cookie.Value != "" {
+		err = seccookie.Decode(id, cookie.Value, &data)
+	}
+	data = gosaml.Inflate(data)
+	return
+}
+
+func (s Session) Del(w http.ResponseWriter, r *http.Request, id string) (err error) {
+    http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Hybrid.Domain, Value: "", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
+    return
+}
+
+func (s Session) GetDel(w http.ResponseWriter, r *http.Request, id string) (data []byte, err error) {
+    data, err = s.Get(w, r, id)
+    s.Del(w, r, id)
+    return
+}
+
 func (s SLOInfoCookie) PutSLOInfo(w http.ResponseWriter, r *http.Request, id string, sloinfo *gosaml.SLOInfo) {
 	cookieBytes, _ := json.Marshal(sloinfo)
-	cookieValue, _ := seccookie.Encode(id, gosaml.Deflate(string(cookieBytes)))
-	http.SetCookie(w, &http.Cookie{Name: id, Domain: "wayf.dk", Value: cookieValue, Path: "/", Secure: true, HttpOnly: true, MaxAge: 8 * 3600})
+	_ = SessionStore.Set(w, r, id, cookieBytes)
 }
 
 func (s SLOInfoCookie) GetSLOInfo(w http.ResponseWriter, r *http.Request, id string) (sloinfo *gosaml.SLOInfo) {
 	sloinfo = &gosaml.SLOInfo{}
-	slocookie, err := r.Cookie(id)
-	if err == nil && slocookie.Value != "" {
-		sloInfoJson := []byte{}
-		if err = seccookie.Decode(id, slocookie.Value, &sloInfoJson); err != nil {
-			return
-		}
-		if err = json.Unmarshal(gosaml.Inflate(sloInfoJson), &sloinfo); err != nil {
-			return
-		}
+    data, err := SessionStore.GetDel(w, r, id)
+	if err == nil {
+		err = json.Unmarshal(data, &sloinfo)
 	}
-	http.SetCookie(w, &http.Cookie{Name: id, Domain: "wayf.dk", Value: "", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
 	return
 }
 
@@ -152,6 +174,7 @@ func Main() {
 	config.Hybrid.KribServiceHandler = WayfKribHandler
 	config.Hybrid.DeKribify = DeKribify
 	config.Hybrid.SLOStore = SLOStore
+	config.Hybrid.Session = SessionStore
 
 	gohybrid.Config(config.Hybrid)
 
@@ -332,7 +355,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	newrequest, _ := gosaml.NewAuthnRequest(stdtiming.Refresh(), nil, sp_md, hub_md)
+	newrequest, _ := gosaml.NewAuthnRequest(stdtiming.Refresh(), nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
 	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
@@ -340,7 +363,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/nemlogin.wayf.dk")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/idp.testshib.org/idp/shibboleth")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/wayf.ait.dtu.dk/saml2/idp/metadata.php")
-	q.Set("idpentityid", "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
+//	q.Set("idpentityid", "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
