@@ -99,7 +99,7 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	config     = wayfHybridConfig{}
+	config    = wayfHybridConfig{}
 	stdTiming = gosaml.IdAndTiming{time.Now(), 4 * time.Minute, 4 * time.Hour, "", ""}
 	remap     = map[string]idpsppair{
 		"https://nemlogin.wayf.dk": idpsppair{"https://saml.test-nemlog-in.dk/", "https://saml.nemlogin.wayf.dk"},
@@ -195,7 +195,7 @@ func Main() {
 }
 
 func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id string, data []byte) (err error) {
-	cookie, err := seccookie.Encode(id, gosaml.Deflate(string(data)))
+	cookie, err := seccookie.Encode(id, gosaml.Deflate(data))
 	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: 8 * 3600})
 	return
 }
@@ -268,7 +268,7 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	case err != nil:
 		return
 	default:
-		md = gosaml.Inflate([]byte(md))
+		md = gosaml.Inflate(md)
 		xp = goxml.NewXp(md)
 	}
 	return
@@ -693,7 +693,7 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 }
 
 func WayfKribHandler(response, birkmd, kribmd *goxml.Xp) (destination string, err error) {
-	destination =  debify.ReplaceAllString(response.Query1(nil, "@Destination"), "$1$2")
+	destination = debify.ReplaceAllString(response.Query1(nil, "@Destination"), "$1$2")
 
 	if err = checkForCommonFederations(birkmd, kribmd); err != nil {
 		return

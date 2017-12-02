@@ -112,8 +112,7 @@ func ExampleNemLoginAttributeHandler() {
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	prepareTables(hub_md)
 
-	_, err := WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, nemloginResponse)
-	log.Println("err", err)
+	WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, nemloginResponse)
 
 	gosaml.AttributeCanonicalDump(os.Stdout, nemloginResponse)
 	// output:
