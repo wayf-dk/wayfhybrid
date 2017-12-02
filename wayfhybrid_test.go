@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
-	"io/ioutil"
 	"log"
 	"os"
 )
@@ -12,15 +11,6 @@ import (
 var (
 	_ = log.Println
 )
-
-func xpFromFile(file string) (res *goxml.Xp) {
-	xml, err := ioutil.ReadFile(file)
-	if err != nil {
-		log.Panic(err)
-	}
-	res = goxml.NewXp(string(xml))
-	return
-}
 
 func ExampleCheckCprCentury() {
 	testData := [][]int{
@@ -67,10 +57,10 @@ func ExampleCheckCprCentury() {
 }
 
 func ExampleWayfAttributeHandler() {
-	sourceResponse := xpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := xpFromFile("testdata/idp_md_dtu.xml")
-	hub_md := xpFromFile("testdata/hub_md.xml")
-	sp_md := xpFromFile("testdata/sp_md.xml")
+	sourceResponse := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	hub_md := goxml.NewXpFromFile("testdata/hub_md.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	prepareTables(hub_md)
 
 	WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, sourceResponse)
@@ -116,10 +106,10 @@ func ExampleWayfAttributeHandler() {
 }
 
 func ExampleNemLoginAttributeHandler() {
-	nemloginResponse := xpFromFile("testdata/nemloginresponse.xml")
-	idp_md := xpFromFile("testdata/idp_md_nemlogin.xml")
-	hub_md := xpFromFile("testdata/hub_md.xml")
-	sp_md := xpFromFile("testdata/sp_md.xml")
+	nemloginResponse := goxml.NewXpFromFile("testdata/nemloginresponse.xml")
+	idp_md := goxml.NewXpFromFile("testdata/idp_md_nemlogin.xml")
+	hub_md := goxml.NewXpFromFile("testdata/hub_md.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	prepareTables(hub_md)
 
 	_, err := WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, nemloginResponse)
@@ -162,7 +152,7 @@ func ExampleNemLoginAttributeHandler() {
 }
 
 func ExampleSamlError() {
-	nemloginResponse := xpFromFile("testdata/samlerror.xml")
+	nemloginResponse := goxml.NewXpFromFile("testdata/samlerror.xml")
 	fmt.Println(nemloginResponse.PP())
 	// output:
     // <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"

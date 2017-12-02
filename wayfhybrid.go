@@ -141,7 +141,7 @@ func Main() {
 	postForm = template.Must(template.New("post").Parse(config.PostFormTemplate))
 	attributeReleaseForm = template.Must(template.New("post").Parse(config.AttributeReleaseTemplate))
 
-	hubRequestedAttributes = goxml.NewXp(config.Hubrequestedattributes)
+	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
 	internal = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_INTERNAL"}
 	externalIdP = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL_IDP"}
@@ -258,7 +258,7 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	}
 	defer db.Close()
 	ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key))
-	var md string
+	var md []byte
 	var query = "select e.md md from entity_" + m.table + " e, lookup_" + m.table + " l where l.hash = ? and l.entity_id_fk = e.id"
 	err = db.QueryRow(query, ent).Scan(&md)
 	switch {
@@ -268,7 +268,7 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 	case err != nil:
 		return
 	default:
-		md = string(gosaml.Inflate([]byte(md)))
+		md = gosaml.Inflate([]byte(md))
 		xp = goxml.NewXp(md)
 	}
 	return
@@ -402,7 +402,7 @@ func makeSloUrl(response, issuer, destination *goxml.Xp) string {
     </saml:NameID>
 </samlp:LogoutRequest>
 `
-	request := goxml.NewXp(template)
+	request := goxml.NewXpFromString(template)
 	slo := destination.Query1(nil, `./md:IDPSSODescriptor/md:SingleLogoutService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
 	request.QueryDashP(nil, "./@IssueInstant", time.Now().Format(gosaml.XsDateTime), nil)
 	request.QueryDashP(nil, "./@ID", gosaml.Id(), nil)
@@ -876,7 +876,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	// we checked the request when we received in birkService - we can use it without fear ie. we just parse it
-	request := goxml.NewXp(string(value))
+	request := goxml.NewXpFromString(string(value))
 
 	directToSP := request.Query1(nil, "./@DirectToSP") == "true"
 	spMetadataSet := externalSP
@@ -1070,7 +1070,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		legacyStatLog("birk-99", "saml20-idp-SLO "+res[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), "")
 
 		// we checked the request when we received in birkService - we can use it without fear ie. we just parse it
-		request := goxml.NewXp(string(value))
+		request := goxml.NewXp(value)
 		issuermd, _ := finalIssuerMdSet.MDQ(request.Query1(nil, "@Destination"))
 		destinationmd, _ := finalDestinationMdSet.MDQ(request.Query1(nil, "./saml:Issuer"))
 
