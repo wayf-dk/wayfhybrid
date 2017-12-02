@@ -165,5 +165,23 @@ func ExampleSamlError() {
 	nemloginResponse := xpFromFile("testdata/samlerror.xml")
 	fmt.Println(nemloginResponse.PP())
 	// output:
-	// hi
+    // <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+    //                 xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+    //                 ID="_27af2a04b11ad6b9b819c6f33e333a536ecffc4163"
+    //                 Version="2.0"
+    //                 IssueInstant="2017-11-13T13:02:32Z"
+    //                 Destination="https://wayf.wayf.dk/module.php/saml/sp/saml2-acs.php/wayf.wayf.dk"
+    //                 InResponseTo="_7d8dc3ba9cf00cb09c887d7686cdb33973863fb2b1">
+    //     <saml:Issuer>
+    //      https://wayf.ait.dtu.dk/saml2/idp/metadata.php
+    //     </saml:Issuer>
+    //     <samlp:Status>
+    //         <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Responder">
+    //             <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:NoPassive"/>
+    //         </samlp:StatusCode>
+    //         <samlp:StatusMessage>
+    //           Passive authentication not supported.
+    //         </samlp:StatusMessage>
+    //     </samlp:Status>
+    // </samlp:Response>
 }
