@@ -309,7 +309,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		contextmutex.Unlock()
 		w.Header().Set("content-Security-Policy", "referrer no-referrer;")
 	*/
-	starttime := time.Now()
+	//starttime := time.Now()
 	err := fn(w, r)
 
 	status := 200
@@ -320,10 +320,10 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("OK")
 	}
 
-	log.Printf("%s %s %s %+v %1.3f %d %s", r.RemoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
+	//log.Printf("%s %s %s %+v %1.3f %d %s", r.RemoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
 	switch x := err.(type) {
 	case goxml.Werror:
-		log.Print(x.Stack(7))
+		log.Print(x.Stack(5))
 	}
 
 	/*	contextmutex.Lock()
@@ -1106,17 +1106,20 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, samlOut, des
 
 func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
-	attributestatement := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
-	for _, attr := range requestedattributes {
-		nameFormat, _ := attr.(types.Element).GetAttribute("NameFormat")
-		if nameFormat.NodeValue() == "urn:oasis:names:tc:SAML:2.0:attrname-format:basic" {
-			basicname, _ := attr.(types.Element).GetAttribute("Name")
-			uriname := basic2uri[basicname.NodeValue()]
-			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name='"+uriname+"']")
-			if len(responseattribute) > 0 {
-				responseattribute[0].(types.Element).SetAttribute("Name", basicname.NodeValue())
-				responseattribute[0].(types.Element).SetAttribute("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
-			}
-		}
+	attributestatements := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")
+	if len(attributestatements) != 0 {
+	    attributestatement := attributestatements[0]
+        for _, attr := range requestedattributes {
+            nameFormat, _ := attr.(types.Element).GetAttribute("NameFormat")
+            if nameFormat.NodeValue() == "urn:oasis:names:tc:SAML:2.0:attrname-format:basic" {
+                basicname, _ := attr.(types.Element).GetAttribute("Name")
+                uriname := basic2uri[basicname.NodeValue()]
+                responseattribute := response.Query(attributestatement, "saml:Attribute[@Name='"+uriname+"']")
+                if len(responseattribute) > 0 {
+                    responseattribute[0].(types.Element).SetAttribute("Name", basicname.NodeValue())
+                    responseattribute[0].(types.Element).SetAttribute("NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic")
+                }
+            }
+        }
 	}
 }
