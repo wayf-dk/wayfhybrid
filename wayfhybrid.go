@@ -492,6 +492,7 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
 	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
+	destinationAttributes.(types.Element).SetAttribute("xmlns:xs", "http://www.w3.org/2001/XMLSchema")
 
 	base64encoded := idp_md.Query1(nil, "//wayf:base64attributes") == "1"
 
@@ -726,6 +727,8 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
 }
 
+/* see http://www.cpr.dk/cpr_artikler/Files/Fil1/4225.pdf or http://da.wikipedia.org/wiki/CPR-nummer for algorithm */
+
 func yearfromyearandcifferseven(year, c7 int) int {
 	cpr2year := [][]int{
 		{99, 1900},
@@ -733,9 +736,9 @@ func yearfromyearandcifferseven(year, c7 int) int {
 		{99, 1900},
 		{99, 1900},
 		{36, 2000, 1900},
-		{36, 2000, 1900},
-		{36, 2000, 1900},
-		{36, 2000, 1900},
+		{57, 2000, 1800},
+		{57, 2000, 1800},
+		{57, 2000, 1800},
 		{57, 2000, 1800},
 		{36, 2000, 1900},
 	}
