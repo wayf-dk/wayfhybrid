@@ -99,9 +99,8 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	config    = wayfHybridConfig{}
-	stdTiming = gosaml.IdAndTiming{time.Now(), 4 * time.Minute, 4 * time.Hour, "", ""}
-	remap     = map[string]idpsppair{
+	config = wayfHybridConfig{}
+	remap  = map[string]idpsppair{
 		"https://nemlogin.wayf.dk": idpsppair{"https://saml.test-nemlog-in.dk/", "https://saml.nemlogin.wayf.dk"},
 		//"https://nemlogin.wayf.dk": idpsppair{"https://saml.nemlog-in.dk", "https://nemlogin.wayf.dk"},
 	}
@@ -343,8 +342,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	newrequest, _ := gosaml.NewAuthnRequest(stdTiming.Refresh(), nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
-	//newrequest, _ := gosaml.NewAuthnRequest(stdTiming.Refresh(), nil, sp_md, hub_md, "")
+	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
+	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
 	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
@@ -843,7 +842,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	// why not use orig request?
-	newrequest, err := gosaml.NewAuthnRequest(stdTiming.Refresh(), request, mdhub, mdidp, "")
+	newrequest, err := gosaml.NewAuthnRequest(request, mdhub, mdidp, "")
 	if err != nil {
 		return
 	}
@@ -914,7 +913,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		newresponse = gosaml.NewResponse(stdTiming.Refresh(), birkmd, sp_md, request, response)
+		newresponse = gosaml.NewResponse(birkmd, sp_md, request, response)
 
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
@@ -942,7 +941,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 	} else {
-		newresponse = gosaml.NewErrorResponse(stdTiming.Refresh(), birkmd, sp_md, request, response)
+		newresponse = gosaml.NewErrorResponse(birkmd, sp_md, request, response)
 		err = gosaml.SignResponse(newresponse, "/samlp:Response", birkmd)
 		if err != nil {
 			return
@@ -1048,7 +1047,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			if err != nil {
 				return err
 			}
-			newRequest := gosaml.NewLogoutRequest(stdTiming.Refresh(), issuer, finaldestination, request, sloinfo)
+			newRequest := gosaml.NewLogoutRequest(issuer, finaldestination, request, sloinfo)
 			async := request.QueryBool(nil, "boolean(./samlp:Extensions/aslo:Asynchronous)")
 			if !async {
 				session.Set(w, r, tag+"-REQ", []byte(request.Doc.Dump(true)))
@@ -1077,7 +1076,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		issuermd, _ := finalIssuerMdSet.MDQ(request.Query1(nil, "@Destination"))
 		destinationmd, _ := finalDestinationMdSet.MDQ(request.Query1(nil, "./saml:Issuer"))
 
-		newResponse := gosaml.NewLogoutResponse(stdTiming.Refresh(), issuermd, destinationmd, request, response)
+		newResponse := gosaml.NewLogoutResponse(issuermd, destinationmd, request, response)
 
 		u, _ := gosaml.SAMLRequest2Url(newResponse, relayState, "", "", "")
 		http.Redirect(w, r, u.String(), http.StatusFound)
