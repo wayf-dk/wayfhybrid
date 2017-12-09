@@ -819,13 +819,17 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	// is this a request from KRIB?
 	request, mdsp, mdbirkidp, relayState, err := gosaml.ReceiveAuthnRequest(r, externalSP, externalIdP)
 	if err != nil {
+		var err2 error
 		e, ok := err.(goxml.Werror)
 		if ok && e.Cause == gosaml.ACSError {
 			// or is it coming directly from a SP
-			request, mdsp, mdbirkidp, relayState, err = gosaml.ReceiveAuthnRequest(r, internal, externalIdP)
-		}
-		if err != nil {
-			return
+			request, mdsp, mdbirkidp, relayState, err2 = gosaml.ReceiveAuthnRequest(r, internal, externalIdP)
+    		if err2 != nil {
+                // we need the original error for a SP that use an invalid ACS, but is in the external feed
+			    return goxml.Wrap(err, e.C...)
+		    }
+		} else {
+		    return e
 		}
 		// If we get here we need to tag the request as a direct BIRK to SP - otherwise we will end up sending the response to KRIB
 		directToSP = true
