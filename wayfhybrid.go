@@ -15,15 +15,22 @@ import (
 	"github.com/wayf-dk/godiscoveryservice"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
+	"github.com/wayf-dk/lMDQ"
+	"github.com/y0ssar1an/q"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	_ = q.Q
 )
 
 type (
@@ -86,6 +93,10 @@ type (
 		GetDel(http.ResponseWriter, *http.Request, string) ([]byte, error)
 	}
 
+	MdSets struct {
+	    Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
+	}
+
 	sloInfo struct{}
 
 	wayfHybridSession struct{}
@@ -115,7 +126,8 @@ var (
 	hashKey                        []byte
 
 	hubRequestedAttributes                 *goxml.Xp
-	internal, externalIdP, externalSP, hub gosaml.Md
+
+	Md                                     MdSets
 	basic2uri                              map[string]string
 	sSOServiceHandler                      func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (string, string, string, error)
 	birkHandler                            func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (*goxml.Xp, *goxml.Xp, error)
@@ -142,11 +154,21 @@ func Main() {
 
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
-	internal = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_INTERNAL"}
-	externalIdP = mddb{db: "../hybrid-metadata-test.mddb", table: "HYBRID_EXTERNAL_IDP"}
-	externalSP = mddb{db: "../hybrid-metadata.mddb", table: "HYBRID_EXTERNAL_SP"}
-	hub = mddb{db: "../hybrid-metadata-test.mddb", table: "WAYF_HUB_PUBLIC"}
-	sSOServiceHandler = WayfSSOServiceHandler
+
+    if Md.Internal == nil { // either all or none
+        Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
+        Md.Internal = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
+        Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
+        Md.ExternalSP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
+        for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
+            err := md.(*lMDQ.MDQ).Open()
+            if err != nil {
+                panic(err)
+            }
+        }
+    }
+
+    sSOServiceHandler = WayfSSOServiceHandler
 	birkHandler = WayfBirkHandler
 	aCSServiceHandler = WayfACSServiceHandler
 	kribServiceHandler = WayfKribHandler
@@ -234,11 +256,11 @@ func (s sloInfo) GetDel(w http.ResponseWriter, r *http.Request, id string) (sloi
 }
 
 func (writer logWriter) Write(bytes []byte) (int, error) {
-	return fmt.Print(time.Now().UTC().Format("Jan _2 15:04:05 ") + string(bytes))
+	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ") + string(bytes))
 }
 
 func legacyStatLog(server, tag, idp, sp, hash string) {
-	log.Printf("%s ssp-wayf[%s]: 5 STAT [%d] %s %s %s %s\n", server, "007", time.Now().UnixNano(), tag, idp, sp, hash)
+	//log.Printf("%s ssp-wayf[%s]: 5 STAT [%d] %s %s %s %s\n", server, "007", time.Now().UnixNano(), tag, idp, sp, hash)
 }
 
 func prepareTables(attrs *goxml.Xp) {
@@ -333,11 +355,11 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	sp_md, err := internal.MDQ("https://" + config.Testsp)
+	sp_md, err := Md.Internal.MDQ("https://" + config.Testsp)
 	if err != nil {
 		return err
 	}
-	hub_md, err := hub.MDQ(config.HubEntityID)
+	hub_md, err := Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
 		return err
 	}
@@ -360,9 +382,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	// try to decode SAML message to ourselves or just another SP
-	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, hub, internal, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
+	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
 	if err != nil {
-		response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, externalIdP, externalSP, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
+		response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
 	}
 	// don't do destination check - we accept and dumps anything ...
 	if err != nil {
@@ -450,20 +472,20 @@ func WayfBirkHandler(request, mdsp, mdbirkidp *goxml.Xp) (mdhub, mdidp *goxml.Xp
 	idp := debify.ReplaceAllString(mdbirkidp.Query1(nil, "@entityID"), "$1$2")
 
 	if rm, ok := remap[idp]; ok {
-		mdidp, err = internal.MDQ(rm.idp)
+		mdidp, err = Md.Internal.MDQ(rm.idp)
 		if err != nil {
 			return
 		}
-		mdhub, err = hub.MDQ(rm.sp)
+		mdhub, err = Md.Hub.MDQ(rm.sp)
 		if err != nil {
 			return
 		}
 	} else {
-		mdidp, err = internal.MDQ(idp)
+		mdidp, err = Md.Internal.MDQ(idp)
 		if err != nil {
 			return
 		}
-		mdhub, err = hub.MDQ(config.HubEntityID)
+		mdhub, err = Md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
 			return
 		}
@@ -681,7 +703,8 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	ard.SPDescription["da"] = sp_md.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`)
 	ard.SPLogo = sp_md.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
 	ard.SPEntityID = sp_md.Query1(nil, "@entityID")
-	ard.NoConsent = idp_md.QueryBool(nil, `count(md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
+	ard.NoConsent = idp_md.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
+	ard.NoConsent = ard.NoConsent || sp_md.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.='1']) > 0`)
 	ard.Key = eppn
 	ard.Hash = eppn + ard.SPEntityID
 	ard.ConsentAsAService = config.ConsentAsAService
@@ -717,9 +740,9 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
 	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
 	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
 	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
 	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
 	//setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
@@ -765,7 +788,7 @@ func b64ToString(enc string) string {
 
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spmd, hubmd, relayState, err := gosaml.ReceiveAuthnRequest(r, internal, hub)
+	request, spmd, hubmd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.Hub)
 	if err != nil {
 		return
 	}
@@ -789,7 +812,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		data.Set("entityID", entityID)
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
-		idpmd, err := externalIdP.MDQ(idp)
+		idpmd, err := Md.ExternalIdP.MDQ(idp)
 		if err != nil {
 			return err
 		}
@@ -816,13 +839,13 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	var directToSP bool
 	// is this a request from KRIB?
-	request, mdsp, mdbirkidp, relayState, err := gosaml.ReceiveAuthnRequest(r, externalSP, externalIdP)
+	request, mdsp, mdbirkidp, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
 	if err != nil {
 		var err2 error
 		e, ok := err.(goxml.Werror)
 		if ok && e.Cause == gosaml.ACSError {
 			// or is it coming directly from a SP
-			request, mdsp, mdbirkidp, relayState, err2 = gosaml.ReceiveAuthnRequest(r, internal, externalIdP)
+			request, mdsp, mdbirkidp, relayState, err2 = gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.ExternalIdP)
 			if err2 != nil {
 				// we need the original error for a SP that use an invalid ACS, but is in the external feed
 				return goxml.Wrap(err, e.C...)
@@ -884,9 +907,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	request := goxml.NewXpFromString(string(value))
 
 	directToSP := request.Query1(nil, "./@DirectToSP") == "true"
-	spMetadataSet := externalSP
+	spMetadataSet := Md.ExternalSP
 	if directToSP {
-		spMetadataSet = internal
+		spMetadataSet = Md.Internal
 	}
 
 	sp_md, err := spMetadataSet.MDQ(request.Query1(nil, "/samlp:AuthnRequest/saml:Issuer"))
@@ -894,16 +917,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 	var birkmd *goxml.Xp
-	if directToSP {
-		birkmd, err = hub.MDQ(config.HubEntityID)
-	} else {
-		birkmd, err = externalIdP.MDQ(request.Query1(nil, "/samlp:AuthnRequest/@Destination"))
-	}
+	birkmd, err = Md.ExternalIdP.MDQ(request.Query1(nil, "/samlp:AuthnRequest/@Destination"))
 	if err != nil {
 		return
 	}
 
-	response, idp_md, hub_md, relayState, err := gosaml.ReceiveSAMLResponse(r, internal, hub)
+	response, idp_md, hub_md, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
 	if err != nil {
 		return
 	}
@@ -965,7 +984,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
 
-	response, birkmd, kribmd, relayState, err := gosaml.ReceiveSAMLResponse(r, externalIdP, externalSP)
+	response, birkmd, kribmd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP)
 	if err != nil {
 		return
 	}
@@ -979,7 +998,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	issuer := config.HubEntityID
 	response.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 
-	mdhub, err := hub.MDQ(config.HubEntityID)
+	mdhub, err := Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
 		return err
 	}
@@ -991,9 +1010,9 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		response.QueryDashP(nil, "./saml:Assertion/saml:Issuer", issuer, nil)
 		// Krib always receives attributes with nameformat=urn. Before sending to the real SP we need to look into
-		// the metadata for SP to determine the actual nameformat - as WAYF supports both for internal SPs.
+		// the metadata for SP to determine the actual nameformat - as WAYF supports both for Md.Internal SPs.
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
-		mdsp, err := internal.MDQ(destination)
+		mdsp, err := Md.Internal.MDQ(destination)
 		if err != nil {
 			return err
 		}
@@ -1019,19 +1038,19 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func BirkSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, externalSP, externalIdP, hub, internal, gosaml.IdPRole, "BIRK-SLO")
+	return SLOService(w, r, Md.ExternalSP, Md.ExternalIdP, Md.Hub, Md.Internal, gosaml.IdPRole, "BIRK-SLO")
 }
 
 func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, externalIdP, externalSP, hub, internal, gosaml.SPRole, "KRIB-SLO")
+	return SLOService(w, r, Md.ExternalIdP, Md.ExternalSP, Md.Hub, Md.Internal, gosaml.SPRole, "KRIB-SLO")
 }
 
 func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, internal, hub, externalIdP, externalSP, gosaml.SPRole, "BIRK-SLO")
+	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, "BIRK-SLO")
 }
 
 func IdPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, internal, hub, externalSP, externalIdP, gosaml.IdPRole, "KRIB-SLO")
+	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalSP, Md.ExternalIdP, gosaml.IdPRole, "KRIB-SLO")
 }
 
 func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destinationMdSet, finalIssuerMdSet, finalDestinationMdSet gosaml.Md, role int, tag string) (err error) {
