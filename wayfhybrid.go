@@ -94,7 +94,7 @@ type (
 	}
 
 	MdSets struct {
-	    Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
+		Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
 	}
 
 	sloInfo struct{}
@@ -125,14 +125,14 @@ var (
 	postForm, attributeReleaseForm *template.Template
 	hashKey                        []byte
 
-	hubRequestedAttributes                 *goxml.Xp
+	hubRequestedAttributes *goxml.Xp
 
-	Md                                     MdSets
-	basic2uri                              map[string]string
-	sSOServiceHandler                      func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (string, string, string, error)
-	birkHandler                            func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (*goxml.Xp, *goxml.Xp, error)
-	aCSServiceHandler                      func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (AttributeReleaseData, error)
-	kribServiceHandler                     func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
+	Md                 MdSets
+	basic2uri          map[string]string
+	sSOServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (string, string, string, error)
+	birkHandler        func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (*goxml.Xp, *goxml.Xp, error)
+	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (AttributeReleaseData, error)
+	kribServiceHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
 )
 
 func Main() {
@@ -155,20 +155,20 @@ func Main() {
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
 
-    if Md.Internal == nil { // either all or none
-        Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
-        Md.Internal = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
-        Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
-        Md.ExternalSP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
-        for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
-            err := md.(*lMDQ.MDQ).Open()
-            if err != nil {
-                panic(err)
-            }
-        }
-    }
+	if Md.Internal == nil { // either all or none
+		Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
+		Md.Internal = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
+		Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
+		Md.ExternalSP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
+		for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
+			err := md.(*lMDQ.MDQ).Open()
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
 
-    sSOServiceHandler = WayfSSOServiceHandler
+	sSOServiceHandler = WayfSSOServiceHandler
 	birkHandler = WayfBirkHandler
 	aCSServiceHandler = WayfACSServiceHandler
 	kribServiceHandler = WayfKribHandler
@@ -256,7 +256,7 @@ func (s sloInfo) GetDel(w http.ResponseWriter, r *http.Request, id string) (sloi
 }
 
 func (writer logWriter) Write(bytes []byte) (int, error) {
-	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ") + string(bytes))
+	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ")+string(bytes))
 }
 
 func legacyStatLog(server, tag, idp, sp, hash string) {
@@ -740,9 +740,9 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
 	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
 	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
 	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
 	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
 	//setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
