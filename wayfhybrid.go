@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"regexp"
@@ -112,8 +113,7 @@ var (
 
 	config = wayfHybridConfig{}
 	remap  = map[string]idpsppair{
-		"https://nemlogin.wayf.dk": idpsppair{"https://saml.test-nemlog-in.dk/", "https://saml.nemlogin.wayf.dk"},
-		//"https://nemlogin.wayf.dk": idpsppair{"https://saml.nemlog-in.dk", "https://nemlogin.wayf.dk"},
+		"https://nemlogin.wayf.dk": idpsppair{"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
 	}
 
 	bify     = regexp.MustCompile("^(https?://)(.*)$")
@@ -156,9 +156,9 @@ func Main() {
 	prepareTables(hubRequestedAttributes)
 
 	if Md.Internal == nil { // either all or none
-		Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
+		Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
 		Md.Internal = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
-		Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
+		Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
 		Md.ExternalSP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
 		for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
 			err := md.(*lMDQ.MDQ).Open()
@@ -207,6 +207,10 @@ func Main() {
 	http.Handle(config.Testsp_Acs, appHandler(testSPACService))
 	http.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
 	http.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
+
+	go func() {
+		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
+	}()
 
 	log.Println("listening on ", config.Intf)
 	err = http.ListenAndServeTLS(config.Intf, config.Https_Cert, config.Https_Key, nil)
@@ -364,11 +368,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
-	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
+	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
+	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
 	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
-	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
+	u, _ := gosaml.SAMLRequest2Url(newrequest, "", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/nemlogin.wayf.dk")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/idp.testshib.org/idp/shibboleth")
@@ -655,12 +659,12 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 		epaAdd = append(epaAdd, "member")
 		epaset["member"] = true
 	}
-	newattribute, _ := hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]`)[0].Copy()
+	newattribute := response.CopyNode(hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]`)[0], 1)
 	_ = destinationAttributes.AddChild(newattribute)
 	for i, epa := range epaAdd {
 		response.QueryDashP(newattribute, `saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, epa, nil)
 	}
-	newattribute, _ = hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]`)[0].Copy()
+	newattribute = response.CopyNode(hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]`)[0], 1)
 	_ = destinationAttributes.AddChild(newattribute)
 	i := 1
 	for epa, _ := range epaset {
@@ -891,7 +895,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 
-	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), passwd, "sha256")
+	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), passwd, "sha1")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -932,7 +936,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 		ard, err = aCSServiceHandler(idp_md, hubRequestedAttributes, sp_md, request, response)
 		if err != nil {
-			return err
+			return goxml.Wrap(err)
 		}
 
 		newresponse = gosaml.NewResponse(birkmd, sp_md, request, response)
@@ -975,6 +979,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	acs := newresponse.Query1(nil, "@Destination")
 
 	ardjson, err := json.Marshal(ard)
+	if err != nil {
+		return goxml.Wrap(err)
+	}
 	data := formdata{Acs: acs, Samlresponse: base64.StdEncoding.EncodeToString([]byte(newresponse.Doc.Dump(false))), RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
 	return
