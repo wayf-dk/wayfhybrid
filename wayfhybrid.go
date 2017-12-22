@@ -18,9 +18,9 @@ import (
 	"github.com/wayf-dk/lMDQ"
 	"github.com/y0ssar1an/q"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"regexp"
@@ -102,18 +102,13 @@ type (
 	wayfHybridSession struct{}
 )
 
-const (
-	spCertQuery = `./md:SPSSODescriptor/md:KeyDescriptor[@use="signing" or not(@use)]/ds:KeyInfo/ds:X509Data/ds:X509Certificate`
-)
-
 var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
 	config = wayfHybridConfig{}
 	remap  = map[string]idpsppair{
-		"https://nemlogin.wayf.dk": idpsppair{"https://saml.test-nemlog-in.dk/", "https://saml.nemlogin.wayf.dk"},
-		//"https://nemlogin.wayf.dk": idpsppair{"https://saml.nemlog-in.dk", "https://nemlogin.wayf.dk"},
+		"https://nemlogin.wayf.dk": idpsppair{"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
 	}
 
 	bify     = regexp.MustCompile("^(https?://)(.*)$")
@@ -156,9 +151,9 @@ func Main() {
 	prepareTables(hubRequestedAttributes)
 
 	if Md.Internal == nil { // either all or none
-		Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
+		Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
 		Md.Internal = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
-		Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
+		Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
 		Md.ExternalSP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
 		for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
 			err := md.(*lMDQ.MDQ).Open()
@@ -207,6 +202,10 @@ func Main() {
 	http.Handle(config.Testsp_Acs, appHandler(testSPACService))
 	http.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
 	http.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
+
+	go func() {
+		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
+	}()
 
 	log.Println("listening on ", config.Intf)
 	err = http.ListenAndServeTLS(config.Intf, config.Https_Cert, config.Https_Key, nil)
@@ -364,11 +363,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
-	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
+	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
+	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
 	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
-	u, _ := gosaml.SAMLRequest2Url(newrequest, "anton-banton", "", "", "") // not signed so blank key, pw and algo
+	u, _ := gosaml.SAMLRequest2Url(newrequest, "", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/nemlogin.wayf.dk")
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/idp.testshib.org/idp/shibboleth")
@@ -729,6 +728,7 @@ func WayfKribHandler(response, birkmd, kribmd *goxml.Xp) (destination string, er
 }
 
 func nemloginAttributeHandler(response *goxml.Xp) {
+    q.Q(response.PP())
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0].(types.Element)
 	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.3"]/saml:AttributeValue`)
 	names := strings.Split(value, " ")
@@ -740,13 +740,14 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
 	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
 	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
 	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
 	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
-	//setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
+	setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
 	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
+    q.Q(response.PP())
 }
 
 /* see http://www.cpr.dk/cpr_artikler/Files/Fil1/4225.pdf or http://da.wikipedia.org/wiki/CPR-nummer for algorithm */
@@ -874,24 +875,16 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	var privatekey []byte
-	passwd := "-"
 	wars := mdidp.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
 	switch wars {
 	case "true", "1":
-		cert := mdhub.Query1(nil, spCertQuery) // actual signing key is always first
-		var keyname string
-		keyname, _, err = gosaml.PublicKeyInfo(cert)
-		if err != nil {
-			return err
-		}
-
-		privatekey, err = ioutil.ReadFile(config.Certpath + keyname + ".key")
-		if err != nil {
-			return
-		}
+	    privatekey, err = gosaml.GetPrivateKey(mdhub)
+	    if err != nil {
+	        return
+	    }
 	}
 
-	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), passwd, "sha256")
+	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", "sha1")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -932,7 +925,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 		ard, err = aCSServiceHandler(idp_md, hubRequestedAttributes, sp_md, request, response)
 		if err != nil {
-			return err
+			return goxml.Wrap(err)
 		}
 
 		newresponse = gosaml.NewResponse(birkmd, sp_md, request, response)
@@ -975,6 +968,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	acs := newresponse.Query1(nil, "@Destination")
 
 	ardjson, err := json.Marshal(ard)
+	if err != nil {
+		return goxml.Wrap(err)
+	}
 	data := formdata{Acs: acs, Samlresponse: base64.StdEncoding.EncodeToString([]byte(newresponse.Doc.Dump(false))), RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
 	return
@@ -1076,7 +1072,16 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			}
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
 			legacyStatLog("birk-99", "saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
-			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, "", "", "")
+            wars := finaldestination.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
+            var privatekey []byte
+            switch wars {
+            case "true", "1":
+                privatekey, err = gosaml.GetPrivateKey(issuer)
+                if err != nil {
+                    return err
+                }
+            }
+			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "sha1")
 			http.Redirect(w, r, u.String(), http.StatusFound)
 		} else {
 			err = fmt.Errorf("no Logout info found")
