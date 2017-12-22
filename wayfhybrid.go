@@ -18,7 +18,6 @@ import (
 	"github.com/wayf-dk/lMDQ"
 	"github.com/y0ssar1an/q"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -101,10 +100,6 @@ type (
 	sloInfo struct{}
 
 	wayfHybridSession struct{}
-)
-
-const (
-	spCertQuery = `./md:SPSSODescriptor/md:KeyDescriptor[@use="signing" or not(@use)]/ds:KeyInfo/ds:X509Data/ds:X509Certificate`
 )
 
 var (
@@ -733,6 +728,7 @@ func WayfKribHandler(response, birkmd, kribmd *goxml.Xp) (destination string, er
 }
 
 func nemloginAttributeHandler(response *goxml.Xp) {
+    q.Q(response.PP())
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0].(types.Element)
 	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.3"]/saml:AttributeValue`)
 	names := strings.Split(value, " ")
@@ -744,13 +740,14 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
 	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
 	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
 	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
 	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
-	//setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
+	setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
 	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
+    q.Q(response.PP())
 }
 
 /* see http://www.cpr.dk/cpr_artikler/Files/Fil1/4225.pdf or http://da.wikipedia.org/wiki/CPR-nummer for algorithm */
@@ -878,24 +875,16 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	var privatekey []byte
-	passwd := "-"
 	wars := mdidp.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
 	switch wars {
 	case "true", "1":
-		cert := mdhub.Query1(nil, spCertQuery) // actual signing key is always first
-		var keyname string
-		keyname, _, err = gosaml.PublicKeyInfo(cert)
-		if err != nil {
-			return err
-		}
-
-		privatekey, err = ioutil.ReadFile(config.Certpath + keyname + ".key")
-		if err != nil {
-			return
-		}
+	    privatekey, err = gosaml.GetPrivateKey(mdhub)
+	    if err != nil {
+	        return
+	    }
 	}
 
-	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), passwd, "sha1")
+	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", "sha1")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -1083,7 +1072,16 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			}
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
 			legacyStatLog("birk-99", "saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
-			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, "", "", "")
+            wars := finaldestination.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
+            var privatekey []byte
+            switch wars {
+            case "true", "1":
+                privatekey, err = gosaml.GetPrivateKey(issuer)
+                if err != nil {
+                    return err
+                }
+            }
+			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "sha1")
 			http.Redirect(w, r, u.String(), http.StatusFound)
 		} else {
 			err = fmt.Errorf("no Logout info found")
