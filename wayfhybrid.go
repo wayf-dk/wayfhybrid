@@ -655,12 +655,12 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 		epaAdd = append(epaAdd, "member")
 		epaset["member"] = true
 	}
-	newattribute, _ := hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]`)[0].Copy()
+	newattribute := response.CopyNode(hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]`)[0], 1)
 	_ = destinationAttributes.AddChild(newattribute)
 	for i, epa := range epaAdd {
 		response.QueryDashP(newattribute, `saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, epa, nil)
 	}
-	newattribute, _ = hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]`)[0].Copy()
+	newattribute = response.CopyNode(hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]`)[0], 1)
 	_ = destinationAttributes.AddChild(newattribute)
 	i := 1
 	for epa, _ := range epaset {
