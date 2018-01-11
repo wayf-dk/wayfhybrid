@@ -2,6 +2,7 @@ package wayfhybrid
 
 import (
 	"crypto"
+	"crypto/sha1"
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
@@ -279,7 +280,9 @@ func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
 		return
 	}
 	defer db.Close()
-	ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key))
+	//ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key))
+	hash := sha1.Sum([]byte(key))
+	ent := hex.EncodeToString(append(hash[:]))
 	var md []byte
 	var query = "select e.md md from entity_" + m.table + " e, lookup_" + m.table + " l where l.hash = ? and l.entity_id_fk = e.id"
 	err = db.QueryRow(query, ent).Scan(&md)
@@ -459,7 +462,7 @@ func WayfSSOServiceHandler(request, mdsp, mdhub, mdidp *goxml.Xp) (kribID, acsur
 	ssourl = mdidp.Query1(nil, "./md:IDPSSODescriptor/md:SingleSignOnService[1]/@Location")
 
 	acsurl = request.Query1(nil, "@AssertionConsumerServiceURL")
-	hashedKribID := fmt.Sprintf("%x", goxml.Hash(crypto.SHA1, kribID))
+	hashedKribID := fmt.Sprintf("%x", sha1.Sum([]byte(kribID)))
 	acsurl = bify.ReplaceAllString(acsurl, "${1}krib.wayf.dk/"+hashedKribID+"/$2")
 
 	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
@@ -599,8 +602,11 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	uidhashbase += strconv.Itoa(len(sp)) + ":" + sp
 	uidhashbase += strconv.Itoa(len(eppn)) + ":" + eppn
 	uidhashbase += config.EptidSalt
-	eptid := "WAYF-DK-" + hex.EncodeToString(goxml.Hash(crypto.SHA1, uidhashbase))
+	uidhashbase += config.EptidSalt
+	//eptid := "WAYF-DK-" + hex.EncodeToString(goxml.Hash(crypto.SHA1, uidhashbase))
 
+	hash := sha1.Sum([]byte(uidhashbase))
+	eptid := "WAYF-DK-" + hex.EncodeToString(append(hash[:]))
 	setAttribute("eduPersonTargetedID", eptid, response, destinationAttributes)
 
 	dkcprpreg := regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
@@ -738,9 +744,9 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
 	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
 	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
 	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
 	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
 	setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
