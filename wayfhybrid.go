@@ -597,11 +597,15 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	// Use kribified?, use birkified?
 	sp := sp_md.Query1(nil, "@entityID")
 
+	idpPEID := idp
+	if tmp := idp_md.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
+	    idpPEID = tmp
+	}
+
 	uidhashbase := "uidhashbase" + config.EptidSalt
-	uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
+	uidhashbase += strconv.Itoa(len(idpPEID)) + ":" + idpPEID
 	uidhashbase += strconv.Itoa(len(sp)) + ":" + sp
 	uidhashbase += strconv.Itoa(len(eppn)) + ":" + eppn
-	uidhashbase += config.EptidSalt
 	uidhashbase += config.EptidSalt
 	//eptid := "WAYF-DK-" + hex.EncodeToString(goxml.Hash(crypto.SHA1, uidhashbase))
 
