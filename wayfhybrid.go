@@ -147,7 +147,6 @@ func Main() {
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s\n", err))
 	}
-
 	err = tomlConfig.Unmarshal(&config)
 	if err != nil {
 		panic(fmt.Errorf("Fatal error %s\n", err))
@@ -343,7 +342,8 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		contextmutex.Unlock()
 		w.Header().Set("content-Security-Policy", "referrer no-referrer;")
 	*/
-	//starttime := time.Now()
+
+	starttime := time.Now()
 	err := fn(w, r)
 
 	status := 200
@@ -354,7 +354,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("OK")
 	}
 
-	//log.Printf("%s %s %s %+v %1.3f %d %s", r.RemoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
+	log.Printf("%s %s %s %+v %1.3f %d %s", r.RemoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
 	switch x := err.(type) {
 	case goxml.Werror:
 		log.Print(x.Stack(5))
@@ -379,7 +379,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
 	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
-	newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
+	//newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
@@ -830,10 +830,10 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
         // Bypass KRIB -> BIRK if we know this is for an internal IdP
-		if idp != debify.ReplaceAllString(idp, "$1$2") { // a BIRK IdP
-			err := sendRequestToInternalIdP(w, r, request, spmd, idpmd, relayState, true)
-			return err
-		}
+//		if idp != debify.ReplaceAllString(idp, "$1$2") { // a BIRK IdP
+//			err := sendRequestToInternalIdP(w, r, request, spmd, idpmd, relayState, true)
+//			return err
+//		}
 
 		kribID, acsurl, ssourl, err := sSOServiceHandler(request, spmd, hubmd, idpmd)
 		if err != nil {
@@ -908,7 +908,7 @@ func sendRequestToInternalIdP(w http.ResponseWriter, r *http.Request, request, m
 		}
 	}
 
-	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", "sha1")
+	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", "")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -933,6 +933,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
+
+    signingMethod := sp_md.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+
 	var birkmd *goxml.Xp
 	destination := request.Query1(nil, "/samlp:AuthnRequest/@Destination")
 	birkmd, err = Md.ExternalIdP.MDQ(destination)
@@ -943,7 +946,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	response, idp_md, hub_md, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
+	response, idp_md, hub_md, _, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
 	if err != nil {
 		return
 	}
@@ -973,7 +976,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		handleAttributeNameFormat(newresponse, sp_md)
 
 		for _, q := range config.ElementsToSign {
-			err = gosaml.SignResponse(newresponse, q, birkmd)
+			err = gosaml.SignResponse(newresponse, q, birkmd, signingMethod)
 			if err != nil {
 				return err
 			}
@@ -985,7 +988,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	} else {
 		newresponse = gosaml.NewErrorResponse(birkmd, sp_md, request, response)
-		err = gosaml.SignResponse(newresponse, "/samlp:Response", birkmd)
+		err = gosaml.SignResponse(newresponse, "/samlp:Response", birkmd, signingMethod)
 		if err != nil {
 			return
 		}
@@ -999,7 +1002,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return goxml.Wrap(err)
 	}
-	data := formdata{Acs: acs, Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
+	data := formdata{Acs: acs, Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: "abc", Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
 	return
 }
@@ -1017,6 +1020,12 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
+    mdsp, err := Md.Internal.MDQ(destination)
+    if err != nil {
+        return
+    }
+
+    signingMethod := mdsp.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
 	response.QueryDashP(nil, "@Destination", destination, nil)
 	issuer := config.HubEntityID
@@ -1036,21 +1045,16 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		// Krib always receives attributes with nameformat=urn. Before sending to the real SP we need to look into
 		// the metadata for SP to determine the actual nameformat - as WAYF supports both for Md.Internal SPs.
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
-		mdsp, err := Md.Internal.MDQ(destination)
-		if err != nil {
-			return err
-		}
-
 		handleAttributeNameFormat(response, mdsp)
 
 		for _, q := range config.ElementsToSign {
-			err = gosaml.SignResponse(response, q, mdhub)
+			err = gosaml.SignResponse(response, q, mdhub, signingMethod)
 			if err != nil {
 				return err
 			}
 		}
 	} else {
-		err = gosaml.SignResponse(response, "/samlp:Response", mdhub)
+		err = gosaml.SignResponse(response, "/samlp:Response", mdhub, signingMethod)
 		if err != nil {
 			return
 		}
@@ -1109,7 +1113,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 					return err
 				}
 			}
-			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "sha1")
+			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "")
 			http.Redirect(w, r, u.String(), http.StatusFound)
 		} else {
 			err = fmt.Errorf("no Logout info found")
