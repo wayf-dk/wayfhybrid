@@ -56,6 +56,7 @@ type (
 		Idpslo, Birkslo, Spslo, Kribslo, SaltForHashedEppn                                       string
 		NameIDFormats                                                                            []string
 		ElementsToSign                                                                           []string
+		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{Path, Table string}
 	}
 
 	idpsppair struct {
@@ -154,10 +155,10 @@ func Main() {
 	prepareTables(hubRequestedAttributes)
 
 	if Md.Internal == nil { // either all or none
-		Md.Hub = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "WAYF_HUB_PUBLIC"}
-		Md.Internal = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
-		Md.ExternalIdP = &lMDQ.MDQ{Path: "file:../hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
-		Md.ExternalSP = &lMDQ.MDQ{Path: "file:../hybrid-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
+		Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table}
+		Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table}
+		Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table}
+		Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
 		for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
 			err := md.(*lMDQ.MDQ).Open()
 			if err != nil {
