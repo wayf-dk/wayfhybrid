@@ -102,6 +102,11 @@ type (
 	sloInfo struct{}
 
 	wayfHybridSession struct{}
+
+    // https://stackoverflow.com/questions/47475802/golang-301-moved-permanently-if-request-path-contains-additional-slash
+    slashFix struct {
+        mux http.Handler
+    }
 )
 
 var (
@@ -186,36 +191,39 @@ func Main() {
 	hashKey, _ := hex.DecodeString(config.SecureCookieHashKey)
 	seccookie = securecookie.New(hashKey, nil)
 
+    httpMux := http.NewServeMux()
+
 	//http.HandleFunc("/status", statushandler)
 	//http.Handle(config["hybrid_public_prefix"], http.FileServer(http.Dir(config["hybrid_public"])))
-	http.Handle(config.Sso_Service, appHandler(SSOService))
-	http.Handle(config.Idpslo, appHandler(IdPSLOService))
-	http.Handle(config.Birkslo, appHandler(BirkSLOService))
-	http.Handle(config.Spslo, appHandler(SPSLOService))
-	http.Handle(config.Kribslo, appHandler(KribSLOService))
+	httpMux.Handle(config.Sso_Service, appHandler(SSOService))
+	httpMux.Handle(config.Idpslo, appHandler(IdPSLOService))
+	httpMux.Handle(config.Birkslo, appHandler(BirkSLOService))
+	httpMux.Handle(config.Spslo, appHandler(SPSLOService))
+	httpMux.Handle(config.Kribslo, appHandler(KribSLOService))
 
-	http.Handle(config.Acs, appHandler(ACSService))
-	http.Handle(config.Nemlogin_Acs, appHandler(ACSService))
-	http.Handle(config.Birk, appHandler(BirkService))
-	http.Handle(config.Krib, appHandler(KribService))
-	http.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
-	http.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
-	http.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
+	httpMux.Handle(config.Acs, appHandler(ACSService))
+	httpMux.Handle(config.Nemlogin_Acs, appHandler(ACSService))
+	httpMux.Handle(config.Birk, appHandler(BirkService))
+	httpMux.Handle(config.Krib, appHandler(KribService))
+	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
+	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
+	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
-	http.Handle(config.Testsp_Slo, appHandler(testSPACService))
-	http.Handle(config.Testsp_Acs, appHandler(testSPACService))
-	http.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
-	http.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
-
-	go func() {
-		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
-	}()
+	httpMux.Handle(config.Testsp_Slo, appHandler(testSPACService))
+	httpMux.Handle(config.Testsp_Acs, appHandler(testSPACService))
+	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
+	httpMux.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
 
 	log.Println("listening on ", config.Intf)
-	err = http.ListenAndServeTLS(config.Intf, config.Https_Cert, config.Https_Key, nil)
+	err = http.ListenAndServeTLS(config.Intf, config.Https_Cert, config.Https_Key, &slashFix{httpMux})
 	if err != nil {
 		log.Printf("main(): %s\n", err)
 	}
+}
+
+func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+    r.URL.Path = strings.Replace(r.URL.Path, "//", "/", -1)
+    h.mux.ServeHTTP(w, r)
 }
 
 func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id string, data []byte) (err error) {
