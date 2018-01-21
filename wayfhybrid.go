@@ -234,7 +234,7 @@ func Main() {
 	mdUpdateMux.Handle("/", appHandler(updateMetadataService)) // need a root "/" for routing
 
 	go func() {
-        log.Println("listening on 0.0.0.0:9000")
+        log.Println("listening on 0.0.0.0:9009")
         err = http.ListenAndServe(":9009", mdUpdateMux)
         if err != nil {
             log.Printf("main(): %s\n", err)
@@ -395,26 +395,10 @@ func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
 	case metadataUpdateGuard <- 1:
 		{
 	        for _, mdfeed := range config.MetadataFeeds {
-                dir := path.Dir(mdfeed.Path)
-                tempmddb, err := ioutil.TempFile(dir, "")
-                if err != nil {
-                    return err
-                }
-                defer tempmddb.Close()
-                resp, err := http.Get(mdfeed.URL)
-                if err != nil {
-                    return err
-                }
-                defer resp.Body.Close()
-                _, err = io.Copy(tempmddb, resp.Body)
-                if err != nil {
-                    return err
-                }
-                err = os.Rename(tempmddb.Name(), mdfeed.Path)
-                if err != nil {
-                    os.Remove(tempmddb.Name())
-                    return err
-                }
+	            if err = refreshMetadataFeed(mdfeed.Path, mdfeed.URL); err != nil {
+		            <- metadataUpdateGuard
+                    return
+	            }
             }
        		for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
                 err := md.(*lMDQ.MDQ).Open()
@@ -424,13 +408,36 @@ func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
     		}
             io.WriteString(w, "Pong")
             <- metadataUpdateGuard
-		} // Create one event. Push true in to the 'run' channel.
+		}
 	default:
 		{
         	io.WriteString(w, "Ignored")
 		}
 	}
 	return
+}
+
+func refreshMetadataFeed(mddbpath, url string) (err error) {
+    dir := path.Dir(mddbpath)
+    tempmddb, err := ioutil.TempFile(dir, "")
+    if err != nil {
+        return err
+    }
+    defer tempmddb.Close()
+    defer os.Remove(tempmddb.Name())
+    resp, err := http.Get(url)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+    _, err = io.Copy(tempmddb, resp.Body)
+    if err != nil {
+        return err
+    }
+    if err = os.Rename(tempmddb.Name(), mddbpath); err != nil {
+        return err
+    }
+    return
 }
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
