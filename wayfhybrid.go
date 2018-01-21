@@ -19,10 +19,13 @@ import (
 	"github.com/wayf-dk/lMDQ"
 	"github.com/y0ssar1an/q"
 	"html/template"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
+	"path"
 	"os"
 	"regexp"
 	"strconv"
@@ -57,6 +60,7 @@ type (
 		NameIDFormats                                                                            []string
 		ElementsToSign                                                                           []string
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{Path, Table string}
+		MetadataFeeds                                                                            []struct{Path, URL string}
 	}
 
 	idpsppair struct {
@@ -122,6 +126,8 @@ var (
 	debify        = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
 
+    metadataUpdateGuard chan int
+
 	sloStore = sloInfo{}
 	session  = wayfHybridSession{}
 
@@ -152,6 +158,7 @@ func Main() {
 		panic(fmt.Errorf("Fatal error %s\n", err))
 	}
 
+	metadataUpdateGuard = make(chan int, 1)
 	postForm = template.Must(template.New("post").Parse(config.PostFormTemplate))
 	attributeReleaseForm = template.Must(template.New("post").Parse(config.AttributeReleaseTemplate))
 
@@ -213,11 +220,28 @@ func Main() {
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
 	httpMux.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
 
-	log.Println("listening on ", config.Intf)
-	err = http.ListenAndServeTLS(config.Intf, config.Https_Cert, config.Https_Key, &slashFix{httpMux})
-	if err != nil {
-		log.Printf("main(): %s\n", err)
-	}
+	finish := make(chan bool)
+
+	go func() {
+        log.Println("listening on ", config.Intf)
+        err = http.ListenAndServeTLS(config.Intf, config.Https_Cert, config.Https_Key, &slashFix{httpMux})
+        if err != nil {
+            log.Printf("main(): %s\n", err)
+        }
+	}()
+
+   	mdUpdateMux := http.NewServeMux()
+	mdUpdateMux.Handle("/", appHandler(updateMetadataService)) // need a root "/" for routing
+
+	go func() {
+        log.Println("listening on 0.0.0.0:9000")
+        err = http.ListenAndServe(":9009", mdUpdateMux)
+        if err != nil {
+            log.Printf("main(): %s\n", err)
+        }
+	}()
+
+	<-finish
 }
 
 func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -364,6 +388,49 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		delete(context, r)
 		contextmutex.Unlock()
 	*/
+}
+
+func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
+	select {
+	case metadataUpdateGuard <- 1:
+		{
+	        for _, mdfeed := range config.MetadataFeeds {
+                dir := path.Dir(mdfeed.Path)
+                tempmddb, err := ioutil.TempFile(dir, "")
+                if err != nil {
+                    return err
+                }
+                defer tempmddb.Close()
+                resp, err := http.Get(mdfeed.URL)
+                if err != nil {
+                    return err
+                }
+                defer resp.Body.Close()
+                _, err = io.Copy(tempmddb, resp.Body)
+                if err != nil {
+                    return err
+                }
+                err = os.Rename(tempmddb.Name(), mdfeed.Path)
+                if err != nil {
+                    os.Remove(tempmddb.Name())
+                    return err
+                }
+            }
+       		for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
+                err := md.(*lMDQ.MDQ).Open()
+                if err != nil {
+                    panic(err)
+                }
+    		}
+            io.WriteString(w, "Pong")
+            <- metadataUpdateGuard
+		} // Create one event. Push true in to the 'run' channel.
+	default:
+		{
+        	io.WriteString(w, "Ignored")
+		}
+	}
+	return
 }
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
