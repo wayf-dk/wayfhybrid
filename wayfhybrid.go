@@ -44,6 +44,16 @@ type (
 		db, table string
 	}
 
+	goElevenConfig struct {
+		Hsmlib        string
+		Usertype      string
+		Serialnumber  string
+		Slot          string
+		Slot_password string
+		Key_label     string
+		Maxsessions   string
+	}
+
 	wayfHybridConfig struct {
 		DiscoveryService                                                                         string
 		Domain                                                                                   string
@@ -156,6 +166,19 @@ func Main() {
 	err = tomlConfig.Unmarshal(&config)
 	if err != nil {
 		panic(fmt.Errorf("Fatal error %s\n", err))
+	}
+
+	if config.GoEleven.Slot_password != "" {
+		c := config.GoEleven
+		goeleven.LibraryInit(map[string]string{
+			"GOELEVEN_HSMLIB":        c.Hsmlib,
+			"GOELEVEN_USERTYPE":      c.Usertype,
+			"GOELEVEN_SERIALNUMBER":  c.Serialnumber,
+			"GOELEVEN_SLOT":          c.Slot,
+			"GOELEVEN_SLOT_PASSWORD": c.Slot_password,
+			"GOELEVEN_KEY_LABEL":     c.Key_label,
+			"GOELEVEN_MAXSESSIONS":   c.Maxsessions,
+		})
 	}
 
 	metadataUpdateGuard = make(chan int, 1)
