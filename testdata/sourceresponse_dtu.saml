@@ -104,8 +104,8 @@
                             >
                 <saml:AttributeValue xsi:type="xs:string">Petersen</saml:AttributeValue>
             </saml:Attribute>
-            <saml:Attribute Name="cn"
-                            NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
+            <saml:Attribute Name="urn:oid:2.5.4.3"
+                            NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri"
                             >
                 <saml:AttributeValue xsi:type="xs:string">Mads Freek Petersen</saml:AttributeValue>
             </saml:Attribute>

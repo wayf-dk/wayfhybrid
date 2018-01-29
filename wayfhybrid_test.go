@@ -1,6 +1,8 @@
 package wayfhybrid
 
 import (
+    "crypto/sha1"
+    "encoding/base64"
 	"fmt"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
@@ -15,6 +17,11 @@ var (
 	_ = log.Println
 	_ = q.Q
 )
+
+func printHashedDom(xp *goxml.Xp) {
+    hash := sha1.Sum([]byte(xp.C14n(nil, "")))
+	fmt.Println(base64.StdEncoding.EncodeToString(append(hash[:])))
+}
 
 /**
   ExampleNewMetadata tests that the lock preventing race conditions when
@@ -96,7 +103,7 @@ func ExampleWayfAttributeHandler() {
 	WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, sourceResponse)
 	gosaml.AttributeCanonicalDump(os.Stdout, sourceResponse)
 
-	// output:
+	// Output:
 	// cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Mads Freek Petersen
 	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
@@ -145,7 +152,7 @@ func ExampleNemLoginAttributeHandler() {
 	WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, nemloginResponse)
 
 	gosaml.AttributeCanonicalDump(os.Stdout, nemloginResponse)
-	// output:
+	// Output:
 	// cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Anton Banton Cantonsen
 	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
@@ -183,7 +190,7 @@ func ExampleNemLoginAttributeHandler() {
 func ExampleSamlError() {
 	nemloginResponse := goxml.NewXpFromFile("testdata/samlerror.xml")
 	fmt.Println(nemloginResponse.PP())
-	// output:
+	// Output:
 	// <samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
 	//                 xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
 	//                 ID="_27af2a04b11ad6b9b819c6f33e333a536ecffc4163"
@@ -203,4 +210,74 @@ func ExampleSamlError() {
 	//         </samlp:StatusMessage>
 	//     </samlp:Status>
 	// </samlp:Response>
+}
+
+func ExampleCheckForCommonFederations() {
+    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+	err := checkForCommonFederations(idp_md, sp_md)
+	fmt.Println(err)
+	// Output:
+	// <nil>
+}
+
+func ExampleNoCommonFederations() {
+    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+	sp_md.QueryDashP(nil, "./md:Extensions/wayf:wayf/wayf:feds", "ExampleFed", nil)
+	err := checkForCommonFederations(idp_md, sp_md)
+	fmt.Println(err)
+	// Output:
+	// no common federations
+}
+
+func ExampleSetAttribute() {
+    response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+    sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+    setAttribute("schacHomeOrganization", "DEIC", response, sourceAttributes)
+	setAttribute("organizationName", "WAYF", response, sourceAttributes)
+	printHashedDom(response)
+	// Output:
+	// uOmMloU+SsYGph41T3Fso0lmdCk=
+}
+
+func ExampleHandleAttributeNameFormat() {
+    sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+    response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+    requestedAttr := goxml.NewXpFromFile("testdata/requestedattr.xml")
+	prepareTables(requestedAttr)
+    handleAttributeNameFormat(response, sp_md)
+    // Output:
+    //
+}
+
+func ExampleWayfSSOServiceHandler() {
+    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+	hub_md := goxml.NewXpFromFile("testdata/hub_md.xml")
+	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
+	kribID, acsurl, ssourl, err  := WayfSSOServiceHandler(request, sp_md, hub_md, idp_md)
+	fmt.Println(kribID, acsurl, ssourl, err)
+	// Output:
+    // https://wayfsp.wayf.dk https://krib.wayf.dk/b267bd3559352c5fb837ea444a1034b823e8d195/wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-acs.php/default-sp https://wayf.ait.dtu.dk/saml2/idp/SSOService.php <nil>
+}
+
+func ExampleMakeSloUrl() {
+    response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+    url := makeSloUrl(response, idp_md, sp_md)
+    fmt.Println(url)
+    // Output:
+    // ?SAMLRequest=fJHNbtQwFIX38xSW95M4jpsfa5IKaVRppIKAFhZsqhv7urWa2CG%2BgfL2aFKQBhbdWP4539E5vofrl2lkP3BJPoaOF5ngDIOJ1ofHjn%2B5v9k3%2FLrfHRJM46xv42Nc6TN%2BXzERe5nGkPT20vF1CTpC8kkHmDBpMvru3ftbLTOh5yVSNHHkF8jbBKSEC%2FkYODsdO%2F5g6gGNU1A1VXvllG2HxklAi6qxDkRlBiMd1o0RnH39W0aey5xSWvEUEkGgjktRNHtR7GV1L1qtCq3qb5wdMZEPQBvF%2Bx1jjG2N9UYv%2FRPRnHSe%2F4RfLgNPmaU1s8%2F5WSNzb%2Bd8QgILBNn8NB%2FyS%2FbC7QNMeDqyu4%2FnzacVRu88Lh3%2Fx35b7DNnN3GZgN7%2Bp%2FONt3u3STUtEJLHQLx%2FULVwJTaDLVUplLwyEtpKloUYFDRWQN3a0hknS%2FwT9zVcv3s9%2Fjfrfvc7AAD%2F%2Fw%3D%3D
+}
+
+func xxExampleWayfBirkHandler() {
+    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
+	_, _, err := WayfBirkHandler(request, sp_md, idp_md)
+	fmt.Println(err)
+	// Output:
+    // Mkhan
 }
