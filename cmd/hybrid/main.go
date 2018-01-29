@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-    wayfhybrid.Main()
+	wayfhybrid.Main()
 }
