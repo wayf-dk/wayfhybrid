@@ -5,10 +5,10 @@ import (
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lMDQ"
+	"github.com/y0ssar1an/q"
 	"log"
 	"os"
 	"time"
-	"github.com/y0ssar1an/q"
 )
 
 var (
@@ -16,31 +16,30 @@ var (
 	_ = q.Q
 )
 
-
 /**
-    ExampleNewMetadata tests that the lock preventing race conditions when
-    opening and using a mddb works. In real life we (re-)open a mddb file with the
-    same name (but hopefully with updated metadata).
+  ExampleNewMetadata tests that the lock preventing race conditions when
+  opening and using a mddb works. In real life we (re-)open a mddb file with the
+  same name (but hopefully with updated metadata).
 */
 func ExampleNewMetadata() {
-    onetwo := map[string]bool{}
+	onetwo := map[string]bool{}
 	finish := make(chan bool)
-    mdset := &lMDQ.MDQ{Path: "file:testdata/one.mddb?mode=ro", Table: "wayf_hub_base"}
-    mdset.Open()
-    go func() {
-        for range [1000]int{} {
-            md, _ := mdset.MDQ("https://wayf.wayf.dk")
-            onetwo[md.Query1(nil, "//wayf:phphfeed")] = true
-        }
-        finish <- true
-    }()
-    time.Sleep(1 * time.Millisecond)
-    mdset.Path = "file:testdata/two.mddb?mode=ro"
-    mdset.Open()
-    <-finish
-    fmt.Println(onetwo)
-    // Output:
-    // map[one:true two:true]
+	mdset := &lMDQ.MDQ{Path: "file:testdata/one.mddb?mode=ro", Table: "wayf_hub_base"}
+	mdset.Open()
+	go func() {
+		for range [1000]int{} {
+			md, _ := mdset.MDQ("https://wayf.wayf.dk")
+			onetwo[md.Query1(nil, "//wayf:phphfeed")] = true
+		}
+		finish <- true
+	}()
+	time.Sleep(1 * time.Millisecond)
+	mdset.Path = "file:testdata/two.mddb?mode=ro"
+	mdset.Open()
+	<-finish
+	fmt.Println(onetwo)
+	// Output:
+	// map[one:true two:true]
 }
 
 func ExampleCheckCprCentury() {
