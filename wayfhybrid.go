@@ -115,7 +115,6 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
 	}
 
-
 	wayfHybridSession struct{}
 
 	// https://stackoverflow.com/questions/47475802/golang-301-moved-permanently-if-request-path-contains-additional-slash
@@ -140,7 +139,7 @@ var (
 
 	metadataUpdateGuard chan int
 
-	session  = wayfHybridSession{}
+	session = wayfHybridSession{}
 
 	seccookie                      *securecookie.SecureCookie
 	postForm, attributeReleaseForm *template.Template
@@ -221,6 +220,7 @@ func Main() {
 
 	hashKey, _ := hex.DecodeString(config.SecureCookieHashKey)
 	seccookie = securecookie.New(hashKey, nil)
+	seccookie.SetSerializer(securecookie.NopEncoder{})
 
 	httpMux := http.NewServeMux()
 
@@ -276,7 +276,6 @@ func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id string, data []byte) (err error) {
-	q.Q(id, string(data))
 	cookie, err := seccookie.Encode(id, gosaml.Deflate(data))
 	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: 8 * 3600})
 	return
@@ -539,7 +538,7 @@ func makeSloRequestURL(response, issuer, destination *goxml.Xp) string {
 }
 
 func makeSloResponseURL(request, issuer, destination *goxml.Xp) string {
-    template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+	template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                       xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
                       ID="_7e3ee93a09570edc9bb85a2d300e6f701dc74393"
                       Version="2.0"
@@ -594,7 +593,7 @@ func WayfSSOServiceHandler(request, mdsp, mdhub, mdidp *goxml.Xp) (kribID, acsur
 		return
 	}
 
-	legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+	legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 	return
 }
 
@@ -624,7 +623,7 @@ func WayfBirkHandler(request, mdsp, mdbirkidp *goxml.Xp) (mdhub, mdidp *goxml.Xp
 		return
 	}
 
-	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
 	return
 }
@@ -1092,7 +1091,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 		}
-		if _, err = SLOInfoHandler(w, r, response, hub_md, newresponse, sp_md, gosaml.SPRole, "BIRK-SLO"); err != nil {
+		if _, err = SLOInfoHandler(w, r, response, hub_md, newresponse, sp_md, gosaml.SPRole, "BS"); err != nil {
 			return
 		}
 
@@ -1136,7 +1135,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	signingMethod := mdsp.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
-    origResponse := goxml.NewXpFromNode(response.DocGetRootElement())
+	origResponse := goxml.NewXpFromNode(response.DocGetRootElement())
 
 	response.QueryDashP(nil, "@Destination", destination, nil)
 	issuer := config.HubEntityID
@@ -1149,7 +1148,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		if _, err = SLOInfoHandler(w, r, origResponse, kribmd, response, mdsp, gosaml.SPRole, "KRIB-SLO"); err != nil {
+		if _, err = SLOInfoHandler(w, r, origResponse, kribmd, response, mdsp, gosaml.SPRole, "KS"); err != nil {
 			return err
 		}
 
@@ -1178,19 +1177,19 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, "BIRK-SLO")
+	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, "BS")
 }
 
 func BirkSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, Md.ExternalSP, Md.ExternalIdP, Md.Hub, Md.Internal, gosaml.IdPRole, "BIRK-SLO")
+	return SLOService(w, r, Md.ExternalSP, Md.ExternalIdP, Md.Hub, Md.Internal, gosaml.IdPRole, "BS")
 }
 
 func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, Md.ExternalIdP, Md.ExternalSP, Md.Hub, Md.Internal, gosaml.SPRole, "KRIB-SLO")
+	return SLOService(w, r, Md.ExternalIdP, Md.ExternalSP, Md.Hub, Md.Internal, gosaml.SPRole, "KS")
 }
 
 func IdPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalSP, Md.ExternalIdP, gosaml.IdPRole, "KRIB-SLO")
+	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalSP, Md.ExternalIdP, gosaml.IdPRole, "KS")
 }
 
 func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destinationMdSet, finalIssuerMdSet, finalDestinationMdSet gosaml.Md, role int, tag string) (err error) {
@@ -1208,31 +1207,31 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			md = issuer
 		}
 		sloinfo, _ := SLOInfoHandler(w, r, request, md, request, md, role, tag)
-		if sloinfo.NameID != "" {
-		    if role == gosaml.IdPRole { // reverse if we are getting the request form a SP
-		        sloinfo.IssuerID, sloinfo.DestinationID = sloinfo.DestinationID, sloinfo.IssuerID
-		    }
-            q.Q(role, sloinfo)
-			finalDestination, err := finalDestinationMdSet.MDQ(sloinfo.DestinationID)
+		if sloinfo.Na != "" {
+			if role == gosaml.IdPRole { // reverse if we are getting the request form a SP
+				sloinfo.Is, sloinfo.De = sloinfo.De, sloinfo.Is
+			}
+			finalDestination, err := finalDestinationMdSet.MDQ("{sha1}"+sloinfo.De)
 			if err != nil {
 				return err
 			}
-			finalIssuer, err := finalIssuerMdSet.MDQ(sloinfo.IssuerID)
+			sloinfo.De = finalDestination.Query1(nil, "./@entityID")
+			finalIssuer, err := finalIssuerMdSet.MDQ("{sha1}"+sloinfo.Is)
 			if err != nil {
 				return err
 			}
+			sloinfo.Is = finalIssuer.Query1(nil, "./@entityID")
 
 			newRequest, err := gosaml.NewLogoutRequest(finalIssuer, finalDestination, request, sloinfo, role)
 			if err != nil {
-			    return err
+				return err
 			}
-			q.Q("newRequest", newRequest.PP())
 			async := request.QueryBool(nil, "boolean(./samlp:Extensions/aslo:Asynchronous)")
 			if !async {
 				session.Set(w, r, tag+"-REQ", request.Dump())
 			}
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
-			legacyStatLog("birk-99", "saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
+			legacyStatLog("birk-99", "saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.Na+fmt.Sprintf(" async:%t", async))
 			// always sign if a private key is available - ie. ignore missing keys
 			privatekey, _ := gosaml.GetPrivateKey(finalIssuer)
 			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "")
@@ -1275,70 +1274,80 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		HashIn, HashOut string
 	}
 	var key, idp, sp, spIdPHash string
-	var data []byte
-	hashIn := fmt.Sprintf("%s-%d-%x", tag, gosaml.SPRole, sha1.Sum([]byte(tag+"#"+samlIn.Query1(nil, "//saml:NameID"))))
-	hashOut := fmt.Sprintf("%s-%d-%x", tag, gosaml.IdPRole, sha1.Sum([]byte(tag+"#"+samlOut.Query1(nil, "//saml:NameID"))))
+	hashIn := fmt.Sprintf("%s-%d-%s", tag, gosaml.SPRole, sloHash(samlIn.Query1(nil, "//saml:NameID")))
+	hashOut := fmt.Sprintf("%s-%d-%s", tag, gosaml.IdPRole, sloHash(samlOut.Query1(nil, "//saml:NameID")))
 
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
-	    switch role {
-        case gosaml.IdPRole: // request from a SP
-            key = hashOut
-        case gosaml.SPRole: // reguest from an IdP
-            key = hashIn
-        }
+		switch role {
+		case gosaml.IdPRole: // request from a SP
+			key = hashOut
+		case gosaml.SPRole: // reguest from an IdP
+			key = hashIn
+		}
 		sloinfo = &gosaml.SLOInfo{}
-		data, err = session.Get(w, r, key)
+		data, err := session.Get(w, r, key)
 		if err == nil {
 			err = json.Unmarshal(data, &sloinfo)
 		}
-		q.Q(role, key, sloinfo)
 		session.Del(w, r, key)
-		key = fmt.Sprintf("%s-%d-%x", tag, (role+1)%2, sha1.Sum([]byte(tag+"#"+sloinfo.NameID)))
+		key = fmt.Sprintf("%s-%d-%s", tag, (role+1)%2, sloHash(sloinfo.Na))
 		sloinfo2 := &gosaml.SLOInfo{}
 		data, err = session.Get(w, r, key)
 		if err == nil {
 			err = json.Unmarshal(data, &sloinfo2)
 		}
-	    switch role {
-        case gosaml.IdPRole: // request from a SP
-           idp = sloinfo2.IssuerID
-           sp = sloinfo2.DestinationID
-        case gosaml.SPRole: // reguest from an IdP
-           idp = sloinfo.IssuerID
-           sp = sloinfo.DestinationID
-        }
 		session.Del(w, r, key)
-    	spIdPHash = fmt.Sprintf("%x", sha1.Sum([]byte(tag+"#"+idp+"#"+sp)))
+		switch role {
+		case gosaml.IdPRole: // request from a SP
+			idp = sloinfo2.Is
+			sp = sloinfo2.De
+		case gosaml.SPRole: // reguest from an IdP
+			idp = sloinfo.Is
+			sp = sloinfo.De
+		}
+		spIdPHash = sloHash(tag+"#"+idp+"#"+sp)
 		session.Del(w, r, spIdPHash)
 	case "LogoutResponse":
 		// needed at all ???
 	case "Response":
 		idp = samlOut.Query1(nil, "./saml:Issuer")
-		sp = destinationOutMd .Query1(nil, "./@entityID")
-    	spIdPHash = fmt.Sprintf("%x", sha1.Sum([]byte(tag+"#"+idp+"#"+sp)))
+		sp = destinationOutMd.Query1(nil, "./@entityID")
+		idpHash := sloHash(idp)
+		spHash := sloHash(sp)
+		spIdPHash = sloHash(tag+"#"+idpHash+"#"+spHash)
 		// 1st delete any SLO info for the same idp-sp pair
 		unique := &touple{}
 		data, err := session.Get(w, r, spIdPHash)
 		if err == nil {
 			err = json.Unmarshal(data, &unique)
 		}
-		q.Q(unique, string(data), err, spIdPHash, idp, sp)
 		session.Del(w, r, unique.HashIn)
 		session.Del(w, r, unique.HashOut)
 		// 2nd create 2 new SLO info recs and save them under the hash of the opposite
 		unique.HashIn = hashIn
 		unique.HashOut = hashOut
 		bytes, err := json.Marshal(&unique)
-		q.Q(unique, err, string(bytes))
 		session.Set(w, r, spIdPHash, bytes)
-		bytes, _ = json.Marshal(gosaml.NewSLOInfo(samlIn, destinationInMd))
+
+		slo := gosaml.NewSLOInfo(samlIn, destinationInMd)
+     	slo.Is = sloHash(slo.Is)
+	    slo.De = sloHash(slo.De)
+        bytes, _ = json.Marshal(&slo)
 		session.Set(w, r, hashOut, bytes)
-		bytes, _ = json.Marshal(gosaml.NewSLOInfo(samlOut, destinationOutMd))
+
+		slo = gosaml.NewSLOInfo(samlOut, destinationOutMd)
+    	slo.Is = sloHash(slo.Is)
+	    slo.De = sloHash(slo.De)
+        bytes, _ = json.Marshal(&slo)
 		session.Set(w, r, hashIn, bytes)
+
 	}
-	q.Q(samlIn.QueryString(nil, "local-name(/*)"), role, tag, idp, sp, hashIn, hashOut, spIdPHash, sloinfo)
 	return
+}
+
+func sloHash(data string) (string) {
+    return fmt.Sprintf("%.5x", sha1.Sum([]byte(data)))
 }
 
 func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
