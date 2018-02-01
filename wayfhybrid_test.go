@@ -1,8 +1,8 @@
 package wayfhybrid
 
 import (
-    "crypto/sha1"
-    "encoding/base64"
+	"crypto/sha1"
+	"encoding/base64"
 	"fmt"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
@@ -19,7 +19,7 @@ var (
 )
 
 func printHashedDom(xp *goxml.Xp) {
-    hash := sha1.Sum([]byte(xp.C14n(nil, "")))
+	hash := sha1.Sum([]byte(xp.C14n(nil, "")))
 	fmt.Println(base64.StdEncoding.EncodeToString(append(hash[:])))
 }
 
@@ -213,7 +213,7 @@ func ExampleSamlError() {
 }
 
 func ExampleCheckForCommonFederations() {
-    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	err := checkForCommonFederations(idp_md, sp_md)
 	fmt.Println(err)
@@ -222,7 +222,7 @@ func ExampleCheckForCommonFederations() {
 }
 
 func ExampleNoCommonFederations() {
-    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	sp_md.QueryDashP(nil, "./md:Extensions/wayf:wayf/wayf:feds", "ExampleFed", nil)
 	err := checkForCommonFederations(idp_md, sp_md)
@@ -232,9 +232,9 @@ func ExampleNoCommonFederations() {
 }
 
 func ExampleSetAttribute() {
-    response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-    sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-    setAttribute("schacHomeOrganization", "DEIC", response, sourceAttributes)
+	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+	setAttribute("schacHomeOrganization", "DEIC", response, sourceAttributes)
 	setAttribute("organizationName", "WAYF", response, sourceAttributes)
 	printHashedDom(response)
 	// Output:
@@ -242,24 +242,24 @@ func ExampleSetAttribute() {
 }
 
 func ExampleHandleAttributeNameFormat() {
-    sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-    response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-    requestedAttr := goxml.NewXpFromFile("testdata/requestedattr.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	requestedAttr := goxml.NewXpFromFile("testdata/requestedattr.xml")
 	prepareTables(requestedAttr)
-    handleAttributeNameFormat(response, sp_md)
-    // Output:
-    //
+	handleAttributeNameFormat(response, sp_md)
+	// Output:
+	//
 }
 
 func ExampleWayfSSOServiceHandler() {
-    idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	hub_md := goxml.NewXpFromFile("testdata/hub_md.xml")
 	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
-	kribID, acsurl, ssourl, err  := WayfSSOServiceHandler(request, sp_md, hub_md, idp_md)
+	kribID, acsurl, ssourl, err := WayfSSOServiceHandler(request, sp_md, hub_md, idp_md)
 	fmt.Println(kribID, acsurl, ssourl, err)
 	// Output:
-    // https://wayfsp.wayf.dk https://krib.wayf.dk/b267bd3559352c5fb837ea444a1034b823e8d195/wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-acs.php/default-sp https://wayf.ait.dtu.dk/saml2/idp/SSOService.php <nil>
+	// https://wayfsp.wayf.dk https://krib.wayf.dk/b267bd3559352c5fb837ea444a1034b823e8d195/wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-acs.php/default-sp https://wayf.ait.dtu.dk/saml2/idp/SSOService.php <nil>
 }
 
 

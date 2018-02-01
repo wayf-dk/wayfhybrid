@@ -67,7 +67,7 @@ type (
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs                    string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService    string
-		Idpslo, Birkslo, Spslo, Kribslo, SaltForHashedEppn                                       string
+		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, SaltForHashedEppn                          string
 		NameIDFormats                                                                            []string
 		ElementsToSign                                                                           []string
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
@@ -115,7 +115,6 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
 	}
 
-	sloInfo struct{}
 
 	wayfHybridSession struct{}
 
@@ -141,7 +140,6 @@ var (
 
 	metadataUpdateGuard chan int
 
-	sloStore = sloInfo{}
 	session  = wayfHybridSession{}
 
 	seccookie                      *securecookie.SecureCookie
@@ -156,7 +154,6 @@ var (
 	birkHandler        func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (*goxml.Xp, *goxml.Xp, error)
 	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (AttributeReleaseData, error)
 	kribServiceHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
-	xxx                map[string]string
 )
 
 func Main() {
@@ -234,6 +231,7 @@ func Main() {
 	httpMux.Handle(config.Birkslo, appHandler(BirkSLOService))
 	httpMux.Handle(config.Spslo, appHandler(SPSLOService))
 	httpMux.Handle(config.Kribslo, appHandler(KribSLOService))
+	httpMux.Handle(config.Nemloginslo, appHandler(SPSLOService))
 
 	httpMux.Handle(config.Acs, appHandler(ACSService))
 	httpMux.Handle(config.Nemlogin_Acs, appHandler(ACSService))
@@ -262,8 +260,8 @@ func Main() {
 	mdUpdateMux.Handle("/", appHandler(updateMetadataService)) // need a root "/" for routing
 
 	go func() {
-		log.Println("listening on 0.0.0.0:9009")
-		err = http.ListenAndServe(":9009", mdUpdateMux)
+		log.Println("listening on 0.0.0.0:9000")
+		err = http.ListenAndServe(":9000", mdUpdateMux)
 		if err != nil {
 			log.Printf("main(): %s\n", err)
 		}
@@ -278,6 +276,7 @@ func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id string, data []byte) (err error) {
+	q.Q(id, string(data))
 	cookie, err := seccookie.Encode(id, gosaml.Deflate(data))
 	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: 8 * 3600})
 	return
@@ -300,20 +299,6 @@ func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id string
 func (s wayfHybridSession) GetDel(w http.ResponseWriter, r *http.Request, id string) (data []byte, err error) {
 	data, err = s.Get(w, r, id)
 	s.Del(w, r, id)
-	return
-}
-
-func (s sloInfo) Put(w http.ResponseWriter, r *http.Request, id string, sloinfo *gosaml.SLOInfo) {
-	cookieBytes, _ := json.Marshal(sloinfo)
-	_ = session.Set(w, r, id, cookieBytes)
-}
-
-func (s sloInfo) GetDel(w http.ResponseWriter, r *http.Request, id string) (sloinfo *gosaml.SLOInfo) {
-	sloinfo = &gosaml.SLOInfo{}
-	data, err := session.GetDel(w, r, id)
-	if err == nil {
-		err = json.Unmarshal(data, &sloinfo)
-	}
 	return
 }
 
@@ -479,8 +464,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
-	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
+	//newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "https://birk.wayf.dk/birk.php/orphanage.wayf.dk")
+	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
 	//newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "", "", "", "") // not signed so blank key, pw and algo
@@ -497,9 +482,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	// try to decode SAML message to ourselves or just another SP
-	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
+	response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
 	if err != nil {
-		response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutResponse"}, false)
+		response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
 	}
 	// don't do destination check - we accept and dumps anything ...
 	if err != nil {
@@ -513,8 +498,10 @@ func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8") // normal header
 	w.WriteHeader(http.StatusOK)
 
-	slo := makeSloUrl(response, destinationmd, issuermd)
-	w.Write([]byte("<pre>SLO: <a href=\"" + slo + "\">SLO</a>\n"))
+	sloRequest := makeSloRequestURL(response, destinationmd, issuermd)
+	sloResponse := makeSloResponseURL(response, destinationmd, issuermd)
+	w.Write([]byte("<pre><a href=\"" + sloRequest + "\">SLO Request</a>\n"))
+	w.Write([]byte("<pre><a href=\"" + sloResponse + "\">SLO Response</a>\n"))
 	w.Write([]byte("RelayState: " + relayState + "\n"))
 	w.Write([]byte("Error: " + errStr + "\n"))
 
@@ -525,7 +512,7 @@ func testSPACService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-func makeSloUrl(response, issuer, destination *goxml.Xp) string {
+func makeSloRequestURL(response, issuer, destination *goxml.Xp) string {
 	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                      xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
                      ID=""
@@ -548,6 +535,33 @@ func makeSloUrl(response, issuer, destination *goxml.Xp) string {
 	request.QueryDashP(nil, "./saml:NameID/@Format", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@Format"), nil)
 	request.QueryDashP(nil, "./saml:NameID", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID"), nil)
 	u, _ := gosaml.SAMLRequest2Url(request, "", "", "", "")
+	return u.String()
+}
+
+func makeSloResponseURL(request, issuer, destination *goxml.Xp) string {
+    template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+                      xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
+                      ID="_7e3ee93a09570edc9bb85a2d300e6f701dc74393"
+                      Version="2.0"
+                      IssueInstant="2018-01-31T14:01:19Z"
+                      Destination="https://wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-logout.php/default-sp"
+                      InResponseTo="_7645977ce3d668e7ef9d650f4361e350f612a178eb">
+    <saml:Issuer>
+     https://wayf.wayf.dk
+    </saml:Issuer>
+    <samlp:Status>
+        <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+    </samlp:Status>
+</samlp:LogoutResponse>
+`
+	response := goxml.NewXpFromString(template)
+	slo := destination.Query1(nil, `./md:IDPSSODescriptor/md:SingleLogoutService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
+	response.QueryDashP(nil, "./@IssueInstant", time.Now().Format(gosaml.XsDateTime), nil)
+	response.QueryDashP(nil, "./@ID", gosaml.Id(), nil)
+	response.QueryDashP(nil, "./@Destination", slo, nil)
+	response.QueryDashP(nil, "./@InResponseTo", request.Query1(nil, "./@ID"), nil)
+	response.QueryDashP(nil, "./saml:Issuer", issuer.Query1(nil, `/md:EntityDescriptor/@entityID`), nil)
+	u, _ := gosaml.SAMLRequest2Url(response, "", "", "", "")
 	return u.String()
 }
 
@@ -1078,8 +1092,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 		}
-
-		if _, err = SLOInfoHandler(w, r, response, newresponse, hub_md, "BIRK-SLO"); err != nil {
+		if _, err = SLOInfoHandler(w, r, response, hub_md, newresponse, sp_md, gosaml.SPRole, "BIRK-SLO"); err != nil {
 			return
 		}
 
@@ -1123,10 +1136,12 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	signingMethod := mdsp.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+    origResponse := goxml.NewXpFromNode(response.DocGetRootElement())
 
 	response.QueryDashP(nil, "@Destination", destination, nil)
 	issuer := config.HubEntityID
 	response.QueryDashP(nil, "./saml:Issuer", issuer, nil)
+	response.QueryDashP(nil, "./saml:Assertion/saml:Issuer", issuer, nil)
 
 	mdhub, err := Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
@@ -1134,7 +1149,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		if _, err = SLOInfoHandler(w, r, response, response, kribmd, "KRIB-SLO"); err != nil {
+		if _, err = SLOInfoHandler(w, r, origResponse, kribmd, response, mdsp, gosaml.SPRole, "KRIB-SLO"); err != nil {
 			return err
 		}
 
@@ -1162,16 +1177,16 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
+	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, "BIRK-SLO")
+}
+
 func BirkSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, Md.ExternalSP, Md.ExternalIdP, Md.Hub, Md.Internal, gosaml.IdPRole, "BIRK-SLO")
 }
 
 func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, Md.ExternalIdP, Md.ExternalSP, Md.Hub, Md.Internal, gosaml.SPRole, "KRIB-SLO")
-}
-
-func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, Md.Internal, Md.Hub, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, "BIRK-SLO")
 }
 
 func IdPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
@@ -1188,29 +1203,38 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		if err != nil {
 			return err
 		}
-		sloinfo, _ := SLOInfoHandler(w, r, request, request, nil, tag)
+		md := destination
+		if role == gosaml.SPRole {
+			md = issuer
+		}
+		sloinfo, _ := SLOInfoHandler(w, r, request, md, request, md, role, tag)
 		if sloinfo.NameID != "" {
-			finaldestination, err := finalDestinationMdSet.MDQ(sloinfo.EntityID)
+		    if role == gosaml.IdPRole { // reverse if we are getting the request form a SP
+		        sloinfo.IssuerID, sloinfo.DestinationID = sloinfo.DestinationID, sloinfo.IssuerID
+		    }
+            q.Q(role, sloinfo)
+			finalDestination, err := finalDestinationMdSet.MDQ(sloinfo.DestinationID)
 			if err != nil {
 				return err
 			}
-			newRequest := gosaml.NewLogoutRequest(issuer, finaldestination, request, sloinfo)
+			finalIssuer, err := finalIssuerMdSet.MDQ(sloinfo.IssuerID)
+			if err != nil {
+				return err
+			}
+
+			newRequest, err := gosaml.NewLogoutRequest(finalIssuer, finalDestination, request, sloinfo, role)
+			if err != nil {
+			    return err
+			}
+			q.Q("newRequest", newRequest.PP())
 			async := request.QueryBool(nil, "boolean(./samlp:Extensions/aslo:Asynchronous)")
 			if !async {
 				session.Set(w, r, tag+"-REQ", request.Dump())
 			}
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
 			legacyStatLog("birk-99", "saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
-			wars := finaldestination.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
-			wars = "1"
-			var privatekey []byte
-			switch wars {
-			case "true", "1":
-				privatekey, err = gosaml.GetPrivateKey(issuer)
-				if err != nil {
-					//return err
-				}
-			}
+			// always sign if a private key is available - ie. ignore missing keys
+			privatekey, _ := gosaml.GetPrivateKey(finalIssuer)
 			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "")
 			http.Redirect(w, r, u.String(), http.StatusFound)
 		} else {
@@ -1228,7 +1252,6 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		}
 		legacyStatLog("birk-99", "saml20-idp-SLO "+res[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), "")
 
-		// we checked the request when we received in birkService - we can use it without fear ie. we just parse it
 		request := goxml.NewXp(value)
 		issuermd, _ := finalIssuerMdSet.MDQ(request.Query1(nil, "@Destination"))
 		destinationmd, _ := finalDestinationMdSet.MDQ(request.Query1(nil, "./saml:Issuer"))
@@ -1247,16 +1270,74 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 
 // Saves or retrieves the SLO info relevant to the contents of the samlMessage
 // For now uses cookies to keep the SLOInfo
-func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, samlOut, destination *goxml.Xp, tag string) (sloinfo *gosaml.SLOInfo, err error) {
-	nameIDHash := gosaml.NameIDHash(samlOut, tag)
+func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationInMd, samlOut, destinationOutMd *goxml.Xp, role int, tag string) (sloinfo *gosaml.SLOInfo, err error) {
+	type touple struct {
+		HashIn, HashOut string
+	}
+	var key, idp, sp, spIdPHash string
+	var data []byte
+	hashIn := fmt.Sprintf("%s-%d-%x", tag, gosaml.SPRole, sha1.Sum([]byte(tag+"#"+samlIn.Query1(nil, "//saml:NameID"))))
+	hashOut := fmt.Sprintf("%s-%d-%x", tag, gosaml.IdPRole, sha1.Sum([]byte(tag+"#"+samlOut.Query1(nil, "//saml:NameID"))))
+
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
-		sloinfo = sloStore.GetDel(w, r, nameIDHash)
+	    switch role {
+        case gosaml.IdPRole: // request from a SP
+            key = hashOut
+        case gosaml.SPRole: // reguest from an IdP
+            key = hashIn
+        }
+		sloinfo = &gosaml.SLOInfo{}
+		data, err = session.Get(w, r, key)
+		if err == nil {
+			err = json.Unmarshal(data, &sloinfo)
+		}
+		q.Q(role, key, sloinfo)
+		session.Del(w, r, key)
+		key = fmt.Sprintf("%s-%d-%x", tag, (role+1)%2, sha1.Sum([]byte(tag+"#"+sloinfo.NameID)))
+		sloinfo2 := &gosaml.SLOInfo{}
+		data, err = session.Get(w, r, key)
+		if err == nil {
+			err = json.Unmarshal(data, &sloinfo2)
+		}
+	    switch role {
+        case gosaml.IdPRole: // request from a SP
+           idp = sloinfo2.IssuerID
+           sp = sloinfo2.DestinationID
+        case gosaml.SPRole: // reguest from an IdP
+           idp = sloinfo.IssuerID
+           sp = sloinfo.DestinationID
+        }
+		session.Del(w, r, key)
+    	spIdPHash = fmt.Sprintf("%x", sha1.Sum([]byte(tag+"#"+idp+"#"+sp)))
+		session.Del(w, r, spIdPHash)
 	case "LogoutResponse":
 		// needed at all ???
 	case "Response":
-		sloStore.Put(w, r, nameIDHash, gosaml.NewSLOInfo(samlIn, destination))
+		idp = samlOut.Query1(nil, "./saml:Issuer")
+		sp = destinationOutMd .Query1(nil, "./@entityID")
+    	spIdPHash = fmt.Sprintf("%x", sha1.Sum([]byte(tag+"#"+idp+"#"+sp)))
+		// 1st delete any SLO info for the same idp-sp pair
+		unique := &touple{}
+		data, err := session.Get(w, r, spIdPHash)
+		if err == nil {
+			err = json.Unmarshal(data, &unique)
+		}
+		q.Q(unique, string(data), err, spIdPHash, idp, sp)
+		session.Del(w, r, unique.HashIn)
+		session.Del(w, r, unique.HashOut)
+		// 2nd create 2 new SLO info recs and save them under the hash of the opposite
+		unique.HashIn = hashIn
+		unique.HashOut = hashOut
+		bytes, err := json.Marshal(&unique)
+		q.Q(unique, err, string(bytes))
+		session.Set(w, r, spIdPHash, bytes)
+		bytes, _ = json.Marshal(gosaml.NewSLOInfo(samlIn, destinationInMd))
+		session.Set(w, r, hashOut, bytes)
+		bytes, _ = json.Marshal(gosaml.NewSLOInfo(samlOut, destinationOutMd))
+		session.Set(w, r, hashIn, bytes)
 	}
+	q.Q(samlIn.QueryString(nil, "local-name(/*)"), role, tag, idp, sp, hashIn, hashOut, spIdPHash, sloinfo)
 	return
 }
 
