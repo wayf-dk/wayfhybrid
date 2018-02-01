@@ -262,6 +262,7 @@ func ExampleWayfSSOServiceHandler() {
 	// https://wayfsp.wayf.dk https://krib.wayf.dk/b267bd3559352c5fb837ea444a1034b823e8d195/wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-acs.php/default-sp https://wayf.ait.dtu.dk/saml2/idp/SSOService.php <nil>
 }
 
+
 func ExampleMakeSloUrl() {
 	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
@@ -273,6 +274,16 @@ func ExampleMakeSloUrl() {
 }
 
 func xxExampleWayfBirkHandler() {
+	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
+	_, _, err := WayfBirkHandler(request, sp_md, idp_md)
+	fmt.Println(err)
+	// Output:
+	// Mkhan
+}
+
+func xxExampleSendRequestToInternalIdP() {
 	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
