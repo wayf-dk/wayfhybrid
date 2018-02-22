@@ -263,7 +263,7 @@ func ExampleWayfSSOServiceHandler() {
 }
 
 
-func ExampleMakeSloUrl() {
+func xExampleMakeSloUrl() {
 	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
