@@ -244,7 +244,7 @@ func Main() {
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPACService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPACService))
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
-	httpMux.Handle(config.Testsp+"/favicon.ico", http.NotFoundHandler())
+	httpMux.Handle("/favicon.ico", http.NotFoundHandler())
 
 	finish := make(chan bool)
 
@@ -467,6 +467,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	newrequest, _ := gosaml.NewAuthnRequest(nil, sp_md, hub_md, "")
 	//newrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.Persistent, nil)
 	// newrequest.QueryDashP(nil, "./@IsPassive", "true", nil)
+	newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 	u, _ := gosaml.SAMLRequest2Url(newrequest, "", "", "", "") // not signed so blank key, pw and algo
 	q := u.Query()
 	//q.Set("idpentityid", "https://birk.wayf.dk/birk.php/nemlogin.wayf.dk")
@@ -690,19 +691,10 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
-	eppn := response.Query1(destinationAttributes, "saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue")
-	matches := scoped.FindStringSubmatch(eppn)
-	if len(matches) != 2 {
-		err = fmt.Errorf("eppn does not seem to be an eppn: %s", eppn)
-		return
-	}
 
-	securitydomain := matches[1]
-
-	scope := idp_md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securitydomain)+"]")
-	if len(scope) == 0 {
-		err = fmt.Errorf("security domain '%s' for eppn does not match any scopes", securitydomain)
-		return
+	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue")
+    if err != nil {
+	    return
 	}
 
 	val := idp_md.Query1(nil, "./md:Extensions/wayf:wayf/wayf:wayf_schacHomeOrganizationType")
@@ -755,11 +747,11 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	for _, epsa := range response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue`) {
 		epsaparts := scoped.FindStringSubmatch(epsa)
 		if len(epsaparts) != 2 {
-			fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
 		if !strings.HasSuffix(epsaparts[1], subsecuritydomain) && epsaparts[1] != securitydomain {
-			fmt.Printf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", epsa, securitydomain)
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", epsa, securitydomain)
 			return
 		}
 		epsas[epsa] = true
@@ -782,24 +774,26 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 		epaAdd = append(epaAdd, "member")
 		epaset["member"] = true
 	}
-	newattribute := response.CopyNode(hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]`)[0], 1)
-	_ = destinationAttributes.AddChild(newattribute)
+
 	for i, epa := range epaAdd {
-		response.QueryDashP(newattribute, `saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, epa, nil)
+	    name := hub_md.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]/@Name`)
+	    response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@Name`, name, nil)
+		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, epa, nil)
+	    response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
 	}
-	newattribute = response.CopyNode(hub_md.Query(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]`)[0], 1)
-	_ = destinationAttributes.AddChild(newattribute)
 	i := 1
 	for epa, _ := range epaset {
 		if epsas[epa] {
 			continue
 		}
-		response.QueryDashP(newattribute, `saml:AttributeValue[`+strconv.Itoa(i)+`]`, epa+"@"+securitydomain, nil)
+	    name := hub_md.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`)
+	    response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`, name, nil)
+		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i)+`]`, epa+"@"+securitydomain, nil)
+	    response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
 		i += 1
 	}
 	// legal affiliations 'student', 'faculty', 'staff', 'affiliate', 'alum', 'employee', 'library-walk-in', 'member'
 	// affiliations => scopedaffiliations
-
 	// Fill out the info needed for AttributeReleaseData
 	// to-do add value filtering
 	arp := sp_md.QueryMulti(nil, "md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute/@Name")
@@ -1079,7 +1073,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nameid, "@Format", gosaml.Persistent, nil)
 			eptid := newresponse.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]/saml:AttributeValue`)
 			newresponse.QueryDashP(nameid, ".", eptid, nil)
-		} else if nameidformat == gosaml.Transient {
+		} else { // if nameidformat == gosaml.Transient {
 			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
 		}
 
@@ -1208,7 +1202,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		}
 		sloinfo, _ := SLOInfoHandler(w, r, request, md, request, md, role, tag)
 		if sloinfo.Na != "" {
-			if role == gosaml.IdPRole { // reverse if we are getting the request form a SP
+			if role == gosaml.IdPRole { // reverse if we are getting the request from a SP
 				sloinfo.Is, sloinfo.De = sloinfo.De, sloinfo.Is
 			}
 			finalDestination, err := finalDestinationMdSet.MDQ("{sha1}"+sloinfo.De)
@@ -1368,4 +1362,21 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 			}
 		}
 	}
+}
+
+func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, securityDomain string, err error) {
+    eppn = xp.Query1(context, xpath)
+    matches := scoped.FindStringSubmatch(eppn)
+    if len(matches) != 2 {
+        err = fmt.Errorf("not a scoped value: %s", eppn)
+        return
+    }
+	securityDomain = matches[1]
+
+	scope := md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securityDomain)+"]")
+	if len(scope) == 0 {
+		err = fmt.Errorf("security domain '%s' does not match any scopes", securityDomain)
+		return
+	}
+	return
 }
