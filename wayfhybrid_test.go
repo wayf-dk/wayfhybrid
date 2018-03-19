@@ -262,7 +262,6 @@ func ExampleWayfSSOServiceHandler() {
 	// https://wayfsp.wayf.dk https://krib.wayf.dk/b267bd3559352c5fb837ea444a1034b823e8d195/wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-acs.php/default-sp https://wayf.ait.dtu.dk/saml2/idp/SSOService.php <nil>
 }
 
-
 func xExampleMakeSloUrl() {
 	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
