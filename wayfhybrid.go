@@ -149,7 +149,7 @@ var (
 //		"https://wayf.ait.dtu.dk/saml2/idp/metadata.php": idpsppair{"https://orphanage.wayf.dk", "https://wayf.wayf.dk"},
 	}
 
-	bify          = regexp.MustCompile("^(?:https?://)(.*)$")
+	bify          = regexp.MustCompile("^(https?://)(.*)$")
 	debify        = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
 	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9\.-]+)$`)
@@ -525,10 +525,12 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
 
+    sp_md, err := Md.Internal.MDQ("https://" + config.Testsp)
+    pk, _ := gosaml.GetPrivateKey(sp_md)
     idp := r.Form.Get("idpentityid")
     login := r.Form.Get("login") == "1"
     if login || idp != "" {
-        sp_md, err := Md.Internal.MDQ("https://" + config.Testsp)
+
         if err != nil {
             return err
         }
@@ -550,7 +552,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
             }
         }
 
-        u, _ := gosaml.SAMLRequest2Url(newrequest, "", "", "", "") // not signed so blank key, pw and algo
+        u, err := gosaml.SAMLRequest2Url(newrequest, "", string(pk), "-", "") // not signed so blank key, pw and algo
+        if err != nil {
+            return err
+        }
         if idp != "" {
             q := u.Query()
             q.Set("idpentityid", idp)
@@ -568,7 +573,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
         destination, _ := destinationMdSet.MDQ(r.Form.Get("destination"))
         issuer, _ := issuerMdSet.MDQ(r.Form.Get("issuer"))
         if r.Form.Get("logout") == "1" {
-            SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), destination, issuer)
+            SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), destination, issuer, string(pk))
         } else {
             SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), destination, issuer)
         }
@@ -578,6 +583,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
         // don't do destination check - we accept and dumps anything ...
         external := "0"
         response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
+        q.Q(err)
         if err != nil {
             response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
             external = "1"
@@ -598,7 +604,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-func SloRequest(w http.ResponseWriter, r *http.Request, response, issuer, destination *goxml.Xp)  {
+func SloRequest(w http.ResponseWriter, r *http.Request, response, issuer, destination *goxml.Xp, pk string)  {
 	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                      xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
                      ID=""
@@ -620,7 +626,7 @@ func SloRequest(w http.ResponseWriter, r *http.Request, response, issuer, destin
 	request.QueryDashP(nil, "./saml:NameID/@SPNameQualifier", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@SPNameQualifier"), nil)
 	request.QueryDashP(nil, "./saml:NameID/@Format", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@Format"), nil)
 	request.QueryDashP(nil, "./saml:NameID", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID"), nil)
-	u, _ := gosaml.SAMLRequest2Url(request, "", "", "", "")
+	u, _ := gosaml.SAMLRequest2Url(request, "", pk, "-", "")
     http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
@@ -690,7 +696,7 @@ func WayfSSOServiceHandler(request, mdsp, mdhub, mdidp *goxml.Xp) (kribID, acsur
 
 	acsurl = request.Query1(nil, "@AssertionConsumerServiceURL")
 	hashedKribID := fmt.Sprintf("%x", sha1.Sum([]byte(kribID)))
-	acsurl = bify.ReplaceAllString(acsurl, "https://krib.wayf.dk/"+hashedKribID+"/$1")
+	acsurl = bify.ReplaceAllString(acsurl, "${1}krib.wayf.dk/"+hashedKribID+"/$2")
 
 	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
 		return
@@ -1012,10 +1018,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	entityID := spmd.Query1(nil, "@entityID")
 	idp := spmd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:IDPList")
-	// how to fix this - non-BIRK entityID in metadata ???
-	if idp != "" && !strings.HasPrefix(idp, "https://birk.wayf.dk/birk.php/") {
-		idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
-	}
 
 	if idp == "" {
 		idp = request.Query1(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID")
@@ -1025,11 +1027,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		idp = r.URL.Query().Get("idpentityid")
 	}
 
-	// how to fix this - non-BIRK entityID in metadata ???
-	if idp != "" && !strings.HasPrefix(idp, "https://birk.wayf.dk/birk.php/") {
-		idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
-	}
-
 	if idp == "" {
 		data := url.Values{}
 		data.Set("return", "https://"+r.Host+r.RequestURI)
@@ -1037,6 +1034,11 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		data.Set("entityID", entityID)
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
+        // Is this an internal IdP - birkify it ...
+        if _, err := Md.Internal.MDQ(idp); err == nil {
+            idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
+        }
+
 		idpmd, err := Md.ExternalIdP.MDQ(idp)
 		if err != nil {
 			return err
@@ -1435,7 +1437,12 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 
 		newResponse := gosaml.NewLogoutResponse(issuermd, destinationmd, request, response)
 
-		u, _ := gosaml.SAMLRequest2Url(newResponse, relayState, "", "", "")
+		privatekey, err := gosaml.GetPrivateKey(issuermd)
+
+		if err != nil {
+		    return err
+		}
+		u, _ := gosaml.SAMLRequest2Url(newResponse, relayState, string(privatekey), "-", "")
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		// forward the LogoutResponse to orig sender
 	} else {
