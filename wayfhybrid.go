@@ -1214,12 +1214,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		if _, err = SLOInfoHandler(w, r, response, hub_md, newresponse, sp_md, gosaml.SPRole, "BS"); err != nil {
 			return
 		}
-        gosaml.DumpFile(newresponse)
-		cert := sp_md.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
-        _, publicKey, _ := gosaml.PublicKeyInfo(cert)
-        ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
-        assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-        newresponse.Encrypt(assertion, publicKey, ea)
+//        gosaml.DumpFile(newresponse)
+//		cert := sp_md.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
+//        _, publicKey, _ := gosaml.PublicKeyInfo(cert)
+//        ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
+//        assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
+//        newresponse.Encrypt(assertion, publicKey, ea)
 	} else {
 		newresponse = gosaml.NewErrorResponse(birkmd, sp_md, request, response)
 
