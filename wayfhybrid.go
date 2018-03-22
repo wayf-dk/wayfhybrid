@@ -1081,7 +1081,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil  {
 		var err2 error
 		e, ok := err.(goxml.Werror)
-		if (ok && e.Cause == gosaml.ACSError) {
+		if ok && (e.Cause == gosaml.ACSError || e.Cause == lMDQ.MetaDataNotFoundError) {
 			// or is it coming directly from a SP
 			request, mdsp, mdbirkidp, relayState, err2 = gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
 			if err2 != nil {
