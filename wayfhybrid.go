@@ -583,7 +583,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
         // don't do destination check - we accept and dumps anything ...
         external := "0"
         response, issuermd, destinationmd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
-        q.Q(err)
         if err != nil {
             response, issuermd, destinationmd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
             external = "1"
@@ -1077,14 +1076,14 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
 	var directToSP bool
-	// is this a request from KRIB?
-	request, mdsp, mdbirkidp, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
-	if err != nil {
+
+	request, mdsp, mdbirkidp, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.ExternalIdP)
+	if err != nil  {
 		var err2 error
 		e, ok := err.(goxml.Werror)
-		if ok && e.Cause == gosaml.ACSError {
+		if (ok && e.Cause == gosaml.ACSError) {
 			// or is it coming directly from a SP
-			request, mdsp, mdbirkidp, relayState, err2 = gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.ExternalIdP)
+			request, mdsp, mdbirkidp, relayState, err2 = gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
 			if err2 != nil {
 				// we need the original error for a SP that use an invalid ACS, but is in the external feed
 				return goxml.Wrap(err, e.C...)
@@ -1093,6 +1092,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 		// If we get here we need to tag the request as a direct BIRK to SP - otherwise we will end up sending the response to KRIB
+	} else {
 		directToSP = true
 	}
 	err = sendRequestToInternalIdP(w, r, request, mdsp, mdbirkidp, relayState, directToSP)
@@ -1131,7 +1131,6 @@ func sendRequestToInternalIdP(w http.ResponseWriter, r *http.Request, request, m
 			return
 		}
 	}
-
 	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", "")
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
