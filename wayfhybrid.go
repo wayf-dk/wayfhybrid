@@ -73,7 +73,6 @@ type (
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService    string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, SaltForHashedEppn                          string
-		NameIDFormats                                                                            []string
 		ElementsToSign                                                                           []string
 		NotFoundRoutes                                                                           []string
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
@@ -243,7 +242,6 @@ func Main() {
 	gosaml.Config = gosaml.Conf{
 		SamlSchema:    config.SamlSchema,
 		CertPath:      config.CertPath,
-		NameIDFormats: config.NameIDFormats,
 	}
 
 	hashKey, _ := hex.DecodeString(config.SecureCookieHashKey)
