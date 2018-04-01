@@ -738,7 +738,10 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := response.Query1(nil, "/samlp:Response/saml:Issuer")
 
+	base64encodedIn := idp_md.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
+
 	if idp == "https://saml.nemlog-in.dk" || idp == "https://saml.test-nemlog-in.dk/" {
+	    base64encodedIn = false
 		nemloginAttributeHandler(response)
 	}
 
@@ -750,7 +753,6 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	//response.QueryDashP(destinationAttributes, "@xmlns:xs", "http://www.w3.org/2001/XMLSchema", nil)
 
-	base64encoded := idp_md.Query1(nil, "//wayf:base64attributes") == "1"
 
 	attCS := hub_md.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService")[0]
 
@@ -781,7 +783,7 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 
 		index := 1
 		for _, value := range attributesValues {
-			if base64encoded {
+			if base64encodedIn {
 				v, _ := base64.StdEncoding.DecodeString(value)
 				value = string(v)
 			}
@@ -1136,11 +1138,12 @@ func sendRequestToInternalIdP(w http.ResponseWriter, r *http.Request, request, m
 
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, idp_md, hub_md, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
+	response, _, hub_md, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
 	if err != nil {
 		return
 	}
 
+    gosaml.DumpFile(response)
     inResponseTo := response.Query1(nil, "./@InResponseTo")
 	value, err := session.GetDel(w, r, "BIRK"+sloHash(inResponseTo), authnRequestCookie)
 	if err != nil {
@@ -1564,7 +1567,6 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 }
 
 func handleAttributeNameFormat2(response, mdsp *goxml.Xp) {
-    q.Q(basic2uri)
     const (
         basic = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
         claims = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
