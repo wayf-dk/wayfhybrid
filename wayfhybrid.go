@@ -1184,7 +1184,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		ard, err = aCSServiceHandler(idp_md, hubRequestedAttributes, sp_md, request, response)
+		ard, err = aCSServiceHandler(birkmd, hubRequestedAttributes, sp_md, request, response)
 		if err != nil {
 			return goxml.Wrap(err)
 		}
