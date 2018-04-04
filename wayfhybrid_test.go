@@ -262,7 +262,8 @@ func ExampleWayfSSOServiceHandler() {
 	// https://wayfsp.wayf.dk https://krib.wayf.dk/b267bd3559352c5fb837ea444a1034b823e8d195/wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-acs.php/default-sp https://wayf.ait.dtu.dk/saml2/idp/SSOService.php <nil>
 }
 
-func xExampleMakeSloUrl() {
+/**
+func xxExampleMakeSloUrl() {
 	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
@@ -272,7 +273,7 @@ func xExampleMakeSloUrl() {
 	// ?SAMLRequest=fJHNbtQwFIX38xSW95M4jpsfa5IKaVRppIKAFhZsqhv7urWa2CG%2BgfL2aFKQBhbdWP4539E5vofrl2lkP3BJPoaOF5ngDIOJ1ofHjn%2B5v9k3%2FLrfHRJM46xv42Nc6TN%2BXzERe5nGkPT20vF1CTpC8kkHmDBpMvru3ftbLTOh5yVSNHHkF8jbBKSEC%2FkYODsdO%2F5g6gGNU1A1VXvllG2HxklAi6qxDkRlBiMd1o0RnH39W0aey5xSWvEUEkGgjktRNHtR7GV1L1qtCq3qb5wdMZEPQBvF%2Bx1jjG2N9UYv%2FRPRnHSe%2F4RfLgNPmaU1s8%2F5WSNzb%2Bd8QgILBNn8NB%2FyS%2FbC7QNMeDqyu4%2FnzacVRu88Lh3%2Fx35b7DNnN3GZgN7%2Bp%2FONt3u3STUtEJLHQLx%2FULVwJTaDLVUplLwyEtpKloUYFDRWQN3a0hknS%2FwT9zVcv3s9%2Fjfrfvc7AAD%2F%2Fw%3D%3D
 }
 
-func xxExampleWayfBirkHandler() {
+func ExampleWayfBirkHandler() {
 	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
@@ -282,7 +283,7 @@ func xxExampleWayfBirkHandler() {
 	// Mkhan
 }
 
-func xxExampleSendRequestToInternalIdP() {
+func ExampleSendRequestToInternalIdP() {
 	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
 	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
@@ -291,3 +292,4 @@ func xxExampleSendRequestToInternalIdP() {
 	// Output:
 	// Mkhan
 }
+**/
