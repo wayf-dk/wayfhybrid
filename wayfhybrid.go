@@ -120,7 +120,7 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
 	}
 
-	wayfHybridSession struct{}
+	wayfHybridSession struct {}
 
 	// https://stackoverflow.com/questions/47475802/golang-301-moved-permanently-if-request-path-contains-additional-slash
 	slashFix struct {
@@ -1188,7 +1188,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
-		// The reponse at this time contains a full attribute set
+		// The response at this time contains a full attribute set
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
 		if nameidformat == gosaml.Persistent {
 			newresponse.QueryDashP(nameid, "@Format", gosaml.Persistent, nil)
