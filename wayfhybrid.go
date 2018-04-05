@@ -144,7 +144,7 @@ var (
 
 	config = wayfHybridConfig{}
 	remap  = map[string]idpsppair{
-		"https://nemlogin.wayf.dk": idpsppair{"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
+		"https://nemlogin.wayf.dk": {"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
 		//		"https://wayf.ait.dtu.dk/saml2/idp/metadata.php": idpsppair{"https://orphanage.wayf.dk", "https://wayf.wayf.dk"},
 	}
 
@@ -885,7 +885,7 @@ func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
 	}
 	i := 1
-	for epa, _ := range epaset {
+	for epa := range epaset {
 		if epsas[epa] {
 			continue
 		}

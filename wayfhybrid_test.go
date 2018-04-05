@@ -70,7 +70,7 @@ func ExampleCheckCprCentury() {
 	}
 
 	//var year, ciffer int = 88, 3
-	for i, _ := range testData {
+	for i := range testData {
 		var res = yearfromyearandcifferseven(testData[i][0], testData[i][1])
 		fmt.Println(res)
 	}
