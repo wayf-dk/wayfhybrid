@@ -120,7 +120,7 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
 	}
 
-	wayfHybridSession struct {}
+	wayfHybridSession struct{}
 
 	// https://stackoverflow.com/questions/47475802/golang-301-moved-permanently-if-request-path-contains-additional-slash
 	slashFix struct {
