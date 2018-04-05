@@ -69,7 +69,7 @@ type (
 		PostFormTemplate                                                                         string
 		AttributeReleaseTemplate, WayfSPTestServiceTemplate                                      string
 		Certpath                                                                                 string
-		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs                    string
+		Intf, Hubrequestedattributes, Sso_Service, Sso_Service1, Https_Key, Https_Cert, Acs      string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService    string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, SaltForHashedEppn                          string
@@ -135,6 +135,12 @@ type (
 		Name   string
 		Must   bool
 		Values []string
+	}
+
+	samlRequest struct {
+		Nid, Id, Is, De, Acs string
+		Fo                   int
+		DtS                  bool
 	}
 )
 
@@ -1059,6 +1065,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		request.QueryDashP(nil, "@AssertionConsumerServiceURL", acsurl, nil)
 
 		request.QueryDashP(nil, "@Destination", ssourl, nil)
+		request.Rm(nil, "./@ACSIndex")
 		pk, _ := gosaml.GetPrivateKey(hubmd)
 		u, _ := gosaml.SAMLRequest2Url(request, relayState, string(pk), "", "")
 		http.Redirect(w, r, u.String(), http.StatusFound)
@@ -1114,8 +1121,19 @@ func sendRequestToInternalIdP(w http.ResponseWriter, r *http.Request, request, m
 
 	// Save the request in a session for when the response comes back
 	id := newrequest.Query1(nil, "./@ID")
-	request.QueryDashP(nil, "./@NewID", id, nil)
-	session.Set(w, r, "BIRK"+sloHash(id), request.Dump(), authnRequestCookie, 180)
+
+	sRequest := samlRequest{
+		Nid: id,
+		Id:  request.Query1(nil, "./@ID"),
+		Is:  request.Query1(nil, "./saml:Issuer"),
+		De:  mdbirkidp.Query1(nil, `./@entityID`),
+		Fo:  gosaml.NameIDMap[request.Query1(nil, "./samlp:NameIDPolicy/@Format")],
+		Acs: request.Query1(nil, "./@ACSIndex"),
+		DtS: directToSP,
+	}
+
+	bytes, err := json.Marshal(&sRequest)
+	session.Set(w, r, "BIRK-js-"+sloHash(id), bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
 	wars := mdidp.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
@@ -1140,20 +1158,27 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	gosaml.DumpFile(response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
-	value, err := session.GetDel(w, r, "BIRK"+sloHash(inResponseTo), authnRequestCookie)
+	value, err := session.GetDel(w, r, "BIRK-js-"+sloHash(inResponseTo), authnRequestCookie)
 	if err != nil {
 		return
 	}
+	// to minimize the size of the cookies we have saved the original request in a json'ed struct
+	sRequest := samlRequest{}
+	err = json.Unmarshal(value, &sRequest)
 
-	// we checked the request when we received in birkService - we can use it without fear ie. we just parse it
-	request := goxml.NewXp(value)
+	request := goxml.NewXpFromString("")
+	request.QueryDashP(nil, "/samlp:AuthnRequest/@ID", sRequest.Id, nil)
+	//request.QueryDashP(nil, "./@Destination", sRequest.De, nil)
+	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", sRequest.Acs, nil)
+	request.QueryDashP(nil, "./saml:Issuer", sRequest.Is, nil)
+	request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.NameIDList[sRequest.Fo], nil)
+	directToSP := sRequest.DtS
 
-	if inResponseTo != request.Query1(nil, "./@NewID") {
+	if inResponseTo != sRequest.Nid {
 		err = fmt.Errorf("response.InResponseTo != request.ID")
 		return
 	}
 
-	directToSP := request.Query1(nil, "./@DirectToSP") == "true"
 	spMetadataSet := Md.ExternalSP
 	if directToSP {
 		spMetadataSet = Md.Internal
@@ -1164,13 +1189,16 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
+	acs := sp_md.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@index=`+strconv.Quote(sRequest.Acs)+`]/@Location`)
+	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", acs, nil)
+
 	signingMethod := sp_md.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
 	var birkmd *goxml.Xp
-	destination := request.Query1(nil, "/samlp:AuthnRequest/@Destination")
-	birkmd, err = Md.ExternalIdP.MDQ(destination)
+	//destination := request.Query1(nil, "/samlp:AuthnRequest/@Destination")
+	birkmd, err = Md.ExternalIdP.MDQ(sRequest.De)
 	if err != nil && directToSP { // This might be a response to a request that bypassed KRIB -> BIRK
-		birkmd, err = Md.Hub.MDQ(destination)
+		birkmd, err = Md.Hub.MDQ(sRequest.De)
 	}
 	if err != nil {
 		return
@@ -1226,7 +1254,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	// when consent as a service is ready - we will post to that
-	acs := newresponse.Query1(nil, "@Destination")
+	// acs := newresponse.Query1(nil, "@Destination")
 
 	ardjson, err := json.Marshal(ard)
 	if err != nil {
