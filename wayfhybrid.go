@@ -69,7 +69,7 @@ type (
 		PostFormTemplate                                                                         string
 		AttributeReleaseTemplate, WayfSPTestServiceTemplate                                      string
 		Certpath                                                                                 string
-		Intf, Hubrequestedattributes, Sso_Service, Sso_Service1, Https_Key, Https_Cert, Acs      string
+		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs                    string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService    string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, SaltForHashedEppn                          string
