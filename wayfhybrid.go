@@ -140,7 +140,7 @@ type (
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
 		Fo                   int
-		DtS, BpK             bool
+		DtS                  bool
 	}
 )
 
@@ -997,7 +997,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		sp2 := sp
 		sp2Md := spMd
-		acsURL := request.Query1(nil, "@AssertionConsumerServiceURL")
 
 		altIdp := debify.ReplaceAllString(idp2, "$1$2")
 		if false && idp2 != altIdp { // an internal IdP
@@ -1008,9 +1007,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			sp2 = config.HubEntityID
 			sp2Md = hubMd
 		} else {
-			//acsURL = bify.ReplaceAllString(acsURL, "${1}krib.wayf.dk/"+idHash(sp)+"/$2")
-			hashedSp := fmt.Sprintf("%x", sha1.Sum([]byte(sp)))
-			acsURL = bify.ReplaceAllString(acsURL, "${1}krib.wayf.dk/"+hashedSp+"/$2")
+		    sp2Md, _ = Md.ExternalSP.MDQ(sp2)
 		}
 
 		if err = checkForCommonFederations(spMd, idp2Md); err != nil {
@@ -1019,7 +1016,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, acsURL)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, false)
 		return err
 	}
 	return
@@ -1030,6 +1027,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	// remember to add the Scoping element to inform the IdP of requesterID - if stated in metadata for the IdP
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
+    var directToSp bool
 
 	request, spMd, birkIdpMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.ExternalIdP)
 	if err != nil {
@@ -1040,13 +1038,17 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 			request, spMd, birkIdpMd, relayState, err2 = gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
 			if err2 != nil {
 				// we need the original error for a SP that use an invalid ACS, but is in the external feed
-				return goxml.Wrap(err, e.C...)
+				return goxml.Wrap(err)
 			}
 		} else {
 			return err
 		}
 		// If we get here we need to tag the request as a direct BIRK to SP - otherwise we will end up sending the response to KRIB
+
+	} else {
+		directToSp = true
 	}
+
 	var hubMd, idpMd *goxml.Xp
 
 	birkIdp := birkIdpMd.Query1(nil, "@entityID")
@@ -1078,23 +1080,21 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "")
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, directToSp)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, acsURL string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState string, directToSP bool) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, "")
 	if err != nil {
 		return
 	}
-	if acsURL != "" {
-		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", acsURL, nil)
-	}
 
+q.Q(request.PP())
 	// Save the request in a session for when the response comes back
 	id := newrequest.Query1(nil, "./@ID")
 
@@ -1104,7 +1104,8 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Is:  request.Query1(nil, "./saml:Issuer"),
 		De:  destination,
 		Fo:  gosaml.NameIDMap[request.Query1(nil, "./samlp:NameIDPolicy/@Format")],
-		Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"),
+		Acs: request.Query1(nil, "./@AssertionConsumerServiceIndex"),
+		DtS: directToSP,
 	}
 
 	bytes, err := json.Marshal(&sRequest)
@@ -1124,7 +1125,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	return
 }
 
-func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp) (request *goxml.Xp, sRequest samlRequest, err error) {
+func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFile(response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
 	value, err := session.GetDel(w, r, "SSO-"+idHash(inResponseTo), authnRequestCookie)
@@ -1134,10 +1135,22 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	// to minimize the size of the cookies we have saved the original request in a json'ed struct
 	err = json.Unmarshal(value, &sRequest)
 
+    if sRequest.DtS {
+        spMd, err = md1.MDQ(sRequest.Is)
+    } else {
+        spMd, err = md2.MDQ(sRequest.Is)
+    }
+    if err != nil {
+        return
+    }
+
 	request = goxml.NewXpFromString("")
 	request.QueryDashP(nil, "/samlp:AuthnRequest/@ID", sRequest.Id, nil)
 	//request.QueryDashP(nil, "./@Destination", sRequest.De, nil)
-	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", sRequest.Acs, nil)
+
+	acs := spMd.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@Binding="`+gosaml.POST+`" and @index=`+strconv.Quote(sRequest.Acs)+`]/@Location`)
+
+	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", acs, nil)
 	request.QueryDashP(nil, "./saml:Issuer", sRequest.Is, nil)
 	request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.NameIDList[sRequest.Fo], nil)
 
@@ -1155,14 +1168,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	request, sRequest, err := getOriginalRequest(w, r, response)
+	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP)
 	if err != nil {
 	    return
-	}
-
-	spMd, err := Md.ExternalSP.MDQ(sRequest.Is) // internal and KRIB SPs have the same entityID - differs only in acsURL - so we can safely use the External
-	if err != nil {
-		return
 	}
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
@@ -1235,7 +1243,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	gosaml.DumpFile(newresponse)
 
-	data := formdata{Acs: sRequest.Acs, Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
+	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
 	return
 }
@@ -1249,28 +1257,19 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	request, _, err := getOriginalRequest(w, r, response)
+	spMd, request, _, err := getOriginalRequest(w, r, response, Md.Internal, Md.Internal)
 	if err != nil {
 	    return
 	}
 
-	destination, err := kribServiceHandler(response, birkMd, kribMd)
-	if err != nil {
+	if err = checkForCommonFederations(birkMd, kribMd); err != nil {
 		return
 	}
 
-	lookupdestination := destination
-	/*
-	   if destination == "https://localhost:32361" {
-	       lookupdestination = "https://wayfsp2.wayf.dk"
-	       destination = "http://localhost:32361"
-	   }
-	*/
+	legacyStatLog("krib-99", "saml20-idp-SSO", kribMd.Query1(nil, "@entityID"), birkMd.Query1(nil, "@entityID"), "na")
 
-	spMd, err := Md.Internal.MDQ(lookupdestination)
-	if err != nil {
-		return
-	}
+    destination := request.Query1(nil, "./@AssertionConsumerServiceURL")
+	//	destination = "https://" + config.ConsentAsAService
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 	origResponse := goxml.NewXpFromNode(response.DocGetRootElement())
@@ -1519,6 +1518,7 @@ func idHash(data string) string {
 }
 
 func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
+    q.Q(mdsp.PP())
 	const (
 		basic  = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
 		claims = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
@@ -1532,6 +1532,7 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 			uriname := basic2uri[basicname].uri
 			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name="+strconv.Quote(uriname)+"]")
 			if len(responseattribute) > 0 {
+			    q.Q(mdsp.Query1(attr, "@NameFormat"))
 				switch mdsp.Query1(attr, "@NameFormat") {
 				case basic:
 					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)
