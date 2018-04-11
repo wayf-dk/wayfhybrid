@@ -1016,7 +1016,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, false)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, true)
 		return err
 	}
 	return
