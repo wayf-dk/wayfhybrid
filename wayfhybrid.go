@@ -171,8 +171,6 @@ var (
 
 	Md                 MdSets
 	basic2uri          map[string]attrName
-	sSOServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (string, string, string, error)
-	birkHandler        func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (*goxml.Xp, *goxml.Xp, error)
 	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (AttributeReleaseData, error)
 	kribServiceHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
 
@@ -527,8 +525,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
 
-	sp_md, err := Md.Internal.MDQ("https://" + config.Testsp)
-	pk, _ := gosaml.GetPrivateKey(sp_md)
+	spMd, err := Md.Internal.MDQ("https://" + config.Testsp)
+	pk, _ := gosaml.GetPrivateKey(spMd)
 	idp := r.Form.Get("idpentityid")
 	login := r.Form.Get("login") == "1"
 	if login || idp != "" {
@@ -689,66 +687,18 @@ func checkForCommonFederations(idp_md, sp_md *goxml.Xp) (err error) {
 	return
 }
 
-func WayfSSOServiceHandler(request, mdsp, mdhub, mdidp *goxml.Xp) (kribID, acsurl, ssourl string, err error) {
-	kribID = mdsp.Query1(nil, "@entityID")
-
-	ssourl = mdidp.Query1(nil, "./md:IDPSSODescriptor/md:SingleSignOnService[1]/@Location")
-
-	acsurl = request.Query1(nil, "@AssertionConsumerServiceURL")
-	hashedKribID := fmt.Sprintf("%x", sha1.Sum([]byte(kribID)))
-	acsurl = bify.ReplaceAllString(acsurl, "${1}krib.wayf.dk/"+hashedKribID+"/$2")
-
-	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
-		return
-	}
-
-	legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
-	return
-}
-
-func WayfBirkHandler(request, mdsp, mdbirkidp *goxml.Xp) (mdhub, mdidp *goxml.Xp, err error) {
-	idp := debify.ReplaceAllString(mdbirkidp.Query1(nil, "@entityID"), "$1$2")
-
-	if rm, ok := remap[idp]; ok {
-		mdidp, err = Md.Internal.MDQ(rm.idp)
-		if err != nil {
-			return
-		}
-		mdhub, err = Md.Hub.MDQ(rm.sp)
-		if err != nil {
-			return
-		}
-	} else {
-		mdidp, err = Md.Internal.MDQ(idp)
-		if err != nil {
-			return
-		}
-		mdhub, err = Md.Hub.MDQ(config.HubEntityID)
-		if err != nil {
-			return
-		}
-	}
-	if err = checkForCommonFederations(mdidp, mdsp); err != nil {
-		return
-	}
-
-	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
-
-	return
-}
-
-func WayfACSServiceHandler(idp_md, hub_md, sp_md, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
+func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
 	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := response.Query1(nil, "/samlp:Response/saml:Issuer")
 
-	base64encodedIn := idp_md.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
+	base64encodedIn := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
 
 	if idp == "https://saml.nemlog-in.dk" || idp == "https://saml.test-nemlog-in.dk/" {
 		base64encodedIn = false
 		nemloginAttributeHandler(response)
 	}
 
-	if err = checkForCommonFederations(idp_md, sp_md); err != nil {
+	if err = checkForCommonFederations(idpMd, spMd); err != nil {
 		return
 	}
 
@@ -1011,67 +961,68 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 	response.QueryDashP(attr, `./saml:AttributeValue[`+strconv.Itoa(values)+`]`, value, nil)
 }
 
+func wayf(w http.ResponseWriter, r *http.Request, sp string, candidates ...string) (idp string) {
+	for _, idp = range candidates {
+		if idp != "" {
+			return
+		}
+	}
+	data := url.Values{}
+	data.Set("return", "https://"+r.Host+r.RequestURI)
+	data.Set("returnIDParam", "idpentityid")
+	data.Set("entityID", sp)
+	http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
+	return
+}
+
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spmd, hubmd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.Hub)
+	request, spMd, hubMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.Hub)
 	if err != nil {
 		return
 	}
-	entityID := spmd.Query1(nil, "@entityID")
-	idp := spmd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:IDPList")
 
-	if idp == "" {
-		idp = request.Query1(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID")
-	}
-
-	if idp == "" {
-		idp = r.URL.Query().Get("idpentityid")
-	}
-
-	if idp == "" {
-		data := url.Values{}
-		data.Set("return", "https://"+r.Host+r.RequestURI)
-		data.Set("returnIDParam", "idpentityid")
-		data.Set("entityID", entityID)
-		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
-	} else {
-		// Is this an internal IdP - birkify it ...
-		if _, err := Md.Internal.MDQ(idp); err == nil {
-			idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
+	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
+	idp2 := wayf(w, r, sp, spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
+		request.Query1(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
+		r.URL.Query().Get("idpentityid"))
+	if idp2 != "" {
+		// Legacy: md and scoped entityIDs are internal, so birkify first if that is the case
+		if _, err = Md.Internal.MDQ(idp2); err == nil {
+			idp2 = bify.ReplaceAllString(idp2, "${1}birk.wayf.dk/birk.php/$2")
 		}
 
-		idpmd, err := Md.ExternalIdP.MDQ(idp)
+		idp2Md, err := Md.ExternalIdP.MDQ(idp2)
 		if err != nil {
 			return err
 		}
 
-		//Bypass KRIB -> BIRK if we know this is for an internal IdP
-		altIdp := debify.ReplaceAllString(idp, "$1$2")
-		if idp != altIdp { // a BIRK IdP
-			idpmd, err := Md.Internal.MDQ(altIdp)
+		sp2 := sp
+		sp2Md := spMd
+		acsURL := request.Query1(nil, "@AssertionConsumerServiceURL")
+
+		altIdp := debify.ReplaceAllString(idp2, "$1$2")
+		if false && idp2 != altIdp { // an internal IdP
+			idp2Md, err = Md.Internal.MDQ(altIdp)
 			if err != nil {
 				return err
 			}
-			err = sendRequestToInternalIdP(w, r, request, spmd, idpmd, relayState, false, true)
+			sp2 = config.HubEntityID
+			sp2Md = hubMd
+		} else {
+			//acsURL = bify.ReplaceAllString(acsURL, "${1}krib.wayf.dk/"+idHash(sp)+"/$2")
+			hashedSp := fmt.Sprintf("%x", sha1.Sum([]byte(sp)))
+			acsURL = bify.ReplaceAllString(acsURL, "${1}krib.wayf.dk/"+hashedSp+"/$2")
+		}
+
+		if err = checkForCommonFederations(spMd, idp2Md); err != nil {
 			return err
 		}
 
-		kribID, acsurl, ssourl, err := sSOServiceHandler(request, spmd, hubmd, idpmd)
-		if err != nil {
-			return err
-		}
+		legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-		id := request.Query1(nil, "./@ID")
-		session.Set(w, r, "KRIB"+sloHash(id), []byte(id), authnRequestCookie, 180)
-
-		request.QueryDashP(nil, "/saml:Issuer", kribID, nil)
-		request.QueryDashP(nil, "@AssertionConsumerServiceURL", acsurl, nil)
-
-		request.QueryDashP(nil, "@Destination", ssourl, nil)
-		request.Rm(nil, "./@ACSIndex")
-		pk, _ := gosaml.GetPrivateKey(hubmd)
-		u, _ := gosaml.SAMLRequest2Url(request, relayState, string(pk), "", "")
-		http.Redirect(w, r, u.String(), http.StatusFound)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, acsURL)
+		return err
 	}
 	return
 }
@@ -1098,29 +1049,53 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 		// If we get here we need to tag the request as a direct BIRK to SP - otherwise we will end up sending the response to KRIB
-	} else {
-		directToSP = true
 	}
-	err = sendRequestToInternalIdP(w, r, request, mdsp, mdbirkidp, relayState, directToSP, false)
+	var hubMd, idpMd *goxml.Xp
+
+	birkIdp := birkIdpMd.Query1(nil, "@entityID")
+	idp := debify.ReplaceAllString(birkIdp, "$1$2")
+
+	if rm, ok := remap[idp]; ok {
+		idpMd, err = Md.Internal.MDQ(rm.idp)
+		if err != nil {
+			return
+		}
+		hubMd, err = Md.Hub.MDQ(rm.sp)
+		if err != nil {
+			return
+		}
+	} else {
+		idpMd, err = Md.Internal.MDQ(idp)
+		if err != nil {
+			return
+		}
+		hubMd, err = Md.Hub.MDQ(config.HubEntityID)
+		if err != nil {
+			return
+		}
+	}
+
+	if err = checkForCommonFederations(idpMd, spMd); err != nil {
+		return
+	}
+
+	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "")
 	if err != nil {
 		return
 	}
 	return
 }
 
-func sendRequestToInternalIdP(w http.ResponseWriter, r *http.Request, request, mdsp, mdbirkidp *goxml.Xp, relayState string, directToSP, bypassKRIB bool) (err error) {
-	request.QueryDashP(nil, "./@DirectToSP", strconv.FormatBool(directToSP), nil)
-	request.QueryDashP(nil, "./@BypassKRIB", strconv.FormatBool(bypassKRIB), nil)
-
-	mdhub, mdidp, err := birkHandler(request, mdsp, mdbirkidp)
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, acsURL string) (err error) {
+	// why not use orig request?
+	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, "")
 	if err != nil {
 		return
 	}
-
-	// why not use orig request?
-	newrequest, err := gosaml.NewAuthnRequest(request, mdhub, mdidp, "")
-	if err != nil {
-		return
+	if acsURL != "" {
+		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", acsURL, nil)
 	}
 
 	// Save the request in a session for when the response comes back
@@ -1154,62 +1129,54 @@ func sendRequestToInternalIdP(w http.ResponseWriter, r *http.Request, request, m
 	return
 }
 
-func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
-	defer r.Body.Close()
-	response, _, hub_md, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
-	if err != nil {
-		return
-	}
-
+func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp) (request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFile(response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
-	value, err := session.GetDel(w, r, "BIRK-js-"+sloHash(inResponseTo), authnRequestCookie)
+	value, err := session.GetDel(w, r, "SSO-"+idHash(inResponseTo), authnRequestCookie)
 	if err != nil {
 		return
 	}
 	// to minimize the size of the cookies we have saved the original request in a json'ed struct
-	sRequest := samlRequest{}
 	err = json.Unmarshal(value, &sRequest)
 
-	request := goxml.NewXpFromString("")
+	request = goxml.NewXpFromString("")
 	request.QueryDashP(nil, "/samlp:AuthnRequest/@ID", sRequest.Id, nil)
 	//request.QueryDashP(nil, "./@Destination", sRequest.De, nil)
 	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", sRequest.Acs, nil)
 	request.QueryDashP(nil, "./saml:Issuer", sRequest.Is, nil)
 	request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.NameIDList[sRequest.Fo], nil)
-	directToSP := sRequest.DtS
-	bypassKRIB := sRequest.BpK
 
 	if inResponseTo != sRequest.Nid {
 		err = fmt.Errorf("response.InResponseTo != request.ID")
 		return
 	}
+    return
+}
 
-	spMetadataSet := Md.ExternalSP
-	if directToSP || bypassKRIB {
-		spMetadataSet = Md.Internal
-	}
-
-	sp_md, err := spMetadataSet.MDQ(request.Query1(nil, "/samlp:AuthnRequest/saml:Issuer"))
+func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
+	defer r.Body.Close()
+	response, idpMd, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
 	if err != nil {
 		return
 	}
 
-	acs := sp_md.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@index=`+strconv.Quote(sRequest.Acs)+`]/@Location`)
-	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", acs, nil)
+	request, sRequest, err := getOriginalRequest(w, r, response)
+	if err != nil {
+	    return
+	}
 
-	signingMethod := sp_md.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+	spMd, err := Md.ExternalSP.MDQ(sRequest.Is) // internal and KRIB SPs have the same entityID - differs only in acsURL - so we can safely use the External
+	if err != nil {
+		return
+	}
 
-	var birkmd, issuermd *goxml.Xp
+	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
-	birkmd, err = Md.ExternalIdP.MDQ(sRequest.De)
-	issuermd = birkmd
-	if err != nil && bypassKRIB { // This might be a response to a request that bypassed KRIB -> BIRK
-		birkmd, err = Md.Internal.MDQ(sRequest.De)
-		if err != nil {
-			return
-		}
-		issuermd, err = Md.Hub.MDQ(config.HubEntityID)
+	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
+	issuerMd := birkMd
+	if err != nil {
+		birkMd = idpMd
+		issuerMd, err = Md.Hub.MDQ(config.HubEntityID)
 	}
 	if err != nil {
 		return
@@ -1324,44 +1291,14 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	response.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 	response.QueryDashP(nil, "./saml:Assertion/saml:Issuer", issuer, nil)
 
-	mdhub, err := Md.Hub.MDQ(config.HubEntityID)
+	hubMd, err := Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
 		return err
 	}
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 
-		if destination == "http://localhost:32361" {
-			type formdata struct {
-				Wa          string
-				Wresult     string
-				Wctx        string
-				Destination string
-			}
-
-			wsfedtemplate := `
-<html>
-<body onload="document.forms[0].submit()">
-<form action="{{.Destination}}" method="POST">
-<input type="hidden" name="wresult" value="{{.Wresult}}" />
-<input type="hidden" name="wctx" value="{{.Wctx}}" />
-<input type="hidden" name="wa" value="{{.Wa}}" />
-</form>
-</body>
-</html>
-`
-			postForm := template.Must(template.New("wsfedform").Parse(wsfedtemplate))
-
-			wsFedResponse := gosaml.NewWsFedResponse(mdhub, mdsp, response)
-			err = gosaml.SignResponse(wsFedResponse, "/t:RequestSecurityTokenResponse/t:RequestedSecurityToken/saml:Assertion", mdhub, signingMethod, gosaml.WSFedSign)
-			handleAttributeNameFormat2(wsFedResponse, mdsp)
-			q.Q(wsFedResponse.PP())
-			data := formdata{Destination: destination, Wa: "wsignin1.0", Wresult: base64.StdEncoding.EncodeToString(response.Dump()), Wctx: relayState}
-			postForm.Execute(w, data)
-			return
-		}
-
-		if _, err = SLOInfoHandler(w, r, origResponse, kribmd, response, mdsp, gosaml.SPRole, "KS"); err != nil {
+		if _, err = SLOInfoHandler(w, r, origResponse, kribMd, response, spMd, gosaml.SPRole, "KS"); err != nil {
 			return err
 		}
 
