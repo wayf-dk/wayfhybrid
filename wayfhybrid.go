@@ -999,7 +999,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		sp2Md := spMd
 
 		altIdp := debify.ReplaceAllString(idp2, "$1$2")
-		if false && idp2 != altIdp { // an internal IdP
+		if idp2 != altIdp { // an internal IdP
 			idp2Md, err = Md.Internal.MDQ(altIdp)
 			if err != nil {
 				return err
@@ -1286,7 +1286,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 
-		if _, err = SLOInfoHandler(w, r, origResponse, kribMd, response, spMd, gosaml.SPRole, "KS"); err != nil {
+		if _, err = SLOInfoHandler(w, r, origResponse, kribMd, response, spMd, gosaml.SPRole, "SLO"); err != nil {
 			return err
 		}
 
