@@ -1094,7 +1094,6 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		return
 	}
 
-q.Q(request.PP())
 	// Save the request in a session for when the response comes back
 	id := newrequest.Query1(nil, "./@ID")
 
@@ -1518,7 +1517,6 @@ func idHash(data string) string {
 }
 
 func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
-    q.Q(mdsp.PP())
 	const (
 		basic  = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
 		claims = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
@@ -1532,7 +1530,6 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 			uriname := basic2uri[basicname].uri
 			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name="+strconv.Quote(uriname)+"]")
 			if len(responseattribute) > 0 {
-			    q.Q(mdsp.Query1(attr, "@NameFormat"))
 				switch mdsp.Query1(attr, "@NameFormat") {
 				case basic:
 					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)

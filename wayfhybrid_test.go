@@ -288,4 +288,4 @@ func ExampleSendRequestToInternalIdP() {
 	// Output:
 	// Mkhan
 }
-**/
+
