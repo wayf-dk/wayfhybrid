@@ -999,7 +999,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		sp2Md := spMd
 
 		altIdp := debify.ReplaceAllString(idp2, "$1$2")
-		if idp2 != altIdp { // an internal IdP
+		if false && idp2 != altIdp { // an internal IdP
 			idp2Md, err = Md.Internal.MDQ(altIdp)
 			if err != nil {
 				return err
