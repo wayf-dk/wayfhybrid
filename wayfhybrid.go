@@ -174,7 +174,7 @@ var (
 	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (AttributeReleaseData, error)
 	kribServiceHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
 
-	authenticated string
+	authenticated, redirect string
 )
 
 func Main() {
@@ -278,7 +278,7 @@ func Main() {
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
 	httpMux.Handle("/auth", appHandler(authService))
-	httpMux.Handle("/sso", appHandler(nginxSSOService))
+	httpMux.Handle(config.Testsp+"/XXO", appHandler(nginxSSOService))
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPService))
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
@@ -493,9 +493,8 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 }
 
 func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
+	defer r.Body.Close()
 	q.Q(r.Header)
-	w.Header().Set("set-cookie", "anton=banton") // normal header
-	http.Redirect(w, r, "https://wayfsp2.wayf.dk?anton=banton", http.StatusFound)
 	return
 }
 
@@ -508,7 +507,9 @@ func authService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	if bet := u.Query().Get("backendtoken"); bet == authenticated && bet != "" {
 		w.Header().Set("X-User", "anton")                    // normal header
+		w.Header().Set("xxo", "xxbanton")                    // normal header
 		w.Header().Set("set-cookie", "anton="+authenticated) // normal header
+		//authenticated = ""
 		return
 	}
 	return fmt.Errorf("401")
@@ -518,9 +519,13 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
+	if god := r.Form.Get("NSREDIRECT"); god != "" {
+		redirect = god
+	}
+
 	type testSPFormData struct {
-		Protocol, RelayState, ResponsePP, Issuer, Destination, External string
-		AttrValues                                                      []attrValue
+		Protocol, RelayState, ResponsePP, Issuer, Destination, External, God, ScopedIDP string
+		AttrValues                                                                      []attrValue
 	}
 
 	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
@@ -945,9 +950,9 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
 	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
 	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:AssuranceLevel"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
 	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:Attribute:CprNumberIdentifier"]/saml:AttributeValue`)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
 	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
 	setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
@@ -1188,14 +1193,14 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	// to minimize the size of the cookies we have saved the original request in a json'ed struct
 	err = json.Unmarshal(value, &sRequest)
 
-    if sRequest.DtS {
-        spMd, err = md1.MDQ(sRequest.Is)
-    } else {
-        spMd, err = md2.MDQ(sRequest.Is)
-    }
-    if err != nil {
-        return
-    }
+	if sRequest.DtS {
+		spMd, err = md1.MDQ(sRequest.Is)
+	} else {
+		spMd, err = md2.MDQ(sRequest.Is)
+	}
+	if err != nil {
+		return
+	}
 
 	request = goxml.NewXpFromString("")
 	request.QueryDashP(nil, "/samlp:AuthnRequest/@ID", sRequest.Id, nil)
@@ -1211,7 +1216,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 		err = fmt.Errorf("response.InResponseTo != request.ID")
 		return
 	}
-    return
+	return
 }
 
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
@@ -1220,10 +1225,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
-
 	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP)
 	if err != nil {
-	    return
+		return
 	}
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
@@ -1312,7 +1316,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	spMd, request, _, err := getOriginalRequest(w, r, response, Md.Internal, Md.Internal)
 	if err != nil {
-	    return
+		return
 	}
 
 	if err = checkForCommonFederations(birkMd, kribMd); err != nil {
@@ -1321,7 +1325,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	legacyStatLog("krib-99", "saml20-idp-SSO", kribMd.Query1(nil, "@entityID"), birkMd.Query1(nil, "@entityID"), "na")
 
-    destination := request.Query1(nil, "./@AssertionConsumerServiceURL")
+	destination := request.Query1(nil, "./@AssertionConsumerServiceURL")
 	//	destination = "https://" + config.ConsentAsAService
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
