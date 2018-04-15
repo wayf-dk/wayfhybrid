@@ -104,46 +104,46 @@ func ExampleWayfAttributeHandler() {
 	gosaml.AttributeCanonicalDump(os.Stdout, sourceResponse)
 
 	// Output:
-    // cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     Mads Freek Petersen
-    // displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     Mads Freek Petersen
-    // eduPersonAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     member
-    //     staff
-    // eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     2
-    // eduPersonEntitlement urn:oid:1.3.6.1.4.1.5923.1.1.1.7 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     urn:mace:terena.org:tcs:escience-user
-    // eduPersonPrimaryAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     staff
-    // eduPersonPrincipalName urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     madpe@dtu.dk
-    // eduPersonScopedAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     member@dtu.dk
-    //     staff@dtu.dk
-    // eduPersonTargetedID urn:oid:1.3.6.1.4.1.5923.1.1.1.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     WAYF-DK-9c03f6bdabf9e280d9dfdedb42ebaf161c30ed51
-    // gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     Mads Freek
-    // mail urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     madpe@dtu.dk
-    // organizationName urn:oid:2.5.4.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     Danmarks Tekniske Universitet
-    // preferredLanguage urn:oid:2.16.840.1.113730.3.1.39 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     da-DK
-    // schacDateOfBirth urn:oid:1.3.6.1.4.1.25178.1.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     18580824
-    // schacHomeOrganization urn:oid:1.3.6.1.4.1.25178.1.2.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     dtu.dk
-    // schacHomeOrganizationType urn:oid:1.3.6.1.4.1.25178.1.2.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     urn:mace:terena.org:schac:homeOrganizationType:eu:higherEducationalInstitution
-    // schacPersonalUniqueID urn:oid:1.3.6.1.4.1.25178.1.2.15 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     urn:mace:terena.org:schac:personalUniqueID:dk:CPR:2408588834
-    // schacYearOfBirth urn:oid:1.3.6.1.4.1.25178.1.0.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     1858
-    // sn urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     Petersen
+	// cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     Mads Freek Petersen
+	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     Mads Freek Petersen
+	// eduPersonAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     member
+	//     staff
+	// eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     2
+	// eduPersonEntitlement urn:oid:1.3.6.1.4.1.5923.1.1.1.7 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     urn:mace:terena.org:tcs:escience-user
+	// eduPersonPrimaryAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     staff
+	// eduPersonPrincipalName urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     madpe@dtu.dk
+	// eduPersonScopedAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     member@dtu.dk
+	//     staff@dtu.dk
+	// eduPersonTargetedID urn:oid:1.3.6.1.4.1.5923.1.1.1.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     WAYF-DK-9c03f6bdabf9e280d9dfdedb42ebaf161c30ed51
+	// gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     Mads Freek
+	// mail urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     madpe@dtu.dk
+	// organizationName urn:oid:2.5.4.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     Danmarks Tekniske Universitet
+	// preferredLanguage urn:oid:2.16.840.1.113730.3.1.39 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     da-DK
+	// schacDateOfBirth urn:oid:1.3.6.1.4.1.25178.1.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     18580824
+	// schacHomeOrganization urn:oid:1.3.6.1.4.1.25178.1.2.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     dtu.dk
+	// schacHomeOrganizationType urn:oid:1.3.6.1.4.1.25178.1.2.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     urn:mace:terena.org:schac:homeOrganizationType:eu:higherEducationalInstitution
+	// schacPersonalUniqueID urn:oid:1.3.6.1.4.1.25178.1.2.15 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     urn:mace:terena.org:schac:personalUniqueID:dk:CPR:2408588834
+	// schacYearOfBirth urn:oid:1.3.6.1.4.1.25178.1.0.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     1858
+	// sn urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     Petersen
 }
 
 func ExampleNemLoginAttributeHandler() {
@@ -161,8 +161,8 @@ func ExampleNemLoginAttributeHandler() {
 	//     Anton Banton Cantonsen
 	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Anton Banton Cantonsen
-    // eduPersonAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     member
+	// eduPersonAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//     member
 	// eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     3
 	// eduPersonPrimaryAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
@@ -170,7 +170,7 @@ func ExampleNemLoginAttributeHandler() {
 	// eduPersonPrincipalName urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     PID:5666-1234-2-529868547821@sikker-adgang.dk
 	// eduPersonScopedAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-    //     member@sikker-adgang.dk
+	//     member@sikker-adgang.dk
 	// eduPersonTargetedID urn:oid:1.3.6.1.4.1.5923.1.1.1.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     WAYF-DK-d00398ea98ce6cac598a317dfe8a9e5145b3b5df
 	// gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
@@ -258,34 +258,3 @@ func ExampleHandleAttributeNameFormat() {
 	// Output:
 	//
 }
-
-func xxExampleMakeSloUrl() {
-	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-	url := makeSloUrl(response, idp_md, sp_md)
-	fmt.Println(url)
-	// Output:
-	// ?SAMLRequest=fJHNbtQwFIX38xSW95M4jpsfa5IKaVRppIKAFhZsqhv7urWa2CG%2BgfL2aFKQBhbdWP4539E5vofrl2lkP3BJPoaOF5ngDIOJ1ofHjn%2B5v9k3%2FLrfHRJM46xv42Nc6TN%2BXzERe5nGkPT20vF1CTpC8kkHmDBpMvru3ftbLTOh5yVSNHHkF8jbBKSEC%2FkYODsdO%2F5g6gGNU1A1VXvllG2HxklAi6qxDkRlBiMd1o0RnH39W0aey5xSWvEUEkGgjktRNHtR7GV1L1qtCq3qb5wdMZEPQBvF%2Bx1jjG2N9UYv%2FRPRnHSe%2F4RfLgNPmaU1s8%2F5WSNzb%2Bd8QgILBNn8NB%2FyS%2FbC7QNMeDqyu4%2FnzacVRu88Lh3%2Fx35b7DNnN3GZgN7%2Bp%2FONt3u3STUtEJLHQLx%2FULVwJTaDLVUplLwyEtpKloUYFDRWQN3a0hknS%2FwT9zVcv3s9%2Fjfrfvc7AAD%2F%2Fw%3D%3D
-}
-
-func ExampleWayfBirkHandler() {
-	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
-	_, _, err := WayfBirkHandler(request, sp_md, idp_md)
-	fmt.Println(err)
-	// Output:
-	// Mkhan
-}
-
-func ExampleSendRequestToInternalIdP() {
-	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-	request, _ := gosaml.NewAuthnRequest(nil, sp_md, idp_md, "")
-	_, _, err := WayfBirkHandler(request, sp_md, idp_md)
-	fmt.Println(err)
-	// Output:
-	// Mkhan
-}
-
