@@ -69,7 +69,7 @@ type (
 		PostFormTemplate                                                                         string
 		AttributeReleaseTemplate, WayfSPTestServiceTemplate                                      string
 		Certpath                                                                                 string
-		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs                    string
+		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Vvpmss            string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService    string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, SaltForHashedEppn                          string
@@ -260,6 +260,8 @@ func Main() {
 	for _, pattern := range config.NotFoundRoutes {
 		httpMux.Handle(pattern, http.NotFoundHandler())
 	}
+
+	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.Sso_Service, appHandler(SSOService))
 	httpMux.Handle(config.Idpslo, appHandler(IdPSLOService))
 	httpMux.Handle(config.Birkslo, appHandler(BirkSLOService))
@@ -526,8 +528,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	spMd, err := Md.Internal.MDQ("https://" + config.Testsp)
 	pk, _ := gosaml.GetPrivateKey(spMd)
 	idp := r.Form.Get("idpentityid")
+	idpList := r.Form.Get("idplist")
 	login := r.Form.Get("login") == "1"
-	if login || idp != "" {
+	if login || idp != "" || idpList != "" {
 
 		if err != nil {
 			return err
@@ -536,7 +539,13 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, hubMd, "")
+
+		scoping := ""
+		if r.Form.Get("scoping") == "scoping" {
+			scoping = r.Form.Get("scopedidp")
+		}
+
+		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, hubMd, scoping)
 
 		options := []struct{ name, path, value string }{
 			{"isPassive", "./@IsPassive", "true"},
@@ -554,14 +563,19 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		if idp != "" {
-			q := u.Query()
-			q.Set("idpentityid", idp)
-			u.RawQuery = q.Encode()
+		q := u.Query()
+		q.Set("idplist", idpList)
+		if r.Form.Get("scoping") == "param" {
+			idp = r.Form.Get("scopedidp")
 		}
+		if idp != "" {
+			q.Set("idpentityid", idp)
+		}
+		u.RawQuery = q.Encode()
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return nil
 	} else if r.Form.Get("logout") == "1" || r.Form.Get("logoutresponse") == "1" {
+		authenticated = ""
 		destinationMdSet := Md.Internal
 		issuerMdSet := Md.Hub
 		if r.Form.Get("external") == "1" {
@@ -591,11 +605,24 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		protocol := response.QueryString(nil, "local-name(/*)")
 		vals := attributeValues(response, destinationMd, hubRequestedAttributes)
 
+		god := ""
+		if redirect != "" {
+			authenticated = fmt.Sprintf("%x", securecookie.GenerateRandomKey(12))
+			god = redirect + "?backendtoken=" + authenticated
+		}
+
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"),
-			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals}
+			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, God: god}
 		testSPForm.Execute(w, data)
+	} else if r.Form.Get("ds") != "" {
+		data := url.Values{}
+		data.Set("return", "https://"+r.Host+r.RequestURI)
+		data.Set("returnIDParam", "scopedIDP")
+		data.Set("entityID", "https://"+config.Testsp)
+		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
-		data := testSPFormData{}
+
+		data := testSPFormData{ScopedIDP: r.Form.Get("scopedIDP")}
 		testSPForm.Execute(w, data)
 	}
 	return
@@ -959,13 +986,42 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 	response.QueryDashP(attr, `./saml:AttributeValue[`+strconv.Itoa(values)+`]`, value, nil)
 }
 
-func wayf(w http.ResponseWriter, r *http.Request, sp string, candidates ...string) (idp string) {
-	for _, idp = range candidates {
-		if idp != "" {
-			return
+func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
+	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Domain: config.Domain, Value: r.URL.Query().Get("idpentityid"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 180})
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	return
+}
+
+func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp) (idp string) {
+	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
+	vvpmss := ""
+	if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
+		vvpmss = tmp.Value
+	}
+
+	data := url.Values{}
+
+	idpLists := [][]string{
+		spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
+		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
+		{r.URL.Query().Get("idpentityid")},
+		strings.Split(r.URL.Query().Get("idplist"), ","),
+		strings.Split(vvpmss, ",")}
+
+	for _, IdpList := range idpLists {
+		switch len(IdpList) {
+		case 0:
+			continue
+		case 1:
+			if IdpList[0] != "" {
+				return IdpList[0]
+			}
+		default:
+			data.Set("idplist", strings.Join(IdpList, ","))
+			break
 		}
 	}
-	data := url.Values{}
+
 	data.Set("return", "https://"+r.Host+r.RequestURI)
 	data.Set("returnIDParam", "idpentityid")
 	data.Set("entityID", sp)
@@ -975,16 +1031,12 @@ func wayf(w http.ResponseWriter, r *http.Request, sp string, candidates ...strin
 
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spMd, hubMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.Hub)
+	request, spMd, _, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.Hub)
 	if err != nil {
 		return
 	}
 
-	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
-	idp2 := wayf(w, r, sp, spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
-		request.Query1(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
-		r.URL.Query().Get("idpentityid"))
-	if idp2 != "" {
+	if idp2 := wayf(w, r, request, spMd); idp2 != "" {
 		// Legacy: md and scoped entityIDs are internal, so birkify first if that is the case
 		if _, err = Md.Internal.MDQ(idp2); err == nil {
 			idp2 = bify.ReplaceAllString(idp2, "${1}birk.wayf.dk/birk.php/$2")
@@ -995,19 +1047,16 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		sp2 := sp
-		sp2Md := spMd
+		sp2 := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
+		sp2Md, _ := Md.ExternalSP.MDQ(sp2)
 
 		altIdp := debify.ReplaceAllString(idp2, "$1$2")
 		if idp2 != altIdp { // an internal IdP
-			idp2Md, err = Md.Internal.MDQ(altIdp)
+			sp2Md, idp2Md, _ = remapper(idp2)
 			if err != nil {
 				return err
 			}
 			sp2 = config.HubEntityID
-			sp2Md = hubMd
-		} else {
-		    sp2Md, _ = Md.ExternalSP.MDQ(sp2)
 		}
 
 		if err = checkForCommonFederations(spMd, idp2Md); err != nil {
@@ -1027,7 +1076,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	// remember to add the Scoping element to inform the IdP of requesterID - if stated in metadata for the IdP
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
-    var directToSp bool
+	var directToSp bool
 
 	request, spMd, birkIdpMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.ExternalIdP)
 	if err != nil {
@@ -1052,7 +1101,23 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	var hubMd, idpMd *goxml.Xp
 
 	birkIdp := birkIdpMd.Query1(nil, "@entityID")
-	idp := debify.ReplaceAllString(birkIdp, "$1$2")
+	hubMd, idpMd, _ = remapper(birkIdp)
+
+	if err = checkForCommonFederations(idpMd, spMd); err != nil {
+		return
+	}
+
+	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, directToSp)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
+	idp = debify.ReplaceAllString(idp, "$1$2")
 
 	if rm, ok := remap[idp]; ok {
 		idpMd, err = Md.Internal.MDQ(rm.idp)
@@ -1072,17 +1137,6 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return
 		}
-	}
-
-	if err = checkForCommonFederations(idpMd, spMd); err != nil {
-		return
-	}
-
-	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
-
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, directToSp)
-	if err != nil {
-		return
 	}
 	return
 }
