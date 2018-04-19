@@ -1656,6 +1656,7 @@ func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, secur
 	matches := scoped.FindStringSubmatch(eppn)
 	if len(matches) != 2 {
 		aauscope := regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9\.-]+aau\.dk@aau\.dk)$`)
+    	matches = aauscope.FindStringSubmatch(eppn)
 		if len(matches) != 2 {
 			err = fmt.Errorf("not a scoped value: %s", eppn)
 			return
