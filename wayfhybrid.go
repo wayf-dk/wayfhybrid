@@ -1006,7 +1006,7 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 }
 
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
-	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Domain: config.Domain, Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 180})
+	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Domain: config.Domain, Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10})
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	return
 }
