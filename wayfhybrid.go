@@ -174,8 +174,6 @@ var (
 	basic2uri          map[string]attrName
 	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (AttributeReleaseData, error)
 	kribServiceHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
-
-	authenticated, redirect string
 )
 
 func Main() {
@@ -278,11 +276,14 @@ func Main() {
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
-	httpMux.Handle("/auth", appHandler(authService))
 	httpMux.Handle(config.Testsp+"/XXO", appHandler(nginxSSOService))
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPService))
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
+
+	//id.wayf.dk tests ...
+	httpMux.Handle("id.wayf.dk/SSO", appHandler(IdWayfDkSSOService));
+	httpMux.Handle("id.wayf.dk/ACS", appHandler(IdWayfDkACSService));
 
 	finish := make(chan bool)
 
@@ -1659,5 +1660,102 @@ func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, secur
 		err = fmt.Errorf("security domain '%s' does not match any scopes", securityDomain)
 		return
 	}
+	return
+}
+
+func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
+	defer r.Body.Close()
+
+	request, spMd, idpMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
+	if err != nil {
+	    return err
+	}
+
+	authIdP := ""
+	if tmp, _ := r.Cookie("IdP"); tmp != nil {
+		authIdP = tmp.Value
+	}
+
+	idpLists := [][]string{
+        {authIdP},
+		{r.URL.Query().Get("idpentityid")},
+	}
+
+    if idp2 := wayf(w, r, request, spMd, idpLists); idp2 != "" {
+		idp2Md, err := Md.ExternalIdP.MDQ(idp2)
+		if err != nil {
+			return err
+		}
+
+		sp := idpMd.Query1(nil, "@entityID")
+		sp2Md, err := Md.ExternalSP.MDQ("https://id.wayf.dk")
+		if err != nil {
+		    return err
+		}
+		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 0})
+
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp, relayState, "ID-WAYF-DK", false)
+		return err
+	}
+	return
+}
+
+func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
+	defer r.Body.Close()
+	response, _, spMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP)
+	if err != nil {
+		return
+	}
+	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP, "ID-WAYF-DK")
+	if err != nil {
+		return
+	}
+
+	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+
+	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
+	issuerMd := birkMd
+	if err != nil {
+		return
+	}
+
+	var newresponse *goxml.Xp
+	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
+		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
+
+		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
+		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
+		// The response at this time contains a full attribute set
+		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
+		if nameidformat == gosaml.Persistent {
+			newresponse.QueryDashP(nameid, "@Format", gosaml.Persistent, nil)
+			eptid := newresponse.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]/saml:AttributeValue`)
+			newresponse.QueryDashP(nameid, ".", eptid, nil)
+		} else { // if nameidformat == gosaml.Transient
+			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
+		}
+
+		for _, q := range config.ElementsToSign {
+			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		newresponse = gosaml.NewErrorResponse(issuerMd, spMd, request, response)
+
+		err = gosaml.SignResponse(newresponse, "/samlp:Response", issuerMd, signingMethod, gosaml.SAMLSign)
+		if err != nil {
+			return
+		}
+	}
+
+	// when consent as a service is ready - we will post to that
+	// acs := newresponse.Query1(nil, "@Destination")
+
+	gosaml.DumpFile(newresponse)
+
+	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState}
+	postForm.Execute(w, data)
 	return
 }
