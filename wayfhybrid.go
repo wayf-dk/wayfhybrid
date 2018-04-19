@@ -533,15 +533,8 @@ func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	request, err := gosaml.NewAuthnRequest(nil, spMd, hubMd, "")
-	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", "https://"+r.Header.Get("X-Acs"), nil)
-
-	u, err := gosaml.SAMLRequest2Url(request, "", "", "-", "") // not signed so blank key, pw and algo
-	if err != nil {
-		return
-	}
-	http.Redirect(w, r, u.String(), http.StatusFound)
-	return
+    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", "", "JWT-", "https://"+r.Header.Get("X-Acs"), true)
+    return err
 }
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
