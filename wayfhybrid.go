@@ -506,10 +506,14 @@ func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
-		response, _, _, _, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response"}, false)
-		if err != nil {
-			return err
-		}
+        response, _, _, _, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, "")
+        if err != nil {
+            return err
+        }
+        _, _, _, err = getOriginalRequest(w, r, response, nil, nil, "JWT-")
+        if err != nil {
+            return err
+        }
 
 		attrs := map[string][]string{}
 
@@ -619,9 +623,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		// try to decode SAML message to ourselves or just another SP
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
-		response, issuerMd, destinationMd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
+		response, issuerMd, destinationMd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
 		if err != nil {
-			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, false)
+			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
 			external = "1"
 		}
 		if err != nil {
@@ -1238,16 +1242,12 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	request.QueryDashP(nil, "./saml:Issuer", sRequest.Is, nil)
 	request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.NameIDList[sRequest.Fo], nil)
 
-	if inResponseTo != sRequest.Nid {
-		err = fmt.Errorf("response.InResponseTo != request.ID")
-		return
-	}
 	return
 }
 
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, idpMd, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub)
+	response, idpMd, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub, "https://" + r.Host + r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -1335,7 +1335,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
 
-	response, birkMd, kribMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP)
+	response, birkMd, kribMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://" + r.Host + r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -1718,7 +1718,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, spMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP)
+	response, _, spMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://" + r.Host + r.URL.Path)
 	if err != nil {
 		return
 	}
