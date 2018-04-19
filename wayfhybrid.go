@@ -1006,37 +1006,35 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 }
 
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
-	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Domain: config.Domain, Value: r.URL.Query().Get("idpentityid"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 180})
+	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Domain: config.Domain, Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 180})
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	return
 }
 
-func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp) (idp string) {
-	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
-	vvpmss := ""
-	if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
-		vvpmss = tmp.Value
-	}
+func birkify(idp string) string {
+    if _, err := Md.Internal.MDQ(idp); err == nil {
+        idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
+    }
+    return idp
+}
 
+func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLists [][]string) (idp string) {
+	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
 	data := url.Values{}
 
-	idpLists := [][]string{
-		spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
-		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
-		{r.URL.Query().Get("idpentityid")},
-		strings.Split(r.URL.Query().Get("idplist"), ","),
-		strings.Split(vvpmss, ",")}
-
-	for _, IdpList := range idpLists {
-		switch len(IdpList) {
+	for _, idpList := range idpLists {
+	    for i, idp := range idpList {
+	        idpList[i] = birkify(idp)
+	    }
+	    switch len(idpList) {
 		case 0:
 			continue
 		case 1:
-			if IdpList[0] != "" {
-				return IdpList[0]
+			if idpList[0] != "" {
+				return idpList[0]
 			}
 		default:
-			data.Set("idplist", strings.Join(IdpList, ","))
+			data.Set("idplist", strings.Join(idpList, ","))
 			break
 		}
 	}
@@ -1055,12 +1053,19 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	if idp2 := wayf(w, r, request, spMd); idp2 != "" {
-		// Legacy: md and scoped entityIDs are internal, so birkify first if that is the case
-		if _, err = Md.Internal.MDQ(idp2); err == nil {
-			idp2 = bify.ReplaceAllString(idp2, "${1}birk.wayf.dk/birk.php/$2")
-		}
+	vvpmss := ""
+	if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
+		vvpmss = tmp.Value
+	}
 
+	idpLists := [][]string{
+		spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
+		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
+		{r.URL.Query().Get("idpentityid")},
+		strings.Split(r.URL.Query().Get("idplist"), ","),
+		strings.Split(vvpmss, ",")}
+
+	if idp2 := wayf(w, r, request, spMd, idpLists); idp2 != "" {
 		idp2Md, err := Md.ExternalIdP.MDQ(idp2)
 		if err != nil {
 			return err
