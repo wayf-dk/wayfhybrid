@@ -1733,8 +1733,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
-	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
-	issuerMd := birkMd
+	issuerMd, err := Md.ExternalIdP.MDQ(sRequest.De)
 	if err != nil {
 		return
 	}
