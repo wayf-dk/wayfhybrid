@@ -1089,7 +1089,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", true)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", true)
 		return err
 	}
 	return
@@ -1133,7 +1133,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", directToSp)
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", directToSp)
 	if err != nil {
 		return
 	}
@@ -1165,15 +1165,22 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix string, directToSP bool) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs string, directToSP bool) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, "")
 	if err != nil {
 		return
 	}
+    if altAcs != "" {
+    	newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
+    }
 
 	// Save the request in a session for when the response comes back
 	id := newrequest.Query1(nil, "./@ID")
+
+	if request == nil {
+	    	request = goxml.NewXpFromString("") // an empty one to allow get "" for all the fields below ....
+	}
 
 	sRequest := samlRequest{
 		Nid: id,
@@ -1696,14 +1703,14 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		sp := idpMd.Query1(nil, "@entityID")
+		idp := idpMd.Query1(nil, "@entityID")
 		sp2Md, err := Md.ExternalSP.MDQ("https://id.wayf.dk")
 		if err != nil {
 			return err
 		}
 		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 0})
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp, relayState, "ID-WAYF-DK", false)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK", "", false)
 		return err
 	}
 	return
