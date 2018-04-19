@@ -78,6 +78,7 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
+		SpBackendTenants                                                                         map[string]string
 	}
 
 	idpsppair struct {
@@ -494,38 +495,57 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 
 func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	q.Q(r.Header)
-	return
-}
-
-func authService(w http.ResponseWriter, r *http.Request) (err error) {
-	defer r.Body.Close()
-	q.Q(r.Header)
 	r.ParseForm()
+	q.Q(r.Header)
+	q.Q(r.Form)
 
-	u, err := url.Parse(r.Header["X-Original-Uri"][0])
+	spMd, err := Md.Internal.MDQ(config.SpBackendTenants[r.Header.Get("X-Token")])
+    if err != nil {
+        return
+    }
 
-	if bet := u.Query().Get("backendtoken"); bet == authenticated && bet != "" {
-		w.Header().Set("X-User", "anton")                    // normal header
-		w.Header().Set("xxo", "xxbanton")                    // normal header
-		w.Header().Set("set-cookie", "anton="+authenticated) // normal header
-		//authenticated = ""
-		return
+	if _, ok := r.Form["SAMLResponse"]; ok {
+		response, _, _, _, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response"}, false)
+		if err != nil {
+			return err
+		}
+
+        attrs := map[string][]string{}
+
+        names := response.QueryMulti(nil, "//saml:Attribute/@FriendlyName")
+        for _, name := range names {
+            attrs[name] = response.QueryMulti(nil, "//saml:Attribute[@FriendlyName="+strconv.Quote(name)+"]/saml:AttributeValue")
+        }
+        b, _ := json.Marshal(attrs)
+
+        w.Header().Set("Anton", string(b))
+        w.Header().Set("X-Accel-Redirect", "/")
+        return err
 	}
-	return fmt.Errorf("401")
+
+    hubMd, err := Md.Hub.MDQ(config.HubEntityID)
+    if err != nil {
+        return err
+    }
+
+	request, err := gosaml.NewAuthnRequest(nil, spMd, hubMd, "")
+	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", "https://"+r.Header.Get("X-Acs"), nil)
+
+	u, err := gosaml.SAMLRequest2Url(request, "", "", "-", "") // not signed so blank key, pw and algo
+    if err != nil {
+        return
+    }
+	http.Redirect(w, r, u.String(), http.StatusFound)
+	return
 }
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-	if god := r.Form.Get("NSREDIRECT"); god != "" {
-		redirect = god
-	}
-
 	type testSPFormData struct {
-		Protocol, RelayState, ResponsePP, Issuer, Destination, External, God, ScopedIDP string
-		AttrValues                                                                      []attrValue
+		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP string
+		AttrValues                                                                 []attrValue
 	}
 
 	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
@@ -580,7 +600,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return nil
 	} else if r.Form.Get("logout") == "1" || r.Form.Get("logoutresponse") == "1" {
-		authenticated = ""
 		destinationMdSet := Md.Internal
 		issuerMdSet := Md.Hub
 		if r.Form.Get("external") == "1" {
@@ -610,14 +629,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		protocol := response.QueryString(nil, "local-name(/*)")
 		vals := attributeValues(response, destinationMd, hubRequestedAttributes)
 
-		god := ""
-		if redirect != "" {
-			authenticated = fmt.Sprintf("%x", securecookie.GenerateRandomKey(12))
-			god = redirect + "?backendtoken=" + authenticated
-		}
-
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"),
-			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, God: god}
+			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals}
 		testSPForm.Execute(w, data)
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
