@@ -1089,7 +1089,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, true)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", true)
 		return err
 	}
 	return
@@ -1133,7 +1133,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, directToSp)
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", directToSp)
 	if err != nil {
 		return
 	}
@@ -1165,7 +1165,7 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState string, directToSP bool) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix string, directToSP bool) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, "")
 	if err != nil {
@@ -1184,9 +1184,9 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Acs: request.Query1(nil, "./@AssertionConsumerServiceIndex"),
 		DtS: directToSP,
 	}
-
+    q.Q(sRequest)
 	bytes, err := json.Marshal(&sRequest)
-	session.Set(w, r, "SSO-"+idHash(id), bytes, authnRequestCookie, authnRequestTTL)
+	session.Set(w, r, prefix+idHash(id), bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
 	wars := idpMd.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
@@ -1202,10 +1202,10 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	return
 }
 
-func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
+func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFile(response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
-	value, err := session.GetDel(w, r, "SSO-"+idHash(inResponseTo), authnRequestCookie)
+	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
 	if err != nil {
 		return
 	}
@@ -1244,7 +1244,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
-	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP)
+	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP, "SSO-")
 	if err != nil {
 		return
 	}
@@ -1333,7 +1333,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	spMd, request, _, err := getOriginalRequest(w, r, response, Md.Internal, Md.Internal)
+	spMd, request, _, err := getOriginalRequest(w, r, response, Md.Internal, Md.Internal, "SSO-")
 	if err != nil {
 		return
 	}
