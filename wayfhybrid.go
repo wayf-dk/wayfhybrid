@@ -282,8 +282,8 @@ func Main() {
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
 
 	//id.wayf.dk tests ...
-	httpMux.Handle("id.wayf.dk/SSO", appHandler(IdWayfDkSSOService));
-	httpMux.Handle("id.wayf.dk/ACS", appHandler(IdWayfDkACSService));
+	httpMux.Handle("id.wayf.dk/SSO", appHandler(IdWayfDkSSOService))
+	httpMux.Handle("id.wayf.dk/ACS", appHandler(IdWayfDkACSService))
 
 	finish := make(chan bool)
 
@@ -501,9 +501,9 @@ func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	q.Q(r.Form)
 
 	spMd, err := Md.Internal.MDQ(config.SpBackendTenants[r.Header.Get("X-Token")])
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
 		response, _, _, _, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response"}, false)
@@ -511,31 +511,31 @@ func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-        attrs := map[string][]string{}
+		attrs := map[string][]string{}
 
-        names := response.QueryMulti(nil, "//saml:Attribute/@FriendlyName")
-        for _, name := range names {
-            attrs[name] = response.QueryMulti(nil, "//saml:Attribute[@FriendlyName="+strconv.Quote(name)+"]/saml:AttributeValue")
-        }
-        b, _ := json.Marshal(attrs)
+		names := response.QueryMulti(nil, "//saml:Attribute/@FriendlyName")
+		for _, name := range names {
+			attrs[name] = response.QueryMulti(nil, "//saml:Attribute[@FriendlyName="+strconv.Quote(name)+"]/saml:AttributeValue")
+		}
+		b, _ := json.Marshal(attrs)
 
-        w.Header().Set("Anton", string(b))
-        w.Header().Set("X-Accel-Redirect", "/")
-        return err
+		w.Header().Set("Anton", string(b))
+		w.Header().Set("X-Accel-Redirect", "/")
+		return err
 	}
 
-    hubMd, err := Md.Hub.MDQ(config.HubEntityID)
-    if err != nil {
-        return err
-    }
+	hubMd, err := Md.Hub.MDQ(config.HubEntityID)
+	if err != nil {
+		return err
+	}
 
 	request, err := gosaml.NewAuthnRequest(nil, spMd, hubMd, "")
 	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", "https://"+r.Header.Get("X-Acs"), nil)
 
 	u, err := gosaml.SAMLRequest2Url(request, "", "", "-", "") // not signed so blank key, pw and algo
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -1012,10 +1012,10 @@ func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err
 }
 
 func birkify(idp string) string {
-    if _, err := Md.Internal.MDQ(idp); err == nil {
-        idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
-    }
-    return idp
+	if _, err := Md.Internal.MDQ(idp); err == nil {
+		idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
+	}
+	return idp
 }
 
 func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLists [][]string) (idp string) {
@@ -1023,10 +1023,10 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 	data := url.Values{}
 
 	for _, idpList := range idpLists {
-	    for i, idp := range idpList {
-	        idpList[i] = birkify(idp)
-	    }
-	    switch len(idpList) {
+		for i, idp := range idpList {
+			idpList[i] = birkify(idp)
+		}
+		switch len(idpList) {
 		case 0:
 			continue
 		case 1:
@@ -1184,7 +1184,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Acs: request.Query1(nil, "./@AssertionConsumerServiceIndex"),
 		DtS: directToSP,
 	}
-    q.Q(sRequest)
+	q.Q(sRequest)
 	bytes, err := json.Marshal(&sRequest)
 	session.Set(w, r, prefix+idHash(id), bytes, authnRequestCookie, authnRequestTTL)
 
@@ -1655,8 +1655,11 @@ func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, secur
 	eppn = xp.Query1(context, xpath)
 	matches := scoped.FindStringSubmatch(eppn)
 	if len(matches) != 2 {
-		err = fmt.Errorf("not a scoped value: %s", eppn)
-		return
+		aauscope := regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9\.-]+aau\.dk@aau\.dk)$`)
+		if len(matches) != 2 {
+			err = fmt.Errorf("not a scoped value: %s", eppn)
+			return
+		}
 	}
 	securityDomain = matches[1]
 
@@ -1673,7 +1676,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	request, spMd, idpMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
 	if err != nil {
-	    return err
+		return err
 	}
 
 	authIdP := ""
@@ -1682,11 +1685,11 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	idpLists := [][]string{
-        {authIdP},
+		{authIdP},
 		{r.URL.Query().Get("idpentityid")},
 	}
 
-    if idp2 := wayf(w, r, request, spMd, idpLists); idp2 != "" {
+	if idp2 := wayf(w, r, request, spMd, idpLists); idp2 != "" {
 		idp2Md, err := Md.ExternalIdP.MDQ(idp2)
 		if err != nil {
 			return err
@@ -1695,7 +1698,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		sp := idpMd.Query1(nil, "@entityID")
 		sp2Md, err := Md.ExternalSP.MDQ("https://id.wayf.dk")
 		if err != nil {
-		    return err
+			return err
 		}
 		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 0})
 
