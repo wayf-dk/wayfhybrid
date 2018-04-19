@@ -1218,6 +1218,15 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	// to minimize the size of the cookies we have saved the original request in a json'ed struct
 	err = json.Unmarshal(value, &sRequest)
 
+	if inResponseTo != sRequest.Nid {
+		err = fmt.Errorf("response.InResponseTo != request.ID")
+		return
+	}
+
+    if sRequest.Id == "" { // This is a non-hub request - no original actual original request - just checking if response/@InResponseTo == request/@ID
+        return nil, nil, sRequest, nil
+    }
+
 	if sRequest.DtS {
 		spMd, err = md1.MDQ(sRequest.Is)
 	} else {
