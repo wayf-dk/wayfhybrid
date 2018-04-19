@@ -519,7 +519,7 @@ func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 		b, _ := json.Marshal(attrs)
 
-		w.Header().Set("Anton", string(b))
+		w.Header().Set("Auth", "Bearer "+string(b))
 		w.Header().Set("X-Accel-Redirect", "/")
 		return err
 	}
