@@ -587,7 +587,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 		q := u.Query()
-		q.Set("idplist", idpList)
+		if idpList != "" {
+		        q.Set("idplist", idpList)
+		}
 		if r.Form.Get("scoping") == "param" {
 			idp = r.Form.Get("scopedidp")
 		}
