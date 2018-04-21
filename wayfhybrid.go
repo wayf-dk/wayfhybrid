@@ -10,6 +10,7 @@ import (
 	//"encoding/xml"
 	"fmt"
 	//"github.com/mattn/go-sqlite3"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/securecookie"
 	toml "github.com/pelletier/go-toml"
 	"github.com/wayf-dk/go-libxml2/types"
@@ -78,7 +79,7 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
-		SpBackendTenants                                                                         map[string]string
+		SpBackendTenants                                                                         map[string]struct{EntityID, Secret string}
 	}
 
 	idpsppair struct {
@@ -515,15 +516,28 @@ func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
             return err
         }
 
-		attrs := map[string][]string{}
+		attrs := jwt.MapClaims{}
 
 		names := response.QueryMulti(nil, "//saml:Attribute/@FriendlyName")
 		for _, name := range names {
 			attrs[name] = response.QueryMulti(nil, "//saml:Attribute[@FriendlyName="+strconv.Quote(name)+"]/saml:AttributeValue")
 		}
-		b, _ := json.Marshal(attrs)
 
-		w.Header().Set("Auth", "Bearer "+string(b))
+        // https://godoc.org/github.com/dgrijalva/jwt-go#example-New--Hmac
+        // Create a new token object, specifying signing method and the claims
+        // you would like it to contain.
+        token := jwt.NewWithClaims(jwt.SigningMethodHS256, attrs)
+
+        // Sign and get the complete encoded token as a string using the secret
+        tokenString, err := token.SignedString([]byte(config.SpBackendTenants[r.Header.Get("X-Token")].Secret))
+        if err != nil {
+             return err
+        }
+
+		//b, _ := json.Marshal(attrs)
+
+		w.Header().Set("Auth", "Bearer "+tokenString)
+//		w.Header().Set("Auth", "Bearer "+string(b))
 		w.Header().Set("X-Accel-Redirect", "/")
 		return err
 	}
