@@ -315,9 +315,9 @@ func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.mux.ServeHTTP(w, r)
 }
 
-func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id string, data []byte, secCookie *securecookie.SecureCookie, maxAge int) (err error) {
+func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domain string, data []byte, secCookie *securecookie.SecureCookie, maxAge int) (err error) {
 	cookie, err := secCookie.Encode(id, gosaml.Deflate(data))
-	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge})
+	http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge})
 	return
 }
 
@@ -498,16 +498,14 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	q.Q(r.Header)
-	q.Q(r.Form)
 
-	spMd, err := Md.Internal.MDQ(config.SpBackendTenants[r.Header.Get("X-Token")])
+	spMd, err := Md.Internal.MDQ(config.SpBackendTenants[r.Header.Get("X-Token")].EntityID)
 	if err != nil {
 		return
 	}
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
-        response, _, _, _, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, "")
+        response, _, _, _, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, "https://"+r.Header.Get("X-Acs"))
         if err != nil {
             return err
         }
@@ -547,7 +545,7 @@ func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", "", "JWT-", "https://"+r.Header.Get("X-Acs"), true)
+    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", "", "JWT-", "https://"+r.Header.Get("X-Acs"), "", true)
     return err
 }
 
@@ -1102,7 +1100,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", true)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", config.Domain, true)
 		return err
 	}
 	return
@@ -1146,7 +1144,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", directToSp)
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, directToSp)
 	if err != nil {
 		return
 	}
@@ -1178,7 +1176,7 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs string, directToSP bool) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, directToSP bool) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, "")
 	if err != nil {
@@ -1192,7 +1190,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	id := newrequest.Query1(nil, "./@ID")
 
 	if request == nil {
-	    	request = goxml.NewXpFromString("") // an empty one to allow get "" for all the fields below ....
+	    request = goxml.NewXpFromString("") // an empty one to allow get "" for all the fields below ....
 	}
 
 	sRequest := samlRequest{
@@ -1204,9 +1202,8 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Acs: request.Query1(nil, "./@AssertionConsumerServiceIndex"),
 		DtS: directToSP,
 	}
-	q.Q(sRequest)
 	bytes, err := json.Marshal(&sRequest)
-	session.Set(w, r, prefix+idHash(id), bytes, authnRequestCookie, authnRequestTTL)
+	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
 	wars := idpMd.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
@@ -1225,6 +1222,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFile(response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
+	q.Q(inResponseTo)
 	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
 	if err != nil {
 		return
@@ -1358,7 +1356,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	spMd, request, _, err := getOriginalRequest(w, r, response, Md.Internal, Md.Internal, "SSO-")
+	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.Internal, "SSO-")
 	if err != nil {
 		return
 	}
@@ -1379,6 +1377,8 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	issuer := config.HubEntityID
 	response.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 	response.QueryDashP(nil, "./saml:Assertion/saml:Issuer", issuer, nil)
+	response.QueryDashP(nil, "./@InResponseTo", sRequest.Id, nil)
+	response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@InResponseTo", sRequest.Id, nil)
 
 	hubMd, err := Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
@@ -1391,7 +1391,6 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		response.QueryDashP(nil, "./saml:Assertion/saml:Issuer", issuer, nil)
 		// Krib always receives attributes with nameformat=urn. Before sending to the real SP we need to look into
 		// the metadata for SP to determine the actual nameformat - as WAYF supports both for Md.Internal SPs.
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
@@ -1467,7 +1466,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			}
 			async := request.QueryBool(nil, "boolean(./samlp:Extensions/aslo:Asynchronous)")
 			if !async {
-				session.Set(w, r, "SLO-"+idHash(sloinfo.Is), request.Dump(), authnRequestCookie, 60)
+				session.Set(w, r, "SLO-"+idHash(sloinfo.Is), config.Domain, request.Dump(), authnRequestCookie, 60)
 			}
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
 			legacyStatLog("birk-99", "saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.Na+fmt.Sprintf(" async:%t", async))
@@ -1538,6 +1537,7 @@ func findMdPair(finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, issuer, d
 // Saves or retrieves the SLO info relevant to the contents of the samlMessage
 // For now uses cookies to keep the SLOInfo
 func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationInMd, samlOut, destinationOutMd *goxml.Xp, role int, tag string) (sloinfo *gosaml.SLOInfo, err error) {
+    return nil, nil
 	type touple struct {
 		HashIn, HashOut string
 	}
@@ -1596,19 +1596,19 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		unique.HashIn = hashIn
 		unique.HashOut = hashOut
 		bytes, err := json.Marshal(&unique)
-		session.Set(w, r, spIdPHash, bytes, sloInfoCookie, sloInfoTTL)
+		session.Set(w, r, spIdPHash, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 
 		slo := gosaml.NewSLOInfo(samlIn, destinationInMd)
 		slo.Is = idHash(slo.Is)
 		slo.De = idHash(slo.De)
 		bytes, _ = json.Marshal(&slo)
-		session.Set(w, r, hashOut, bytes, sloInfoCookie, sloInfoTTL)
+		session.Set(w, r, hashOut, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 
 		slo = gosaml.NewSLOInfo(samlOut, destinationOutMd)
 		slo.Is = idHash(slo.Is)
 		slo.De = idHash(slo.De)
 		bytes, _ = json.Marshal(&slo)
-		session.Set(w, r, hashIn, bytes, sloInfoCookie, sloInfoTTL)
+		session.Set(w, r, hashIn, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 
 	}
 	return
@@ -1726,9 +1726,9 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 0})
+		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 31536000})
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK", "", false)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK-", "", "", false)
 		return err
 	}
 	return
@@ -1740,7 +1740,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
-	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP, "ID-WAYF-DK")
+	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP, "ID-WAYF-DK-")
 	if err != nil {
 		return
 	}
