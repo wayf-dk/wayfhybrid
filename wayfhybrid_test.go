@@ -10,6 +10,7 @@ import (
 	"github.com/y0ssar1an/q"
 	"log"
 	"os"
+	//	"strconv"
 	"time"
 )
 
@@ -257,4 +258,62 @@ func ExampleHandleAttributeNameFormat() {
 	handleAttributeNameFormat(response, sp_md)
 	// Output:
 	//
+}
+
+func ExampleCheckScope() {
+	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
+	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	fmt.Println(eppn, securitydomain, err)
+	// Output:
+	// madpe@dtu.dk dtu.dk <nil>
+}
+
+func ExampleCheckScopeAAU() {
+	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
+	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, "mekhan@student.aau.dk@aau.dk", nil)
+
+	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	fmt.Println(eppn, securitydomain, err)
+	// Output:
+	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk <nil>
+}
+
+func ExampleCheckScopeAAU1() {
+	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
+	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, "mekhan@aau.dk", nil)
+
+	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	fmt.Println(eppn, securitydomain, err)
+	// Output:
+	// mekhan@aau.dk aau.dk <nil>
+}
+
+func ExampleInvalidScope() {
+	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
+	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, "mekhan@nu.edu.pk", nil)
+
+	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	fmt.Println(eppn, securitydomain, err)
+	// Output:
+	// mekhan@nu.edu.pk nu.edu.pk security domain 'nu.edu.pk' does not match any scopes
+}
+
+func ExampleNoScope() {
+	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
+	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, " ", nil)
+	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+
+	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	fmt.Println(eppn, securitydomain, err)
+	// Output:
+	// not a scoped value:
 }
