@@ -98,17 +98,18 @@ type (
 	}
 
 	AttributeReleaseData struct {
-		Values            map[string][]string
-		IdPDisplayName    map[string]string
-		IdPLogo           string
-		SPDisplayName     map[string]string
-		SPDescription     map[string]string
-		SPLogo            string
-		SPEntityID        string
-		Key               string
-		Hash              string
-		NoConsent         bool
-		ConsentAsAService string
+		Values             map[string][]string
+		IdPDisplayName     map[string]string
+		IdPLogo            string
+		SPDisplayName      map[string]string
+		SPDescription      map[string]string
+		SPLogo             string
+		SPEntityID         string
+		Key                string
+		Hash               string
+		BypassConfirmation bool
+		ForceConfirmation  bool
+		ConsentAsAService  string
 	}
 
 	HybridSession interface {
@@ -924,7 +925,9 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 			//attrStmt.RemoveChild(attrNode)
 			continue
 		}
+		io.WriteString(h, name)
 		for _, attrValue := range response.QueryMulti(attrNode, "saml:AttributeValue") {
+    		io.WriteString(h, attrValue)
 			ard.Values[friendlyName] = append(ard.Values[friendlyName], attrValue)
 		}
 	}
@@ -938,12 +941,14 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	ard.SPDescription["da"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`)
 	ard.SPLogo = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
 	ard.SPEntityID = spMd.Query1(nil, "@entityID")
-	ard.NoConsent = idpMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
-	ard.NoConsent = ard.NoConsent || spMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.='1']) > 0`)
-	ard.Key = eppn
-	ard.Hash = eppn + ard.SPEntityID
+	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
+	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.='1']) > 0`)
+	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
+	ard.Key = idHash(ard.SPEntityID + idp)
+    io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
+
+	ard.Hash = fmt.Sprintf("%x", h.Sum(nil))
 	ard.ConsentAsAService = config.ConsentAsAService
-	//fmt.Println("ard", ard)
 
 	hashedEppn := fmt.Sprintf("%x", goxml.Hash(crypto.SHA256, config.SaltForHashedEppn+eppn))
 	legacyStatLog("birk-99", "saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
@@ -1222,14 +1227,12 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFile(response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
-	q.Q(inResponseTo)
 	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
 	if err != nil {
 		return
 	}
 	// to minimize the size of the cookies we have saved the original request in a json'ed struct
 	err = json.Unmarshal(value, &sRequest)
-
 	if inResponseTo != sRequest.Nid {
 		err = fmt.Errorf("response.InResponseTo != request.ID")
 		return
@@ -1330,7 +1333,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return
 		}
-		ard = AttributeReleaseData{NoConsent: true}
+		ard = AttributeReleaseData{BypassConfirmation: true}
 	}
 
 	// when consent as a service is ready - we will post to that
