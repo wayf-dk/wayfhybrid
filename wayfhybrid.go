@@ -916,6 +916,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	for _, attrName := range arp {
 		arpmap[attrName] = true
 	}
+	h := sha1.New()
 	for _, attrNode := range response.Query(destinationAttributes, `saml:Attribute`) {
 		friendlyName := response.Query1(attrNode, "@FriendlyName")
 		name := response.Query1(attrNode, "@Name")
