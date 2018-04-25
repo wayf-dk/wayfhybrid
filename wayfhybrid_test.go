@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -22,6 +23,72 @@ var (
 func printHashedDom(xp *goxml.Xp) {
 	hash := sha1.Sum([]byte(xp.C14n(nil, "")))
 	fmt.Println(base64.StdEncoding.EncodeToString(append(hash[:])))
+}
+
+func scopeCheckTest(scopes [][]string) {
+	for _, scope := range scopes {
+		response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+		scopeList := goxml.NewXpFromFile("testdata/scope.xml")
+		ext := scopeList.Query(nil, "//md:EntityDescriptor/md:Extensions")[1]
+		for i, j := range scope {
+			if i > 0 {
+				scopeList.QueryDashP(ext, `/shibmd:Scope[`+strconv.Itoa(i)+`]`, j, nil)
+			}
+			response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
+		}
+		attrNode := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+		eppn, securitydomain, err := checkScope(response, scopeList, attrNode, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+		fmt.Println(eppn, securitydomain, err)
+	}
+}
+
+func ExampleCheckScope() {
+	scopes := [][]string{
+		{"mekhan@dtu.dk", "dtu.dk", "sdu.dk", "ku.dk"},
+		{"mekhan@student.aau.dk@aau.dk", "dtu.dk", "sdu.dk", "ku.dk", "student.aau.dk@aau.dk"},
+		{"mekhan@nu.edu.dk", "aau.dk", "sdu.dk"},
+		{"mh@kmduni.dans.kmd.dk", "kmduni.dans.kmd.dk", "sdu.dk"},
+		{"mh@nybuni.dans.kmd.dk", "ku.dk", "sdu.dk", "nybuni.dans.kmd.dk"},
+		{"mh@dansidp-test2.stads.dk", "dansidp-test2.stads.dk", "sdu.dk", "ruc.dk"},
+		{"mh@dansidp-qa3.stads.dk", "ku.dk", "sdu.dk", "dansidp-qa3.stads.dk"},
+		{"mh@cphbusiness.dk", "cphbusiness.dk", "dtu.dk", "dansidp-test2.stads.dk"},
+		{"mh@cphbusiness.dk", "cphbusiness.dk", "dtu.dk", "sdu.dk", "ku.dk"},
+		{"mh@handelsskolen.com", "handelsskolen.com", "sdu.dk", "dansidp-test2.stads.dk"},
+		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "sdu.dk", "handelsskolen.com"},
+		{"mh@handelsskolen.com", "handelsskolen.com", "sdu.dk"},
+		{"mh@orphanage.wayf.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk"},
+		{"mh@plan.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
+		{"mekhan@student.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
+		{"mh@hst.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk"},
+		{"mh@adm.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "adm.aau.dk@aau.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "create.aau.dk@aau.dk"},
+		{"mh@create.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "create.aau.dk@aau.dk"},
+		{"mh@civil.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "civil.aau.dk@aau.dk"},
+		{"mh@aub.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "aub.aau.dk@aau.dk"},
+		{" ", "dtu.dk", "sdu.dk", "ku.dk"},
+	}
+	scopeCheckTest(scopes)
+	// Output:
+	// mekhan@dtu.dk dtu.dk <nil>
+	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk <nil>
+	// mekhan@nu.edu.dk nu.edu.dk security domain 'nu.edu.dk' does not match any scopes
+	// mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk <nil>
+	// mh@nybuni.dans.kmd.dk nybuni.dans.kmd.dk <nil>
+	// mh@dansidp-test2.stads.dk dansidp-test2.stads.dk <nil>
+	// mh@dansidp-qa3.stads.dk dansidp-qa3.stads.dk <nil>
+	// mh@cphbusiness.dk cphbusiness.dk <nil>
+	// mh@cphbusiness.dk cphbusiness.dk <nil>
+	// mh@handelsskolen.com handelsskolen.com <nil>
+	// mh@sikker-adgang.dk sikker-adgang.dk <nil>
+	// mh@handelsskolen.com handelsskolen.com <nil>
+	// mh@orphanage.wayf.dk orphanage.wayf.dk <nil>
+	// mh@plan.aau.dk@aau.dk plan.aau.dk@aau.dk <nil>
+	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk security domain 'student.aau.dk@aau.dk' does not match any scopes
+	// mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk <nil>
+	// mh@adm.aau.dk@aau.dk adm.aau.dk@aau.dk <nil>
+	// mh@create.aau.dk@aau.dk create.aau.dk@aau.dk <nil>
+	// mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk <nil>
+	// mh@aub.aau.dk@aau.dk aub.aau.dk@aau.dk <nil>
+	//   not a scoped value:
 }
 
 /**
@@ -269,62 +336,4 @@ func ExampleHandleAttributeNameFormat() {
 	handleAttributeNameFormat(response, sp_md)
 	// Output:
 	//
-}
-
-func ExampleCheckScope() {
-	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
-	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-	fmt.Println(eppn, securitydomain, err)
-	// Output:
-	// madpe@dtu.dk dtu.dk <nil>
-}
-
-func ExampleCheckScopeAAU() {
-	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
-	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, "mekhan@student.aau.dk@aau.dk", nil)
-
-	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-	fmt.Println(eppn, securitydomain, err)
-	// Output:
-	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk <nil>
-}
-
-func ExampleCheckScopeAAU1() {
-	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
-	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, "mekhan@aau.dk", nil)
-
-	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-	fmt.Println(eppn, securitydomain, err)
-	// Output:
-	// mekhan@aau.dk aau.dk <nil>
-}
-
-func ExampleInvalidScope() {
-	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
-	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, "mekhan@nu.edu.pk", nil)
-
-	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-	fmt.Println(eppn, securitydomain, err)
-	// Output:
-	// mekhan@nu.edu.pk nu.edu.pk security domain 'nu.edu.pk' does not match any scopes
-}
-
-func ExampleNoScope() {
-	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := goxml.NewXpFromFile("testdata/scope.xml")
-	response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, " ", nil)
-	destinationAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-
-	eppn, securitydomain, err := checkScope(response, idp_md, destinationAttributes, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-	fmt.Println(eppn, securitydomain, err)
-	// Output:
-	// not a scoped value:
 }
