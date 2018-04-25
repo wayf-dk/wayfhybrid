@@ -48,21 +48,25 @@ func ExampleCheckScope() {
 		{"mekhan@student.aau.dk@aau.dk", "dtu.dk", "sdu.dk", "ku.dk", "student.aau.dk@aau.dk"},
 		{"mekhan@nu.edu.dk", "aau.dk", "sdu.dk"},
 		{"mh@kmduni.dans.kmd.dk", "kmduni.dans.kmd.dk", "sdu.dk"},
+		{"mh@kmduni.dans.kmd.dk", "dans.kmd.dk", "sdu.dk"},
 		{"mh@nybuni.dans.kmd.dk", "ku.dk", "sdu.dk", "nybuni.dans.kmd.dk"},
 		{"mh@dansidp-test2.stads.dk", "dansidp-test2.stads.dk", "sdu.dk", "ruc.dk"},
 		{"mh@dansidp-qa3.stads.dk", "ku.dk", "sdu.dk", "dansidp-qa3.stads.dk"},
 		{"mh@cphbusiness.dk", "cphbusiness.dk", "dtu.dk", "dansidp-test2.stads.dk"},
-		{"mh@cphbusiness.dk", "cphbusiness.dk", "dtu.dk", "sdu.dk", "ku.dk"},
+		{"mh@cphbusiness.dk", "cph.dk", "dtu.dk", "dansidp-test2.stads.dk"},
 		{"mh@handelsskolen.com", "handelsskolen.com", "sdu.dk", "dansidp-test2.stads.dk"},
 		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "sdu.dk", "handelsskolen.com"},
+		{"mh@sikker-adgang.dk", "sikker.dk", "sdu.dk", "handelsskolen.com"},
 		{"mh@handelsskolen.com", "handelsskolen.com", "sdu.dk"},
 		{"mh@orphanage.wayf.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk"},
 		{"mh@plan.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
 		{"mekhan@student.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
 		{"mh@hst.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk"},
+		{"mh@hst.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
 		{"mh@adm.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "adm.aau.dk@aau.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "create.aau.dk@aau.dk"},
 		{"mh@create.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "create.aau.dk@aau.dk"},
 		{"mh@civil.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "civil.aau.dk@aau.dk"},
+		{"mh@civil.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "mk.aau.dk@aau.dk"},
 		{"mh@aub.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "aub.aau.dk@aau.dk"},
 		{" ", "dtu.dk", "sdu.dk", "ku.dk"},
 	}
@@ -72,21 +76,25 @@ func ExampleCheckScope() {
 	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk <nil>
 	// mekhan@nu.edu.dk nu.edu.dk security domain 'nu.edu.dk' does not match any scopes
 	// mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk <nil>
+	// mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk security domain 'kmduni.dans.kmd.dk' does not match any scopes
 	// mh@nybuni.dans.kmd.dk nybuni.dans.kmd.dk <nil>
 	// mh@dansidp-test2.stads.dk dansidp-test2.stads.dk <nil>
 	// mh@dansidp-qa3.stads.dk dansidp-qa3.stads.dk <nil>
 	// mh@cphbusiness.dk cphbusiness.dk <nil>
-	// mh@cphbusiness.dk cphbusiness.dk <nil>
+	// mh@cphbusiness.dk cphbusiness.dk security domain 'cphbusiness.dk' does not match any scopes
 	// mh@handelsskolen.com handelsskolen.com <nil>
 	// mh@sikker-adgang.dk sikker-adgang.dk <nil>
+	// mh@sikker-adgang.dk sikker-adgang.dk security domain 'sikker-adgang.dk' does not match any scopes
 	// mh@handelsskolen.com handelsskolen.com <nil>
 	// mh@orphanage.wayf.dk orphanage.wayf.dk <nil>
 	// mh@plan.aau.dk@aau.dk plan.aau.dk@aau.dk <nil>
 	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk security domain 'student.aau.dk@aau.dk' does not match any scopes
 	// mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk <nil>
+	// mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk security domain 'hst.aau.dk@aau.dk' does not match any scopes
 	// mh@adm.aau.dk@aau.dk adm.aau.dk@aau.dk <nil>
 	// mh@create.aau.dk@aau.dk create.aau.dk@aau.dk <nil>
 	// mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk <nil>
+	// mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk security domain 'civil.aau.dk@aau.dk' does not match any scopes
 	// mh@aub.aau.dk@aau.dk aub.aau.dk@aau.dk <nil>
 	//   not a scoped value:
 }
