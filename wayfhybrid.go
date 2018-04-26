@@ -1541,7 +1541,6 @@ func findMdPair(finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, issuer, d
 // Saves or retrieves the SLO info relevant to the contents of the samlMessage
 // For now uses cookies to keep the SLOInfo
 func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationInMd, samlOut, destinationOutMd *goxml.Xp, role int, tag string) (sloinfo *gosaml.SLOInfo, err error) {
-    return nil, nil
 	type touple struct {
 		HashIn, HashOut string
 	}
