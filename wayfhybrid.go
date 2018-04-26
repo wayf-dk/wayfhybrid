@@ -849,9 +849,12 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 			cpryear, _ := strconv.Atoi(matches[3])
 			c7, _ := strconv.Atoi(matches[4])
 			year := strconv.Itoa(yearfromyearandcifferseven(cpryear, c7))
-
-			setAttribute("schacDateOfBirth", year+matches[2]+matches[1], response, destinationAttributes)
-			setAttribute("schacYearOfBirth", year, response, destinationAttributes)
+            if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacDateOfBirth"]`) == "" {
+			    setAttribute("schacDateOfBirth", year+matches[2]+matches[1], response, destinationAttributes)
+			}
+            if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacYearOfBirth"]`) == "" {
+			    setAttribute("schacYearOfBirth", year, response, destinationAttributes)
+			}
 			break
 		}
 	}
