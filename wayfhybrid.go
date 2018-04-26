@@ -988,7 +988,6 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
 	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
-	setAttribute("schacHomeOrganization", "sikker-adgang.dk", response, sourceAttributes)
 	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
 }
 
