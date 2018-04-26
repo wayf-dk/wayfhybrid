@@ -919,20 +919,17 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	for _, attrName := range arp {
 		arpmap[attrName] = true
 	}
+
 	h := sha1.New()
 	for _, attrNode := range response.Query(destinationAttributes, `saml:Attribute`) {
 		friendlyName := response.Query1(attrNode, "@FriendlyName")
 		name := response.Query1(attrNode, "@Name")
-		if !arpmap[name] {
-			// the real ARP filtering is done i gosaml
-			//attrStmt, _ := attrNode.ParentNode()
-			//attrStmt.RemoveChild(attrNode)
-			continue
-		}
-		io.WriteString(h, name)
-		for _, attrValue := range response.QueryMulti(attrNode, "saml:AttributeValue") {
-    		io.WriteString(h, attrValue)
-			ard.Values[friendlyName] = append(ard.Values[friendlyName], attrValue)
+		if arpmap[name] || arpmap[friendlyName] {
+			io.WriteString(h, name)
+			for _, attrValue := range response.QueryMulti(attrNode, "saml:AttributeValue") {
+				io.WriteString(h, attrValue)
+				ard.Values[friendlyName] = append(ard.Values[friendlyName], attrValue)
+			}
 		}
 	}
 
