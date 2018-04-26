@@ -976,6 +976,8 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	l := len(names) - 1
 	//setAttribute("cn", value, response, sourceAttributes) // already there
 	setAttribute("gn", strings.Join(names[0:l], " "), response, sourceAttributes)
+	// sn seems to be empty from from Nemlog-in - remove it
+    response.Rm(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.4"]`)
 	setAttribute("sn", names[l], response, sourceAttributes)
 	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.1"]/saml:AttributeValue`)
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
