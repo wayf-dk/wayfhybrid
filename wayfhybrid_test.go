@@ -278,7 +278,6 @@ func ExampleNemLoginAttributeHandler() {
 	// schacYearOfBirth urn:oid:1.3.6.1.4.1.25178.1.0.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     1858
 	// sn urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//
 	//     Cantonsen
 }
 
