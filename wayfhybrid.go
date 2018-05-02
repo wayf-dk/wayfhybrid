@@ -29,6 +29,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -183,7 +184,7 @@ func Main() {
 	log.SetFlags(0) // no predefined time
 	log.SetOutput(new(logWriter))
 
-	tomlConfig, err := toml.LoadFile("../hybrid-config/hybrid-config.toml")
+	tomlConfig, err := toml.LoadFile("/opt/wayf/hybrid-config/hybrid-config.toml")
 
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s\n", err))
@@ -192,6 +193,9 @@ func Main() {
 	if err != nil {
 		panic(fmt.Errorf("Fatal error %s\n", err))
 	}
+
+	overrideConfig(&config, []string{"EptidSalt"})
+	overrideConfig(&config.GoEleven, []string{"Slot_password"})
 
 	if config.GoEleven.Slot_password != "" {
 		c := config.GoEleven
@@ -310,6 +314,16 @@ func Main() {
 	}()
 
 	<-finish
+}
+
+func overrideConfig(config interface{}, envvars []string) {
+	for _, k := range envvars {
+		envvar := strings.ToUpper("WAYF_"+k)
+		log.Println(envvar)
+		if val, ok := os.LookupEnv(envvar); ok {
+			reflect.ValueOf(config).Elem().FieldByName(k).Set(reflect.ValueOf(val))
+		}
+	}
 }
 
 func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
