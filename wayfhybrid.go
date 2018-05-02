@@ -63,6 +63,7 @@ type (
 	}
 
 	wayfHybridConfig struct {
+		Path    																				 string
 		DiscoveryService                                                                         string
 		Domain                                                                                   string
 		HubEntityID                                                                              string
@@ -152,7 +153,8 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	config = wayfHybridConfig{}
+	config = wayfHybridConfig{Path: "/opt/wayf/"}
+
 	remap  = map[string]idpsppair{
 		"https://nemlogin.wayf.dk": {"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
 		//		"https://wayf.ait.dtu.dk/saml2/idp/metadata.php": idpsppair{"https://orphanage.wayf.dk", "https://wayf.wayf.dk"},
@@ -184,7 +186,9 @@ func Main() {
 	log.SetFlags(0) // no predefined time
 	log.SetOutput(new(logWriter))
 
-	tomlConfig, err := toml.LoadFile("/opt/wayf/hybrid-config/hybrid-config.toml")
+	overrideConfig(&config, []string{"Path"})
+
+	tomlConfig, err := toml.LoadFile(config.Path+"hybrid-config/hybrid-config.toml")
 
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s\n", err))
