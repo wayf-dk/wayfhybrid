@@ -37,8 +37,8 @@ func scopeCheckTest(scopes [][]string) {
 			response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
 		}
 		attrNode := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-		eppn, securitydomain, err := checkScope(response, scopeList, attrNode, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-		fmt.Println(eppn, securitydomain, err)
+		eppn, eppnForEptid, securitydomain, err := checkScope(response, scopeList, attrNode, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+		fmt.Println(eppn, eppnForEptid, securitydomain, err)
 	}
 }
 
@@ -60,6 +60,7 @@ func ExampleCheckScope() {
 		{"mh@handelsskolen.com", "handelsskolen.com", "sdu.dk"},
 		{"mh@orphanage.wayf.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk"},
 		{"mh@plan.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
+		{"mh@plan.aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk"},
 		{"mekhan@student.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
 		{"mh@hst.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk"},
 		{"mh@hst.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
@@ -72,31 +73,32 @@ func ExampleCheckScope() {
 	}
 	scopeCheckTest(scopes)
 	// Output:
-	// mekhan@dtu.dk dtu.dk <nil>
-	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk <nil>
-	// mekhan@nu.edu.dk nu.edu.dk security domain 'nu.edu.dk' does not match any scopes
-	// mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk <nil>
-	// mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk security domain 'kmduni.dans.kmd.dk' does not match any scopes
-	// mh@nybuni.dans.kmd.dk nybuni.dans.kmd.dk <nil>
-	// mh@dansidp-test2.stads.dk dansidp-test2.stads.dk <nil>
-	// mh@dansidp-qa3.stads.dk dansidp-qa3.stads.dk <nil>
-	// mh@cphbusiness.dk cphbusiness.dk <nil>
-	// mh@cphbusiness.dk cphbusiness.dk security domain 'cphbusiness.dk' does not match any scopes
-	// mh@handelsskolen.com handelsskolen.com <nil>
-	// mh@sikker-adgang.dk sikker-adgang.dk <nil>
-	// mh@sikker-adgang.dk sikker-adgang.dk security domain 'sikker-adgang.dk' does not match any scopes
-	// mh@handelsskolen.com handelsskolen.com <nil>
-	// mh@orphanage.wayf.dk orphanage.wayf.dk <nil>
-	// mh@plan.aau.dk@aau.dk plan.aau.dk@aau.dk <nil>
-	// mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk security domain 'student.aau.dk@aau.dk' does not match any scopes
-	// mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk <nil>
-	// mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk security domain 'hst.aau.dk@aau.dk' does not match any scopes
-	// mh@adm.aau.dk@aau.dk adm.aau.dk@aau.dk <nil>
-	// mh@create.aau.dk@aau.dk create.aau.dk@aau.dk <nil>
-	// mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk <nil>
-	// mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk security domain 'civil.aau.dk@aau.dk' does not match any scopes
-	// mh@aub.aau.dk@aau.dk aub.aau.dk@aau.dk <nil>
-	//   not a scoped value:
+	// mekhan@dtu.dk mekhan@dtu.dk dtu.dk <nil>
+	// mekhan@student.aau.dk@aau.dk mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk <nil>
+	// mekhan@nu.edu.dk mekhan@nu.edu.dk nu.edu.dk security domain 'nu.edu.dk' does not match any scopes
+	// mh@kmduni.dans.kmd.dk mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk <nil>
+	// mh@kmduni.dans.kmd.dk mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk security domain 'kmduni.dans.kmd.dk' does not match any scopes
+	// mh@nybuni.dans.kmd.dk mh@nybuni.dans.kmd.dk nybuni.dans.kmd.dk <nil>
+	// mh@dansidp-test2.stads.dk mh@dansidp-test2.stads.dk dansidp-test2.stads.dk <nil>
+	// mh@dansidp-qa3.stads.dk mh@dansidp-qa3.stads.dk dansidp-qa3.stads.dk <nil>
+	// mh@cphbusiness.dk mh@cphbusiness.dk cphbusiness.dk <nil>
+	// mh@cphbusiness.dk mh@cphbusiness.dk cphbusiness.dk security domain 'cphbusiness.dk' does not match any scopes
+	// mh@handelsskolen.com mh@handelsskolen.com handelsskolen.com <nil>
+	// mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk <nil>
+	// mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk security domain 'sikker-adgang.dk' does not match any scopes
+	// mh@handelsskolen.com mh@handelsskolen.com handelsskolen.com <nil>
+	// mh@orphanage.wayf.dk mh@orphanage.wayf.dk orphanage.wayf.dk <nil>
+	// mh@plan.aau.dk@aau.dk mh@plan.aau.dk@aau.dk plan.aau.dk@aau.dk <nil>
+	// mh@plan.aau.dk mh@plan.aau.dk@aau.dk plan.aau.dk <nil>
+	// mekhan@student.aau.dk@aau.dk mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk security domain 'student.aau.dk@aau.dk' does not match any scopes
+	// mh@hst.aau.dk@aau.dk mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk <nil>
+	// mh@hst.aau.dk@aau.dk mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk security domain 'hst.aau.dk@aau.dk' does not match any scopes
+	// mh@adm.aau.dk@aau.dk mh@adm.aau.dk@aau.dk adm.aau.dk@aau.dk <nil>
+	// mh@create.aau.dk@aau.dk mh@create.aau.dk@aau.dk create.aau.dk@aau.dk <nil>
+	// mh@civil.aau.dk@aau.dk mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk <nil>
+	// mh@civil.aau.dk@aau.dk mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk security domain 'civil.aau.dk@aau.dk' does not match any scopes
+	// mh@aub.aau.dk@aau.dk mh@aub.aau.dk@aau.dk aub.aau.dk@aau.dk <nil>
+	//    not a scoped value:
 }
 
 /**
@@ -278,7 +280,6 @@ func ExampleNemLoginAttributeHandler() {
 	// schacYearOfBirth urn:oid:1.3.6.1.4.1.25178.1.0.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     1858
 	// sn urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//
 	//     Cantonsen
 }
 

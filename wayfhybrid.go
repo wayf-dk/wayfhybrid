@@ -160,7 +160,8 @@ var (
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
 	debify        = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
-	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9\.-]+)$`)
+	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
+	aauscope      = regexp.MustCompile(`[@\.]aau\.dk$`)
 
 	metadataUpdateGuard chan int
 
@@ -807,7 +808,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
 
-	eppn, securitydomain, err := checkScope(response, idpMd, destinationAttributes, "saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue")
+	eppn, eppnForEptid, securitydomain, err := checkScope(response, idpMd, destinationAttributes, "saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue")
 	if err != nil {
 		return
 	}
@@ -825,17 +826,21 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	}
 
 	// Use kribified?, use birkified?
-	sp := spMd.Query1(nil, "@entityID")
-
 	idpPEID := idp
 	if tmp := idpMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
 		idpPEID = tmp
 	}
 
+	sp := spMd.Query1(nil, "@entityID")
+	spPEID := sp
+	if tmp := spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
+		spPEID = tmp
+	}
+
 	uidhashbase := "uidhashbase" + config.EptidSalt
 	uidhashbase += strconv.Itoa(len(idpPEID)) + ":" + idpPEID
-	uidhashbase += strconv.Itoa(len(sp)) + ":" + sp
-	uidhashbase += strconv.Itoa(len(eppn)) + ":" + eppn
+	uidhashbase += strconv.Itoa(len(spPEID)) + ":" + spPEID
+	uidhashbase += strconv.Itoa(len(eppnForEptid)) + ":" + eppnForEptid
 	uidhashbase += config.EptidSalt
 
 	hash := sha1.Sum([]byte(uidhashbase))
@@ -864,11 +869,12 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 
 	for _, epsa := range response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue`) {
 		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 2 {
+		if len(epsaparts) != 3 {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
-		if !strings.HasSuffix(epsaparts[1], subsecuritydomain) && epsaparts[1] != securitydomain {
+		domain := epsaparts[1]+epsaparts[2]
+		if !strings.HasSuffix(domain, subsecuritydomain) && domain != securitydomain {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", epsa, securitydomain)
 			return
 		}
@@ -985,8 +991,9 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	//setAttribute("mail", value, response, sourceAttributes)
 	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
 	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`)
-	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
+	if value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`); value != "" {
+		setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
+	}
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
 	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
 }
@@ -1680,23 +1687,24 @@ func handleAttributeNameFormat2(response, mdsp *goxml.Xp) {
 	}
 }
 
-func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, securityDomain string, err error) {
+func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, eppnForEptid, securityDomain string, err error) {
 	eppn = xp.Query1(context, xpath)
+	eppnForEptid = eppn
 	matches := scoped.FindStringSubmatch(eppn)
-	if len(matches) != 2 {
-		aauscope := regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9\.-]+aau\.dk@aau\.dk)$`)
-    	matches = aauscope.FindStringSubmatch(eppn)
-		if len(matches) != 2 {
-			err = fmt.Errorf("not a scoped value: %s", eppn)
-			return
-		}
+	if len(matches) != 3 {
+		err = fmt.Errorf("not a scoped value: %s", eppn)
+		return
 	}
-	securityDomain = matches[1]
+	securityDomain = matches[1] + matches[2] // rm matches[2] when @aau.dk goes away
 
 	scope := md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securityDomain)+"]")
 	if len(scope) == 0 {
 		err = fmt.Errorf("security domain '%s' does not match any scopes", securityDomain)
 		return
+	}
+
+	if matches[2] == "" && aauscope.MatchString(matches[1]) {
+		eppnForEptid += "@aau.dk"
 	}
 	return
 }
