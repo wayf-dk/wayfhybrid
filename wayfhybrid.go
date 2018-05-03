@@ -886,6 +886,9 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	epsas := make(map[string]bool)
 
 	for _, epsa := range response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue`) {
+		if epsa == "" {
+			continue
+		}
 		epsaparts := scoped.FindStringSubmatch(epsa)
 		if len(epsaparts) != 3 {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
