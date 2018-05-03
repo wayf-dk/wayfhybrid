@@ -15,7 +15,6 @@ import (
 	toml "github.com/pelletier/go-toml"
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/godiscoveryservice"
-	"github.com/wayf-dk/goeleven/src/goeleven"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lMDQ"
@@ -52,16 +51,6 @@ type (
 		db, table string
 	}
 
-	goElevenConfig struct {
-		Hsmlib        string
-		Usertype      string
-		Serialnumber  string
-		Slot          string
-		Slot_password string
-		Key_label     string
-		Maxsessions   string
-	}
-
 	wayfHybridConfig struct {
 		Path    																				 string
 		DiscoveryService                                                                         string
@@ -80,7 +69,6 @@ type (
 		NotFoundRoutes                                                                           []string
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
 		MetadataFeeds                                                                            []struct{ Path, URL string }
-		GoEleven                                                                                 goElevenConfig
 		SpBackendTenants                                                                         map[string]struct{EntityID, Secret string}
 	}
 
@@ -199,20 +187,6 @@ func Main() {
 	}
 
 	overrideConfig(&config, []string{"EptidSalt"})
-	overrideConfig(&config.GoEleven, []string{"Slot_password"})
-
-	if config.GoEleven.Slot_password != "" {
-		c := config.GoEleven
-		goeleven.LibraryInit(map[string]string{
-			"GOELEVEN_HSMLIB":        c.Hsmlib,
-			"GOELEVEN_USERTYPE":      c.Usertype,
-			"GOELEVEN_SERIALNUMBER":  c.Serialnumber,
-			"GOELEVEN_SLOT":          c.Slot,
-			"GOELEVEN_SLOT_PASSWORD": c.Slot_password,
-			"GOELEVEN_KEY_LABEL":     c.Key_label,
-			"GOELEVEN_MAXSESSIONS":   c.Maxsessions,
-		})
-	}
 
 	metadataUpdateGuard = make(chan int, 1)
 	postForm = template.Must(template.New("PostForm").Parse(config.PostFormTemplate))
