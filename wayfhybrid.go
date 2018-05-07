@@ -530,6 +530,13 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			attrs[name] = response.QueryMulti(nil, "//saml:Attribute[@FriendlyName="+strconv.Quote(name)+"]/saml:AttributeValue")
 		}
 
+		assertion := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
+		attrs["iss"] = response.Query1(assertion, "./saml:Issuer")
+		attrs["aud"] = response.Query1(assertion, "./saml:Conditions/saml:AudienceRestriction/saml:Audience")
+		attrs["nbf"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
+		attrs["exp"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
+		attrs["iat"] = samlTime2JwtTime(response.Query1(assertion,	 "@IssueInstant"))
+
         // https://godoc.org/github.com/dgrijalva/jwt-go#example-New--Hmac
         // Create a new token object, specifying signing method and the claims
         // you would like it to contain.
