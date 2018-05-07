@@ -264,7 +264,7 @@ func Main() {
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
-	httpMux.Handle(config.Testsp+"/XXO", appHandler(nginxSSOService))
+	httpMux.Handle(config.Testsp+"/XXO", appHandler(saml2jwt))
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPService))
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
@@ -499,7 +499,12 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	return
 }
 
-func nginxSSOService(w http.ResponseWriter, r *http.Request) (err error) {
+func samlTime2JwtTime(xmlTime  string) int64 {
+	samlTime, _ := time.Parse(gosaml.XsDateTime, xmlTime)
+	return samlTime.Unix()
+}
+
+func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
