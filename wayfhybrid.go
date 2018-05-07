@@ -591,9 +591,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		scoping := ""
+		scoping := []string{}
 		if r.Form.Get("scoping") == "scoping" {
-			scoping = r.Form.Get("scopedidp")
+			scoping = strings.Split(r.Form.Get("scopedidp"), ",")
 		}
 
 		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, hubMd, scoping)
