@@ -1332,6 +1332,15 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		handleAttributeNameFormat(newresponse, spMd)
 
+		// gosaml.NewResponse only handles simple attr values so ..
+		if sRequest.Is == "https://monitor.eduroam.org/sp/module.php/saml/sp/metadata.php/default-sp" {
+			if eptidAttr := newresponse.Query(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]`); eptidAttr != nil {
+				value := newresponse.Query1(eptidAttr[0], "./saml:AttributeValue")
+				newresponse.Rm(eptidAttr[0], "./saml:AttributeValue")
+				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID", value, nil)
+			}
+		}
+
 		for _, q := range config.ElementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
 			if err != nil {
