@@ -208,6 +208,9 @@ func Main() {
 		}
 	}
 
+	str, err := refreshAllMetadataFeeds()
+	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+
 	/*
 	   wayfsp2, _ := Md.Internal.MDQ("https://wayfsp2.wayf.dk")
 	   wayfsp2.QueryDashP(nil, "/md:SPSSODescriptor/md:AssertionConsumerService/@Location", "http://localhost:32361", nil)
@@ -440,13 +443,20 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
+	if str, err := refreshAllMetadataFeeds(); err == nil {
+		io.WriteString(w, str)
+	}
+	return
+}
+
+func refreshAllMetadataFeeds() (str string, err error) {
 	select {
 	case metadataUpdateGuard <- 1:
 		{
 			for _, mdfeed := range config.MetadataFeeds {
 				if err = refreshMetadataFeed(mdfeed.Path, mdfeed.URL); err != nil {
 					<-metadataUpdateGuard
-					return
+					return "", err
 				}
 			}
 			for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
@@ -455,15 +465,14 @@ func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
 					panic(err)
 				}
 			}
-			io.WriteString(w, "Pong")
 			<-metadataUpdateGuard
+			return "Pong", nil
 		}
 	default:
 		{
-			io.WriteString(w, "Ignored")
+			return "Ignored", nil
 		}
 	}
-	return
 }
 
 func refreshMetadataFeed(mddbpath, url string) (err error) {
@@ -474,7 +483,8 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	}
 	defer tempmddb.Close()
 	defer os.Remove(tempmddb.Name())
-	resp, err := http.Get(url)
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
