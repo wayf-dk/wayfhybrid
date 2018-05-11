@@ -1239,7 +1239,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
-	wars := idpMd.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)
+	wars := idpMd.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)+idpMd.Query1(nil, `./md:Extensions/wayf:wayf/wayf:redirect.sign`)
 	switch wars {
 	case "true", "1":
 		privatekey, err = gosaml.GetPrivateKey(spMd)
@@ -1247,9 +1247,32 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 			return
 		}
 	}
-	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", "")
+	algo := eIdasExtras(idpMd, newrequest)
+	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", algo)
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
+}
+
+func eIdasExtras(idpMd, request *goxml.Xp) (algo string) {
+    if idpMd.Query1(nil, "@entityID") == "https://eidasconnector.test.eid.digst.dk/idp" {
+        request.QueryDashP(nil, "@ForceAuthn", "true", nil)
+        request.QueryDashP(nil, "@IsPassive", "false", nil)
+        request.Rm(nil, "@ProtocolBinding");
+        request.Rm(nil, "@AssertionConsumerServiceURL")
+        nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
+        ras := request.QueryDashP(nil, "./samlp:Extensions/eidas:RequestedAttributes", "", nameIDPolicyNode)
+        for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
+            ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
+            request.QueryDashP(ra, "./@FriendlyName", n, nil)
+            request.QueryDashP(ra, "@Name", "http://eidas.europa.eu/attributes/naturalperson/"+n, nil)
+            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
+            request.QueryDashP(ra, "@isRequired", "true", nil)
+        }
+
+        request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
+        algo = "sha256"
+    }
+    return
 }
 
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
