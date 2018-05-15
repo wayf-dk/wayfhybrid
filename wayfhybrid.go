@@ -622,7 +622,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			idp = r.Form.Get("scopedidp")
 		}
 		if idp != "" {
-			q.Set("idpentityid", idp)
+			q.Set("idplist", idp)
 		}
 		u.RawQuery = q.Encode()
 		http.Redirect(w, r, u.String(), http.StatusFound)
@@ -662,13 +662,12 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		testSPForm.Execute(w, data)
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
-		data.Set("return", "https://"+r.Host+r.RequestURI)
+		data.Set("return", "https://"+r.Host+r.RequestURI+"?previdplist="+r.Form.Get("scopedidp"))
 		data.Set("returnIDParam", "scopedIDP")
 		data.Set("entityID", "https://"+config.Testsp)
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
-
-		data := testSPFormData{ScopedIDP: r.Form.Get("scopedIDP")}
+		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedIDP")+","+r.Form.Get("previdplist"), " ,")}
 		testSPForm.Execute(w, data)
 	}
 	return
