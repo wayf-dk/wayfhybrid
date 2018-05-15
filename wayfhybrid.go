@@ -763,9 +763,13 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 
 	base64encodedIn := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
 
-	if idp == "https://saml.nemlog-in.dk" || idp == "https://saml.test-nemlog-in.dk/" {
+	switch idp {
+	case "https://saml.nemlog-in.dk", "https://saml.test-nemlog-in.dk/":
 		base64encodedIn = false
 		nemloginAttributeHandler(response)
+	case "https://eidasconnector.test.eid.digst.dk/idp":
+		eidasAttributeHandler(response)
+	default:
 	}
 
 	if err = checkForCommonFederations(idpMd, spMd); err != nil {
@@ -1012,6 +1016,20 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	}
 	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
 	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
+}
+
+func eidasAttributeHandler(response *goxml.Xp) {
+	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:CurrentFamilyName"]/saml:AttributeValue`)
+	setAttribute("gn", value, response, sourceAttributes)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:CurrentGivenName"]/saml:AttributeValue`)
+	setAttribute("sn", value, response, sourceAttributes)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:PersonIdentifier"]/saml:AttributeValue`)
+	setAttribute("eduPersonPrincipalName", value+"@eidasconnector.test.eid.digst.dk", response, sourceAttributes)
+	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:PersonIdentifier:"+value, response, sourceAttributes)
+	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:DateOfBirth"]/saml:AttributeValue`)
+	setAttribute("schacDateOfBirth", value, response, sourceAttributes)
+	setAttribute("organizationName", "eIDAS", response, sourceAttributes)
 }
 
 /* see http://www.cpr.dk/cpr_artikler/Files/Fil1/4225.pdf or http://da.wikipedia.org/wiki/CPR-nummer for algorithm */
@@ -1263,11 +1281,11 @@ func eIdasExtras(idpMd, request *goxml.Xp) (algo string) {
         for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
             ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
             request.QueryDashP(ra, "./@FriendlyName", n, nil)
-            request.QueryDashP(ra, "@Name", "http://eidas.europa.eu/attributes/naturalperson/"+n, nil)
-            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
+            request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:PersonIdentifier:"+n, nil)
+            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
             request.QueryDashP(ra, "@isRequired", "true", nil)
         }
-
+        request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
         request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
         algo = "sha256"
     }
