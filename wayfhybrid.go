@@ -347,6 +347,16 @@ func legacyStatLog(server, tag, idp, sp, hash string) {
 	log.Printf("%s ssp-wayf[%s]: 5 STAT [%d] %s %s %s %s\n", server, "007", time.Now().UnixNano(), tag, idp, sp, hash)
 }
 
+func debugSetting(r *http.Request, name string) string {
+	cookie, err := r.Cookie("debug")
+	if err == nil {
+        vals,_ := url.ParseQuery(cookie.Value)
+        return vals.Get(name)
+    }
+    return ""
+}
+
+
 func prepareTables(attrs *goxml.Xp) {
 	basic2uri = make(map[string]attrName)
 	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
@@ -1388,6 +1398,10 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
+  		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
+  		    signingMethod = sigAlg
+  		}
+
 		for _, q := range config.ElementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
 			if err != nil {
@@ -1397,12 +1411,20 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		if _, err = SLOInfoHandler(w, r, response, hubMd, newresponse, spMd, gosaml.SPRole, "SLO"); err != nil {
 			return
 		}
-		//        gosaml.DumpFile(newresponse)
-		//		cert := spMd.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
-		//        _, publicKey, _ := gosaml.PublicKeyInfo(cert)
-		//        ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
-		//        assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-		//        newresponse.Encrypt(assertion, publicKey, ea)
+
+
+  		if debugSetting(r, "signingError") == "1" {
+  		    newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
+  		}
+
+		if debugSetting(r, "encryptAssertion") == "1" {
+	    	gosaml.DumpFile(newresponse)
+		    cert := spMd.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
+		    _, publicKey, _ := gosaml.PublicKeyInfo(cert)
+		    ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
+		    assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
+		    newresponse.Encrypt(assertion, publicKey, ea)
+	    }
 	} else {
 		newresponse = gosaml.NewErrorResponse(issuerMd, spMd, request, response)
 
@@ -1476,12 +1498,29 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
 		handleAttributeNameFormat(response, spMd)
 
+  		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
+  		    signingMethod = sigAlg
+  		}
+
 		for _, q := range config.ElementsToSign {
 			err = gosaml.SignResponse(response, q, hubMd, signingMethod, gosaml.SAMLSign)
 			if err != nil {
 				return err
 			}
 		}
+
+  		if debugSetting(r, "signingError") == "1" {
+  		    response.QueryDashP(nil, `./saml:Assertion/saml:Issuer[2]`, "an extra fake issuer just to make the signature fail ...", nil)
+  		}
+
+        if debugSetting(r, "encryptAssertion") == "1" {
+	    	gosaml.DumpFile(response)
+		    cert := spMd.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
+		    _, publicKey, _ := gosaml.PublicKeyInfo(cert)
+		    ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
+		    assertion := response.Query(nil, "saml:Assertion[1]")[0]
+		    response.Encrypt(assertion, publicKey, ea)
+	    }
 	} else {
 		newresponse := gosaml.NewErrorResponse(hubMd, spMd, request, response)
 
