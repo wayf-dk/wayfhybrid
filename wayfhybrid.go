@@ -7,9 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	//"encoding/xml"
 	"fmt"
-	//"github.com/mattn/go-sqlite3"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/securecookie"
 	toml "github.com/pelletier/go-toml"
@@ -121,7 +119,7 @@ type (
 	}
 
 	attrName struct {
-		uri, claim string
+		uri, basic, claim string
 	}
 
 	attrValue struct {
@@ -361,7 +359,9 @@ func prepareTables(attrs *goxml.Xp) {
 	basic2uri = make(map[string]attrName)
 	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
 		friendlyName := attrs.Query1(attr, "@FriendlyName")
-		basic2uri[friendlyName] = attrName{uri: attrs.Query1(attr, "@Name"), claim: friendlyName} // attrs.Query1(attr, "@AttributeName")
+		uri := attrs.Query1(attr, "@Name")
+		basic2uri[friendlyName] = attrName{uri: uri, basic: friendlyName, claim: friendlyName} // attrs.Query1(attr, "@AttributeName")
+		basic2uri[uri] = attrName{uri: uri, basic: friendlyName, claim: friendlyName} // attrs.Query1(attr, "@AttributeName")
 	}
 }
 
@@ -536,17 +536,29 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 
 		attrs := jwt.MapClaims{}
 
-		names := response.QueryMulti(nil, "//saml:Attribute/@FriendlyName")
+		names := response.QueryMulti(nil, "//saml:Attribute/@Name")
 		for _, name := range names {
-			attrs[name] = response.QueryMulti(nil, "//saml:Attribute[@FriendlyName="+strconv.Quote(name)+"]/saml:AttributeValue")
+		    basic := basic2uri[name].basic
+			attrs[basic] = response.QueryMulti(nil, "//saml:Attribute[@Name="+strconv.Quote(basic)+"]/saml:AttributeValue")
 		}
 
+        type claim struct {name, xpath string; conv func(string) (int64)}
+
+        claims := []claim{
+            {"iss", "./saml:Issuer", nil},
+            {"aud", "./saml:Conditions/saml:AudienceRestriction/saml:Audience", nil},
+            {"nbf", "./saml:Conditions/@NotBefore", samlTime2JwtTime},
+            {"exp", "./saml:Conditions/@NotOnOrAfter", samlTime2JwtTime},
+            {"iat", "@IssueInstant", samlTime2JwtTime},
+        }
+
 		assertion := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
-		attrs["iss"] = response.Query1(assertion, "./saml:Issuer")
-		attrs["aud"] = response.Query1(assertion, "./saml:Conditions/saml:AudienceRestriction/saml:Audience")
-		attrs["nbf"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
-		attrs["exp"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
-		attrs["iat"] = samlTime2JwtTime(response.Query1(assertion,	 "@IssueInstant"))
+        for _, c := range claims {
+            attrs[c.name] = response.Query1(assertion, c.xpath)
+            if c.conv != nil {
+                attrs[c.name] = c.conv(attrs[c.name].(string))
+            }
+        }
 
         // https://godoc.org/github.com/dgrijalva/jwt-go#example-New--Hmac
         // Create a new token object, specifying signing method and the claims
