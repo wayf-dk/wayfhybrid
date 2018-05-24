@@ -1290,7 +1290,10 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		}
 	}
 	algo := eIdasExtras(idpMd, newrequest)
-	u, _ := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", algo)
+	u, err := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", algo)
+	if err != nil {
+	    return
+	}
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
