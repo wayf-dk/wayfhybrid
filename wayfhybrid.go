@@ -996,7 +996,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
 	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.='1']) > 0`)
 	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
-	ard.Key = idHash(ard.SPEntityID + idp)
+	ard.Key = idHash(ard.SPEntityID)
     io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
 
 	ard.Hash = fmt.Sprintf("%x", h.Sum(nil))
