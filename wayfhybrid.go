@@ -89,6 +89,7 @@ type (
 		Values             map[string][]string
 		IdPDisplayName     map[string]string
 		IdPLogo            string
+		IdPEntityID        string
 		SPDisplayName      map[string]string
 		SPDescription      map[string]string
 		SPLogo             string
