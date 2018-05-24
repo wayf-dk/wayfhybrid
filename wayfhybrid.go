@@ -260,6 +260,8 @@ func Main() {
 	httpMux.Handle(config.Krib, appHandler(KribService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
+	httpMux.Handle("wayf.wayf.dk/dsbackend", appHandler(godiscoveryservice.DSBackend))
+	httpMux.Handle("wayf.wayf.dk/dstiming", appHandler(godiscoveryservice.DSTiming))
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
