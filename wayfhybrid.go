@@ -287,8 +287,6 @@ func Main() {
 	httpMux.Handle(config.Krib, appHandler(KribService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
-	httpMux.Handle("wayf.wayf.dk/dsbackend", appHandler(godiscoveryservice.DSBackend))
-	httpMux.Handle("wayf.wayf.dk/dstiming", appHandler(godiscoveryservice.DSTiming))
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
@@ -954,7 +952,6 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	}
 
 	// primaryaffiliation => affiliation
-	epaAdd := []string{}
 	eppa := response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonPrimaryAffiliation"]/saml:AttributeValue`)
 	epas := response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue`)
 	epaset := make(map[string]bool)
@@ -962,22 +959,21 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 		epaset[epa] = true
 	}
 	if !epaset[eppa] {
-		epaAdd = append(epaAdd, eppa)
 		epaset[eppa] = true
 	}
 	// 'student', 'faculty', 'staff', 'employee' => member
 	if epaset["student"] || epaset["faculty"] || epaset["staff"] || epaset["employee"] {
-		epaAdd = append(epaAdd, "member")
 		epaset["member"] = true
 	}
 
-	for i, epa := range epaAdd {
+    i := 1
+	for epa := range epaset {
 		name := hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]/@Name`)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@Name`, name, nil)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, epa, nil)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
 	}
-	i := 1
+	i = 1
 	for epa := range epaset {
 		if epsas[epa] {
 			continue
