@@ -1192,7 +1192,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		altIdp := debify.ReplaceAllString(idp2, "$1$2")
 		if idp2 != altIdp { // an internal IdP
-			sp2Md, idp2Md, _ = remapper(idp2)
+			sp2Md, idp2Md, err = remapper(idp2)
 			if err != nil {
 				return err
 			}
@@ -1241,7 +1241,10 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	var hubMd, idpMd *goxml.Xp
 
 	birkIdp := birkIdpMd.Query1(nil, "@entityID")
-	hubMd, idpMd, _ = remapper(birkIdp)
+	hubMd, idpMd, err = remapper(birkIdp)
+	if err != nil {
+	    return
+	}
 
 	if err = checkForCommonFederations(idpMd, spMd); err != nil {
 		return
