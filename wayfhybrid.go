@@ -72,7 +72,8 @@ type (
 		Certpath                                                                                 string
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Vvpmss            string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
-		Testsp, Testsp_Acs, Testsp_Slo, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService    string
+		Testsp, Testsp_Acs, Testsp_Slo, Testsp2, Testsp2_Acs, Testsp2_Slo                        string
+		Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                                    string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, Saml2jwt, SaltForHashedEppn                string
 		ElementsToSign                                                                           []string
 		NotFoundRoutes                                                                           []string
@@ -290,10 +291,14 @@ func Main() {
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
-	httpMux.Handle(config.Testsp+"/XXO", appHandler(saml2jwt))
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPService))
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
+
+	httpMux.Handle(config.Testsp2+"/XXO", appHandler(saml2jwt))
+	httpMux.Handle(config.Testsp2_Slo, appHandler(testSPService))
+	httpMux.Handle(config.Testsp2_Acs, appHandler(testSPService))
+	httpMux.Handle(config.Testsp2+"/", appHandler(testSPService)) // need a root "/" for routing
 
 	//id.wayf.dk tests ...
 	httpMux.Handle("id.wayf.dk/SSO", appHandler(IdWayfDkSSOService))
