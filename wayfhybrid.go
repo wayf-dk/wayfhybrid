@@ -558,7 +558,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
-        response, _, _, _, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, r.Header.Get("X-Acs"))
+        response, _, _, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, r.Header.Get("X-Acs"))
         if err != nil {
             return err
         }
@@ -604,11 +604,14 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
              return err
         }
 
-		//b, _ := json.Marshal(attrs)
+        var app []byte
+        err = authnRequestCookie.Decode("app", relayState, &app)
+        if err != nil {
+            return err
+        }
 
 		w.Header().Set("Auth", "Bearer "+tokenString)
-//		w.Header().Set("Auth", "Bearer "+string(b))
-		w.Header().Set("X-Accel-Redirect", "/")
+		w.Header().Set("X-Accel-Redirect", string(app))
 		return err
 	}
 
@@ -617,7 +620,13 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", "", "JWT-", r.Header.Get("X-Acs"), "", true, strings.Split(r.Form.Get("idplist"), ","))
+
+	relayState, err := authnRequestCookie.Encode("app", []byte(r.Header.Get("X-App")))
+	if err != nil {
+	    return err
+	}
+
+    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, strings.Split(r.Form.Get("idplist"), ","))
     return err
 }
 
