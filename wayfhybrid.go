@@ -235,8 +235,8 @@ func Main() {
 		}
 	}
 
-	str, err := refreshAllMetadataFeeds()
-	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+//	str, err := refreshAllMetadataFeeds()
+//	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
 	/*
 	   wayfsp2, _ := Md.Internal.MDQ("https://wayfsp2.wayf.dk")
