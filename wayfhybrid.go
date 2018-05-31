@@ -13,10 +13,10 @@ import (
 	toml "github.com/pelletier/go-toml"
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/godiscoveryservice"
+	"github.com/wayf-dk/goeleven/src/goeleven"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lMDQ"
-    "github.com/wayf-dk/goeleven/src/goeleven"
 	"github.com/y0ssar1an/q"
 	"html/template"
 	"io"
@@ -61,7 +61,7 @@ type (
 	}
 
 	wayfHybridConfig struct {
-		Path    																				 string
+		Path                                                                                     string
 		DiscoveryService                                                                         string
 		Domain                                                                                   string
 		HubEntityID                                                                              string
@@ -80,7 +80,7 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
-		SpBackendTenants                                                                         map[string]struct{EntityID, Secret string}
+		SpBackendTenants                                                                         map[string]struct{ EntityID, Secret string }
 	}
 
 	idpsppair struct {
@@ -155,8 +155,8 @@ var (
 
 	config = wayfHybridConfig{Path: "/opt/wayf/"}
 
-	remap  = map[string]idpsppair{
-		"https://nemlogin.wayf.dk": {"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
+	remap = map[string]idpsppair{
+		"https://nemlogin.wayf.dk":                     {"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
 		"https://eidasconnector.test.eid.digst.dk/idp": {"https://eidasconnector.test.eid.digst.dk/idp", "https://saml.eidas.wayf.dk"},
 		//		"https://wayf.ait.dtu.dk/saml2/idp/metadata.php": idpsppair{"https://orphanage.wayf.dk", "https://wayf.wayf.dk"},
 	}
@@ -189,7 +189,7 @@ func Main() {
 
 	overrideConfig(&config, []string{"Path"})
 
-	tomlConfig, err := toml.LoadFile(config.Path+"hybrid-config/hybrid-config.toml")
+	tomlConfig, err := toml.LoadFile(config.Path + "hybrid-config/hybrid-config.toml")
 
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s\n", err))
@@ -235,8 +235,8 @@ func Main() {
 		}
 	}
 
-//	str, err := refreshAllMetadataFeeds()
-//	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+	//	str, err := refreshAllMetadataFeeds()
+	//	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
 	/*
 	   wayfsp2, _ := Md.Internal.MDQ("https://wayfsp2.wayf.dk")
@@ -331,7 +331,7 @@ func Main() {
 
 func overrideConfig(config interface{}, envvars []string) {
 	for _, k := range envvars {
-		envvar := strings.ToUpper("WAYF_"+k)
+		envvar := strings.ToUpper("WAYF_" + k)
 		log.Println(envvar)
 		if val, ok := os.LookupEnv(envvar); ok {
 			reflect.ValueOf(config).Elem().FieldByName(k).Set(reflect.ValueOf(val))
@@ -381,12 +381,11 @@ func legacyStatLog(server, tag, idp, sp, hash string) {
 func debugSetting(r *http.Request, name string) string {
 	cookie, err := r.Cookie("debug")
 	if err == nil {
-        vals,_ := url.ParseQuery(cookie.Value)
-        return vals.Get(name)
-    }
-    return ""
+		vals, _ := url.ParseQuery(cookie.Value)
+		return vals.Get(name)
+	}
+	return ""
 }
-
 
 func prepareTables(attrs *goxml.Xp) {
 	basic2uri = make(map[string]attrName)
@@ -394,7 +393,7 @@ func prepareTables(attrs *goxml.Xp) {
 		friendlyName := attrs.Query1(attr, "@FriendlyName")
 		uri := attrs.Query1(attr, "@Name")
 		basic2uri[friendlyName] = attrName{uri: uri, basic: friendlyName, claim: friendlyName} // attrs.Query1(attr, "@AttributeName")
-		basic2uri[uri] = attrName{uri: uri, basic: friendlyName, claim: friendlyName} // attrs.Query1(attr, "@AttributeName")
+		basic2uri[uri] = attrName{uri: uri, basic: friendlyName, claim: friendlyName}          // attrs.Query1(attr, "@AttributeName")
 	}
 }
 
@@ -543,7 +542,7 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	return
 }
 
-func samlTime2JwtTime(xmlTime  string) int64 {
+func samlTime2JwtTime(xmlTime string) int64 {
 	samlTime, _ := time.Parse(gosaml.XsDateTime, xmlTime)
 	return samlTime.Unix()
 }
@@ -558,57 +557,60 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
-        response, _, _, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, r.Header.Get("X-Acs"))
-        if err != nil {
-            return err
-        }
-        _, _, _, err = getOriginalRequest(w, r, response, nil, nil, "JWT-")
-        if err != nil {
-            return err
-        }
+		response, _, _, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, r.Header.Get("X-Acs"))
+		if err != nil {
+			return err
+		}
+		_, _, _, err = getOriginalRequest(w, r, response, nil, nil, "JWT-")
+		if err != nil {
+			return err
+		}
 
 		attrs := jwt.MapClaims{}
 
 		names := response.QueryMulti(nil, "//saml:Attribute/@Name")
 		for _, name := range names {
-		    basic := basic2uri[name].basic
+			basic := basic2uri[name].basic
 			attrs[basic] = response.QueryMulti(nil, "//saml:Attribute[@Name="+strconv.Quote(basic)+"]/saml:AttributeValue")
 		}
 
-        type claim struct {name, xpath string; conv func(string) (int64)}
+		type claim struct {
+			name, xpath string
+			conv        func(string) int64
+		}
 
-        claims := []claim{
-            {"iss", "./saml:Issuer", nil},
-            {"aud", "./saml:Conditions/saml:AudienceRestriction/saml:Audience", nil},
-            {"nbf", "./saml:Conditions/@NotBefore", samlTime2JwtTime},
-            {"exp", "./saml:Conditions/@NotOnOrAfter", samlTime2JwtTime},
-            {"iat", "@IssueInstant", samlTime2JwtTime},
-        }
+		claims := []claim{
+			{"iss", "./saml:Issuer", nil},
+			{"aud", "./saml:Conditions/saml:AudienceRestriction/saml:Audience", nil},
+			{"nbf", "./saml:Conditions/@NotBefore", samlTime2JwtTime},
+			{"exp", "./saml:Conditions/@NotOnOrAfter", samlTime2JwtTime},
+			{"iat", "@IssueInstant", samlTime2JwtTime},
+		}
 
 		assertion := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
-        for _, c := range claims {
-            attrs[c.name] = response.Query1(assertion, c.xpath)
-            if c.conv != nil {
-                attrs[c.name] = c.conv(attrs[c.name].(string))
-            }
-        }
+		for _, c := range claims {
+			attrs[c.name] = response.Query1(assertion, c.xpath)
+			if c.conv != nil {
+				attrs[c.name] = c.conv(attrs[c.name].(string))
+			}
+		}
 
-        // https://godoc.org/github.com/dgrijalva/jwt-go#example-New--Hmac
-        // Create a new token object, specifying signing method and the claims
-        // you would like it to contain.
-        token := jwt.NewWithClaims(jwt.SigningMethodHS256, attrs)
+		// https://godoc.org/github.com/dgrijalva/jwt-go#example-New--Hmac
+		// Create a new token object, specifying signing method and the claims
+		// you would like it to contain.
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, attrs)
 
-        // Sign and get the complete encoded token as a string using the secret
-        tokenString, err := token.SignedString([]byte(config.SpBackendTenants[r.Header.Get("X-Token")].Secret))
-        if err != nil {
-             return err
-        }
+		// Sign and get the complete encoded token as a string using the secret
+		tokenString, err := token.SignedString([]byte(config.SpBackendTenants[r.Header.Get("X-Token")].Secret))
+		if err != nil {
+			return err
+		}
 
-        var app []byte
-        err = authnRequestCookie.Decode("app", relayState, &app)
-        if err != nil {
-            return err
-        }
+		var app []byte
+		err = authnRequestCookie.Decode("app", relayState, &app)
+		if err != nil {
+			return err
+		}
 
 		w.Header().Set("Auth", "Bearer "+tokenString)
 		w.Header().Set("X-Accel-Redirect", string(app))
@@ -620,14 +622,13 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-
 	relayState, err := authnRequestCookie.Encode("app", []byte(r.Header.Get("X-App")))
 	if err != nil {
-	    return err
+		return err
 	}
 
-    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, strings.Split(r.Form.Get("idplist"), ","))
-    return err
+	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, strings.Split(r.Form.Get("idplist"), ","))
+	return err
 }
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
@@ -681,7 +682,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 		q := u.Query()
 		if idpList != "" {
-		        q.Set("idplist", idpList)
+			q.Set("idplist", idpList)
 		}
 		if r.Form.Get("scoping") == "param" {
 			idp = r.Form.Get("scopedidp")
@@ -936,11 +937,11 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 			cpryear, _ := strconv.Atoi(matches[3])
 			c7, _ := strconv.Atoi(matches[4])
 			year := strconv.Itoa(yearfromyearandcifferseven(cpryear, c7))
-            if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacDateOfBirth"]`) == "" {
-			    setAttribute("schacDateOfBirth", year+matches[2]+matches[1], response, destinationAttributes)
+			if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacDateOfBirth"]`) == "" {
+				setAttribute("schacDateOfBirth", year+matches[2]+matches[1], response, destinationAttributes)
 			}
-            if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacYearOfBirth"]`) == "" {
-			    setAttribute("schacYearOfBirth", year, response, destinationAttributes)
+			if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacYearOfBirth"]`) == "" {
+				setAttribute("schacYearOfBirth", year, response, destinationAttributes)
 			}
 			break
 		}
@@ -958,7 +959,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
-		domain := epsaparts[1]+epsaparts[2]
+		domain := epsaparts[1] + epsaparts[2]
 		if !strings.HasSuffix(domain, subsecuritydomain) && domain != securitydomain {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", epsa, securitydomain)
 			return
@@ -981,7 +982,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 		epaset["member"] = true
 	}
 
-    i := 1
+	i := 1
 	for epa := range epaset {
 		name := hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]/@Name`)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@Name`, name, nil)
@@ -1036,7 +1037,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.='1']) > 0`)
 	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
 	ard.Key = idHash(ard.SPEntityID)
-    io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
+	io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
 
 	ard.Hash = fmt.Sprintf("%x", h.Sum(nil))
 	ard.ConsentAsAService = config.ConsentAsAService
@@ -1067,7 +1068,7 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	//setAttribute("cn", value, response, sourceAttributes) // already there
 	setAttribute("gn", strings.Join(names[0:l], " "), response, sourceAttributes)
 	// sn seems to be empty from from Nemlog-in - remove it
-    response.Rm(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.4"]`)
+	response.Rm(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.4"]`)
 	setAttribute("sn", names[l], response, sourceAttributes)
 	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.1"]/saml:AttributeValue`)
 	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
@@ -1131,7 +1132,7 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
 	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10})
 	w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
-	w.Header().Set("Access-Control-Allow-Credentials",  "true")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Content-Type", "text/plain")
 	return
 }
@@ -1252,7 +1253,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	birkIdp := birkIdpMd.Query1(nil, "@entityID")
 	hubMd, idpMd, err = remapper(birkIdp)
 	if err != nil {
-	    return
+		return
 	}
 
 	if err = checkForCommonFederations(idpMd, spMd); err != nil {
@@ -1293,21 +1294,21 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, directToSP bool, idPList [] string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, directToSP bool, idPList []string) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList)
 	if err != nil {
 		return
 	}
-    if altAcs != "" {
-    	newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
-    }
+	if altAcs != "" {
+		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
+	}
 
 	// Save the request in a session for when the response comes back
 	id := newrequest.Query1(nil, "./@ID")
 
 	if request == nil {
-	    request = goxml.NewXpFromString("") // an empty one to allow get "" for all the fields below ....
+		request = goxml.NewXpFromString("") // an empty one to allow get "" for all the fields below ....
 	}
 
 	sRequest := samlRequest{
@@ -1323,7 +1324,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
-	wars := idpMd.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`)+idpMd.Query1(nil, `./md:Extensions/wayf:wayf/wayf:redirect.sign`)
+	wars := idpMd.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) + idpMd.Query1(nil, `./md:Extensions/wayf:wayf/wayf:redirect.sign`)
 	switch wars {
 	case "true", "1":
 		privatekey, err = gosaml.GetPrivateKey(spMd)
@@ -1334,32 +1335,32 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	algo := eIdasExtras(idpMd, newrequest)
 	u, err := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", algo)
 	if err != nil {
-	    return
+		return
 	}
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
 
 func eIdasExtras(idpMd, request *goxml.Xp) (algo string) {
-    if idpMd.Query1(nil, "@entityID") == "https://eidasconnector.test.eid.digst.dk/idp" {
-        request.QueryDashP(nil, "@ForceAuthn", "true", nil)
-        request.QueryDashP(nil, "@IsPassive", "false", nil)
-        request.Rm(nil, "@ProtocolBinding");
-        request.Rm(nil, "@AssertionConsumerServiceURL")
-        nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
-        ras := request.QueryDashP(nil, "./samlp:Extensions/eidas:RequestedAttributes", "", nameIDPolicyNode)
-        for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
-            ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
-            request.QueryDashP(ra, "./@FriendlyName", n, nil)
-            request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:PersonIdentifier:"+n, nil)
-            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
-            request.QueryDashP(ra, "@isRequired", "true", nil)
-        }
-        request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
-        request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
-        algo = "sha256"
-    }
-    return
+	if idpMd.Query1(nil, "@entityID") == "https://eidasconnector.test.eid.digst.dk/idp" {
+		request.QueryDashP(nil, "@ForceAuthn", "true", nil)
+		request.QueryDashP(nil, "@IsPassive", "false", nil)
+		request.Rm(nil, "@ProtocolBinding")
+		request.Rm(nil, "@AssertionConsumerServiceURL")
+		nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
+		ras := request.QueryDashP(nil, "./samlp:Extensions/eidas:RequestedAttributes", "", nameIDPolicyNode)
+		for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
+			ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
+			request.QueryDashP(ra, "./@FriendlyName", n, nil)
+			request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:PersonIdentifier:"+n, nil)
+			request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
+			request.QueryDashP(ra, "@isRequired", "true", nil)
+		}
+		request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
+		request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
+		algo = "sha256"
+	}
+	return
 }
 
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
@@ -1376,9 +1377,9 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 		return
 	}
 
-    if sRequest.Id == "" { // This is a non-hub request - no original actual original request - just checking if response/@InResponseTo == request/@ID
-        return nil, nil, sRequest, nil
-    }
+	if sRequest.Id == "" { // This is a non-hub request - no original actual original request - just checking if response/@InResponseTo == request/@ID
+		return nil, nil, sRequest, nil
+	}
 
 	if sRequest.DtS {
 		spMd, err = md1.MDQ(sRequest.Is)
@@ -1404,7 +1405,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, idpMd, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub, "https://" + r.Host + r.URL.Path)
+	response, idpMd, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -1457,9 +1458,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-  		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
-  		    signingMethod = sigAlg
-  		}
+		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
+			signingMethod = sigAlg
+		}
 
 		for _, q := range config.ElementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
@@ -1471,19 +1472,18 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			return
 		}
 
-
-  		if debugSetting(r, "signingError") == "1" {
-  		    newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
-  		}
+		if debugSetting(r, "signingError") == "1" {
+			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
+		}
 
 		if debugSetting(r, "encryptAssertion") == "1" {
-	    	gosaml.DumpFile(newresponse)
-		    cert := spMd.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
-		    _, publicKey, _ := gosaml.PublicKeyInfo(cert)
-		    ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
-		    assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-		    newresponse.Encrypt(assertion, publicKey, ea)
-	    }
+			gosaml.DumpFile(newresponse)
+			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
+			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
+			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
+			assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
+			newresponse.Encrypt(assertion, publicKey, ea)
+		}
 	} else {
 		newresponse = gosaml.NewErrorResponse(issuerMd, spMd, request, response)
 
@@ -1512,7 +1512,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
 
-	response, birkMd, kribMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://" + r.Host + r.URL.Path)
+	response, birkMd, kribMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -1557,9 +1557,9 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
 		handleAttributeNameFormat(response, spMd)
 
-  		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
-  		    signingMethod = sigAlg
-  		}
+		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
+			signingMethod = sigAlg
+		}
 
 		for _, q := range config.ElementsToSign {
 			err = gosaml.SignResponse(response, q, hubMd, signingMethod, gosaml.SAMLSign)
@@ -1568,18 +1568,18 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-  		if debugSetting(r, "signingError") == "1" {
-  		    response.QueryDashP(nil, `./saml:Assertion/saml:Issuer[2]`, "an extra fake issuer just to make the signature fail ...", nil)
-  		}
+		if debugSetting(r, "signingError") == "1" {
+			response.QueryDashP(nil, `./saml:Assertion/saml:Issuer[2]`, "an extra fake issuer just to make the signature fail ...", nil)
+		}
 
-        if debugSetting(r, "encryptAssertion") == "1" {
-	    	gosaml.DumpFile(response)
-		    cert := spMd.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
-		    _, publicKey, _ := gosaml.PublicKeyInfo(cert)
-		    ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
-		    assertion := response.Query(nil, "saml:Assertion[1]")[0]
-		    response.Encrypt(assertion, publicKey, ea)
-	    }
+		if debugSetting(r, "encryptAssertion") == "1" {
+			gosaml.DumpFile(response)
+			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
+			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
+			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
+			assertion := response.Query(nil, "saml:Assertion[1]")[0]
+			response.Encrypt(assertion, publicKey, ea)
+		}
 	} else {
 		newresponse := gosaml.NewErrorResponse(hubMd, spMd, request, response)
 
@@ -1914,7 +1914,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, spMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://" + r.Host + r.URL.Path)
+	response, _, spMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
