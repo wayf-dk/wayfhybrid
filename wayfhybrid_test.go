@@ -12,6 +12,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"testing"
 	"time"
 )
 
@@ -19,6 +20,21 @@ var (
 	_ = log.Println
 	_ = q.Q
 )
+
+func TestMain(m *testing.M) {
+	Md.Hub = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_HUB"}
+	Md.Internal = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
+	Md.ExternalIdP = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
+	Md.ExternalSP = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
+
+	for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
+		err := md.(*lMDQ.MDQ).Open()
+		if err != nil {
+			panic(err)
+		}
+	}
+	os.Exit(m.Run())
+}
 
 func printHashedDom(xp *goxml.Xp) {
 	hash := sha1.Sum([]byte(xp.C14n(nil, "")))
@@ -198,8 +214,8 @@ func ExampleWayfAttributeHandler() {
 	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Mads Freek Petersen
 	// eduPersonAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//
 	//     member
-	//     staff
 	// eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     2
 	// eduPersonEntitlement urn:oid:1.3.6.1.4.1.5923.1.1.1.7 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
@@ -251,6 +267,7 @@ func ExampleNemLoginAttributeHandler() {
 	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Anton Banton Cantonsen
 	// eduPersonAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+	//
 	//     member
 	// eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     3
