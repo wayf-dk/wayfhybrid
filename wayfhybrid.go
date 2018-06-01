@@ -627,6 +627,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	    return err
 	}
 
+    q.Q(r)
     err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, strings.Split(r.Form.Get("idplist"), ","))
     return err
 }
@@ -642,7 +643,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
 
-	spMd, err := Md.Internal.MDQ("https://" + config.Testsp)
+	spMd, err := Md.Internal.MDQ("https://" + r.Host)
 	pk, _ := gosaml.GetPrivateKey(spMd)
 	idp := r.Form.Get("idpentityid")
 	idpList := r.Form.Get("idplist")
@@ -730,7 +731,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		data := url.Values{}
 		data.Set("return", "https://"+r.Host+r.RequestURI+"?previdplist="+r.Form.Get("scopedidp"))
 		data.Set("returnIDParam", "scopedIDP")
-		data.Set("entityID", "https://"+config.Testsp)
+		data.Set("entityID", "https://"+r.Host)
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
 		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedIDP")+","+r.Form.Get("previdplist"), " ,")}
@@ -1273,6 +1274,7 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	idp = debify.ReplaceAllString(idp, "$1$2")
 
 	if rm, ok := remap[idp]; ok {
+	    q.Q(rm)
 		idpMd, err = Md.Internal.MDQ(rm.idp)
 		if err != nil {
 			return
