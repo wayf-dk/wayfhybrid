@@ -222,6 +222,9 @@ func Main() {
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
 
+	str, err := refreshAllMetadataFeeds()
+	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+
 	if Md.Internal == nil { // either all or none
 		Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table}
 		Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table}
@@ -234,9 +237,6 @@ func Main() {
 			}
 		}
 	}
-
-	str, err := refreshAllMetadataFeeds()
-	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
 	/*
 	   wayfsp2, _ := Md.Internal.MDQ("https://wayfsp2.wayf.dk")
