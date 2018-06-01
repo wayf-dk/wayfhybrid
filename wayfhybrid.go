@@ -222,8 +222,8 @@ func Main() {
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
 
-	str, err := refreshAllMetadataFeeds()
-	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+//	str, err := refreshAllMetadataFeeds()
+//	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
 	if Md.Internal == nil { // either all or none
 		Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table}
