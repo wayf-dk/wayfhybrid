@@ -222,21 +222,20 @@ func Main() {
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
 
-//	str, err := refreshAllMetadataFeeds()
-//	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+    Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table}
+    Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table}
+    Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table}
+    Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
 
-	if Md.Internal == nil { // either all or none
-		Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table}
-		Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table}
-		Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table}
-		Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
-		for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
-			err := md.(*lMDQ.MDQ).Open()
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
+	str, err := refreshAllMetadataFeeds()
+	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+
+    for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
+        err := md.(*lMDQ.MDQ).Open()
+        if err != nil {
+            panic(err)
+        }
+    }
 
 	/*
 	   wayfsp2, _ := Md.Internal.MDQ("https://wayfsp2.wayf.dk")
