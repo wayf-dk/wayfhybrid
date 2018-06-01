@@ -22,10 +22,10 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	Md.Hub = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_HUB"}
-	Md.Internal = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
-	Md.ExternalIdP = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
-	Md.ExternalSP = &lMDQ.MDQ{Path: "file:/home/mekhan/wayfhybrid/hybrid-metadata-test.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
+	Md.Hub = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_HUB"}
+	Md.Internal = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
+	Md.ExternalIdP = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
+	Md.ExternalSP = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
 
 	for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
 		err := md.(*lMDQ.MDQ).Open()
