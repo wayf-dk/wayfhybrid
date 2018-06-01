@@ -292,6 +292,7 @@ func Main() {
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
+
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPService))
 	httpMux.Handle(config.Testsp+"/", appHandler(testSPService)) // need a root "/" for routing
@@ -610,7 +611,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
             return err
         }
 
-		w.Header().Set("Auth", "Bearer "+tokenString)
+		w.Header().Set("Authorization", "Bearer "+tokenString)
 		w.Header().Set("X-Accel-Redirect", string(app))
 		return err
 	}
