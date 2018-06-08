@@ -1350,16 +1350,19 @@ func eIdasExtras(idpMd, request *goxml.Xp) (algo string) {
         request.QueryDashP(nil, "@IsPassive", "false", nil)
         request.Rm(nil, "@ProtocolBinding");
         request.Rm(nil, "@AssertionConsumerServiceURL")
-        nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
-        ras := request.QueryDashP(nil, "./samlp:Extensions/eidas:RequestedAttributes", "", nameIDPolicyNode)
-        for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
-            ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
-            request.QueryDashP(ra, "./@FriendlyName", n, nil)
-            request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:PersonIdentifier:"+n, nil)
-            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
-            request.QueryDashP(ra, "@isRequired", "true", nil)
-        }
-        request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
+//        nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
+//        extensions := request.QueryDashP(nil, "./samlp:Extensions", "", nameIDPolicyNode)
+//        request.QueryDashP(extensions, "./eidas:SPType", "public", nil)
+//        ras := request.QueryDashP(extensions, "./eidas:RequestedAttributes", "", nil)
+//        for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
+//            ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
+//            request.QueryDashP(ra, "./@FriendlyName", n, nil)
+//            request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:"+n, nil)
+//            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
+//            request.QueryDashP(ra, "@isRequired", "true", nil)
+//        }
+        request.Rm(nil, "./samlp:NameIDPolicy")
+        //request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
         request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
         algo = "sha256"
     }
