@@ -274,6 +274,7 @@ func Main() {
 		httpMux.Handle(pattern, http.NotFoundHandler())
 	}
 
+	httpMux.Handle("/production", appHandler(OkService))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.Sso_Service, appHandler(SSOService))
 	httpMux.Handle(config.Idpslo, appHandler(IdPSLOService))
@@ -1127,6 +1128,10 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 	response.QueryDashP(attr, `./@FriendlyName`, name, nil)
 	values := len(response.Query(attr, `./saml:AttributeValue`)) + 1
 	response.QueryDashP(attr, `./saml:AttributeValue[`+strconv.Itoa(values)+`]`, value, nil)
+}
+
+func OkService(w http.ResponseWriter, r *http.Request) (err error) {
+	return
 }
 
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
