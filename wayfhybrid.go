@@ -1460,8 +1460,8 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		handleAttributeNameFormat(newresponse, spMd)
 
-		// gosaml.NewResponse only handles simple attr values so ..
-		if sRequest.Is == "https://monitor.eduroam.org/sp/module.php/saml/sp/metadata.php/default-sp" {
+		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
+		if spMd.QueryBool(nil, "count(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds[.='eduGAIN']) > 0") {
 			if eptidAttr := newresponse.Query(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]`); eptidAttr != nil {
 				value := newresponse.Query1(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.Rm(eptidAttr[0], "./saml:AttributeValue")
