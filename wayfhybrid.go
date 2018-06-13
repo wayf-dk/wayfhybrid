@@ -185,7 +185,7 @@ var (
 )
 
 func Main() {
-	//log.SetFlags(0) // no predefined time
+	log.SetFlags(0) // no predefined time
 	//log.SetOutput(new(logWriter))
 
 	hostName, _ = os.Hostname()
