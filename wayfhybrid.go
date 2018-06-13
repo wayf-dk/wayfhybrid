@@ -185,8 +185,8 @@ var (
 )
 
 func Main() {
-	log.SetFlags(0) // no predefined time
-	log.SetOutput(new(logWriter))
+	//log.SetFlags(0) // no predefined time
+	//log.SetOutput(new(logWriter))
 
 	hostName, _ = os.Hostname()
 
@@ -379,16 +379,7 @@ func (writer logWriter) Write(bytes []byte) (int, error) {
 }
 
 func legacyStatLog(tag, idp, sp, hash string) {
-    var remap = map[string]string{
-        "qa": "wayf-01", // remap qa to something that get thru the log filters ...
-    }
-    var host string
-    var ok bool
-    if host, ok = remap[hostName]; !ok { // let all others pass as is
-        host = hostName
-    }
-
-	log.Printf("%s ssp-wayf[%s]: 5 STAT [%d] %s %s %s %s\n", host, "007", time.Now().UnixNano(), tag, idp, sp, hash)
+	log.Printf("5 STAT [%d] %s %s %s %s\n", time.Now().UnixNano(), tag, idp, sp, hash)
 }
 
 func debugSetting(r *http.Request, name string) string {
