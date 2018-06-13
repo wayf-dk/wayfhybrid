@@ -378,8 +378,17 @@ func (writer logWriter) Write(bytes []byte) (int, error) {
 	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ")+string(bytes))
 }
 
-func legacyStatLog(server, tag, idp, sp, hash string) {
-	log.Printf("%s ssp-wayf[%s]: 5 STAT [%d] %s %s %s %s\n", server, "007", time.Now().UnixNano(), tag, idp, sp, hash)
+func legacyStatLog(tag, idp, sp, hash string) {
+    var remap = map[string]string{
+        "qa": "wayf-01", // remap qa to something that get thru the log filters ...
+    }
+    var host string
+    var ok bool
+    if host, ok = remap[hostName]; !ok { // let all others pass as is
+        host = hostName
+    }
+
+	log.Printf("%s ssp-wayf[%s]: 5 STAT [%d] %s %s %s %s\n", host, "007", time.Now().UnixNano(), tag, idp, sp, hash)
 }
 
 func debugSetting(r *http.Request, name string) string {
@@ -390,7 +399,6 @@ func debugSetting(r *http.Request, name string) string {
     }
     return ""
 }
-
 
 func prepareTables(attrs *goxml.Xp) {
 	basic2uri = make(map[string]attrName)
@@ -1047,7 +1055,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	ard.ConsentAsAService = config.ConsentAsAService
 
 	hashedEppn := fmt.Sprintf("%x", goxml.Hash(crypto.SHA256, config.SaltForHashedEppn+eppn))
-	legacyStatLog("birk-99", "saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
+	legacyStatLog("saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
 	return
 }
 
@@ -1058,7 +1066,7 @@ func WayfKribHandler(response, birkMd, kribMd *goxml.Xp) (destination string, er
 		return
 	}
 
-	legacyStatLog("krib-99", "saml20-idp-SSO", kribMd.Query1(nil, "@entityID"), birkMd.Query1(nil, "@entityID"), "na")
+	legacyStatLog("saml20-idp-SSO", kribMd.Query1(nil, "@entityID"), birkMd.Query1(nil, "@entityID"), "na")
 
 	//	destination = "https://" + config.ConsentAsAService
 	return
@@ -1142,8 +1150,7 @@ func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err
 	w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 	w.Header().Set("Access-Control-Allow-Credentials",  "true")
 	w.Header().Set("Content-Type", "text/plain")
-	hostname, _ := os.Hostname()
-	io.WriteString(w, hostname+"\n")
+	io.WriteString(w, hostName+"\n")
 	return
 }
 
@@ -1223,7 +1230,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		legacyStatLog("krib-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+		legacyStatLog("SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
 		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", config.Domain, true, nil)
 		return err
@@ -1270,7 +1277,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	legacyStatLog("birk-99", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+	legacyStatLog("SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
 	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, directToSp, nil)
 	if err != nil {
@@ -1541,7 +1548,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	legacyStatLog("krib-99", "saml20-idp-SSO", kribMd.Query1(nil, "@entityID"), birkMd.Query1(nil, "@entityID"), "na")
+	legacyStatLog("saml20-idp-SSO", kribMd.Query1(nil, "@entityID"), birkMd.Query1(nil, "@entityID"), "na")
 
 	destination := request.Query1(nil, "./@AssertionConsumerServiceURL")
 	//	destination = "https://" + config.ConsentAsAService
@@ -1662,7 +1669,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 				session.Set(w, r, "SLO-"+idHash(sloinfo.Is), config.Domain, request.Dump(), authnRequestCookie, 60)
 			}
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
-			legacyStatLog("birk-99", "saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.Na+fmt.Sprintf(" async:%t", async))
+			legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.Na+fmt.Sprintf(" async:%t", async))
 			// always sign if a private key is available - ie. ignore missing keys
 			privatekey, _ := gosaml.GetPrivateKey(finalIssuer)
 			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "")
@@ -1681,7 +1688,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		if err != nil {
 			return err
 		}
-		legacyStatLog("birk-99", "saml20-idp-SLO "+res[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), "")
+		legacyStatLog("saml20-idp-SLO "+res[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), "")
 
 		request := goxml.NewXp(value)
 		issuerMd, destinationMd, err := findMdPair(finalIssuerMdSets, finalDestinationMdSets, request.Query1(nil, "@Destination"), request.Query1(nil, "./saml:Issuer"))
