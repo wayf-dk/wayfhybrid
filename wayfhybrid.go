@@ -174,6 +174,7 @@ var (
 	sloInfoCookie, authnRequestCookie *securecookie.SecureCookie
 	postForm, attributeReleaseForm    *template.Template
 	hashKey                           []byte
+	hostName                          string
 
 	hubRequestedAttributes *goxml.Xp
 
@@ -186,6 +187,8 @@ var (
 func Main() {
 	log.SetFlags(0) // no predefined time
 	log.SetOutput(new(logWriter))
+
+	hostName, _ = os.Hostname()
 
 	overrideConfig(&config, []string{"Path"})
 
