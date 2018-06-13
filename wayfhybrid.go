@@ -528,7 +528,7 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	}
 	defer tempmddb.Close()
 	defer os.Remove(tempmddb.Name())
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
 		return err
