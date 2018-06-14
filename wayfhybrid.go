@@ -1272,6 +1272,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
+     // Mar 13 14:09:07 birk-03 birk[16805]: 5321bc0335b24 {"action":"receive","type":"samlp:AuthnRequest","src":"https:\/\/wayfsp.wayf.dk","us":"https:\/\/birk.wayf.dk\/birk.php\/orphanage.wayf.dk","ip":"193.11.3.30","ts":1394719747,"host":"birk-03","logtag":"5321bc0335b24"}
 	legacyStatLog("SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
 	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, directToSp, nil)
