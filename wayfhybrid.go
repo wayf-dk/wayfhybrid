@@ -378,8 +378,12 @@ func (writer logWriter) Write(bytes []byte) (int, error) {
 	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ")+string(bytes))
 }
 
+func legacyLog(stat, tag, idp, sp, hash string) {
+	log.Printf("5 %s[%d] %s %s %s %s\n", stat, time.Now().UnixNano(), tag, idp, sp, hash)
+}
+
 func legacyStatLog(tag, idp, sp, hash string) {
-	log.Printf("5 STAT [%d] %s %s %s %s\n", time.Now().UnixNano(), tag, idp, sp, hash)
+    legacyLog("STAT ", tag, idp, sp, hash)
 }
 
 func debugSetting(r *http.Request, name string) string {
@@ -1221,7 +1225,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		legacyStatLog("SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+		legacyLog("", "SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
 
 		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", config.Domain, true, nil)
 		return err
