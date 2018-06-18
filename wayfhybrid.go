@@ -288,6 +288,7 @@ func Main() {
 
 	httpMux.Handle(config.Acs, appHandler(ACSService))
 	httpMux.Handle(config.Nemlogin_Acs, appHandler(ACSService))
+	httpMux.Handle(config.Eidas_Acs, appHandler(ACSService))
 	httpMux.Handle(config.Birk, appHandler(BirkService))
 	httpMux.Handle(config.Krib, appHandler(KribService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
