@@ -73,7 +73,7 @@ type (
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Vvpmss            string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Testsp2, Testsp2_Acs, Testsp2_Slo                        string
-		Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                                    string
+		Eidas_Acs, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                         string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, Saml2jwt, SaltForHashedEppn                string
 		ElementsToSign                                                                           []string
 		NotFoundRoutes                                                                           []string
@@ -1284,9 +1284,9 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
         "src":    request.Query1(nil, "./saml:Issuer"),
         "us":     birkIdpMd.Query1(nil, "@entityID"),
         "ip":     r.RemoteAddr,
-        "ts":     time.Now().Unix(),
+        "ts":     strconv.FormatInt(time.Now().Unix(), 10),
         "host":   hostName,
-        "logtag": time.Now().UnixNano(),
+        "logtag": strconv.FormatInt(time.Now().UnixNano(), 10),
     }
 
     legacyStatJsonLog(jsonlog)
