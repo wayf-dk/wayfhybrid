@@ -386,6 +386,11 @@ func legacyLog(stat, tag, idp, sp, hash string) {
 func legacyStatLog(tag, idp, sp, hash string) {
     legacyLog("STAT ", tag, idp, sp, hash)
 }
+// Mar 13 14:09:07 birk-03 birk[16805]: 5321bc0335b24 {} ...
+func legacyStatJsonLog(rec map[string]string) {
+    b, _ := json.Marshal(rec)
+	log.Printf("[%d] %s\n", time.Now().UnixNano(), b)
+}
 
 func debugSetting(r *http.Request, name string) string {
 	cookie, err := r.Cookie("debug")
@@ -1273,8 +1278,18 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-     // Mar 13 14:09:07 birk-03 birk[16805]: 5321bc0335b24 {"action":"receive","type":"samlp:AuthnRequest","src":"https:\/\/wayfsp.wayf.dk","us":"https:\/\/birk.wayf.dk\/birk.php\/orphanage.wayf.dk","ip":"193.11.3.30","ts":1394719747,"host":"birk-03","logtag":"5321bc0335b24"}
-	legacyStatLog("SAML2.0 - IdP.SSOService: Incoming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+    var jsonlog = map[string]string{
+        "action": "receive",
+        "type":   "samlp:AuthnRequest",
+        "src":    request.Query1(nil, "./saml:Issuer"),
+        "us":     birkIdpMd.Query1(nil, "@entityID"),
+        "ip":     r.RemoteAddr,
+        "ts":     time.Now().Unix(),
+        "host":   hostName,
+        "logtag": time.Now().UnixNano(),
+    }
+
+    legacyStatJsonLog(jsonlog)
 
 	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, directToSp, nil)
 	if err != nil {
