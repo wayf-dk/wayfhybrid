@@ -145,7 +145,7 @@ type (
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
 		Fo                   int
-		DtS                  bool
+		DtS, Brk             bool
 	}
 )
 
@@ -180,7 +180,7 @@ var (
 
 	Md                 MdSets
 	basic2uri          map[string]attrName
-	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp) (AttributeReleaseData, error)
+	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, bool) (AttributeReleaseData, error)
 	kribServiceHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
 )
 
@@ -640,7 +640,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
     q.Q(r)
-    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, strings.Split(r.Form.Get("idplist"), ","))
+    err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, false, strings.Split(r.Form.Get("idplist"), ","))
     return err
 }
 
@@ -836,7 +836,7 @@ func checkForCommonFederations(idpMd, spMd *goxml.Xp) (err error) {
 	return
 }
 
-func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
+func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk bool) (ard AttributeReleaseData, err error) {
 	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := response.Query1(nil, "/samlp:Response/saml:Issuer")
 
@@ -1055,8 +1055,22 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp) (ard
 	ard.Hash = fmt.Sprintf("%x", h.Sum(nil))
 	ard.ConsentAsAService = config.ConsentAsAService
 
-	hashedEppn := fmt.Sprintf("%x", goxml.Hash(crypto.SHA256, config.SaltForHashedEppn+eppn))
-	legacyStatLog("saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
+	if birk {
+//Jun 19 09:42:58 birk-06 birk[18847]: 1529401378 {"action":"send","type":"samlp:Response","us":"https:\/\/birk.wayf.dk\/birk.php\/nemlogin.wayf.dk","destination":"https:\/\/europe.wiseflow.net","ip":"109.105.112.132","ts":1529401378,"host":"birk-06","logtag":1529401378}
+        var jsonlog = map[string]string{
+            "action": "send",
+            "type":   "samlp:Response",
+            "us":     ard.IdPEntityID,
+            "destination":    ard.SPEntityID,
+            "ip":     "0.0.0.0",
+            "ts":     strconv.FormatInt(time.Now().Unix(), 10),
+            "host":   hostName,
+            "logtag": strconv.FormatInt(time.Now().UnixNano(), 10),
+        }
+        legacyStatJsonLog(jsonlog)
+	}
+    hashedEppn := fmt.Sprintf("%x", goxml.Hash(crypto.SHA256, config.SaltForHashedEppn+eppn))
+  	legacyStatLog("saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
 	return
 }
 
@@ -1231,9 +1245,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		legacyLog("", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
-
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", config.Domain, true, nil)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", config.Domain, true, false, nil)
 		return err
 	}
 	return
@@ -1278,20 +1290,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    var jsonlog = map[string]string{
-        "action": "receive",
-        "type":   "samlp:AuthnRequest",
-        "src":    request.Query1(nil, "./saml:Issuer"),
-        "us":     birkIdpMd.Query1(nil, "@entityID"),
-        "ip":     r.RemoteAddr,
-        "ts":     strconv.FormatInt(time.Now().Unix(), 10),
-        "host":   hostName,
-        "logtag": strconv.FormatInt(time.Now().UnixNano(), 10),
-    }
-
-    legacyStatJsonLog(jsonlog)
-
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, directToSp, nil)
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, directToSp, true, nil)
 	if err != nil {
 		return
 	}
@@ -1324,7 +1323,7 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, directToSP bool, idPList [] string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, directToSP, birk bool, idPList [] string) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList)
 	if err != nil {
@@ -1349,6 +1348,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Fo:  gosaml.NameIDMap[request.Query1(nil, "./samlp:NameIDPolicy/@Format")],
 		Acs: request.Query1(nil, "./@AssertionConsumerServiceIndex"),
 		DtS: directToSP,
+		Brk: birk,
 	}
 	bytes, err := json.Marshal(&sRequest)
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
@@ -1367,6 +1367,23 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	if err != nil {
 	    return
 	}
+
+    legacyLog("", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
+    if birk {
+        var jsonlog = map[string]string{
+            "action": "receive",
+            "type":   "samlp:AuthnRequest",
+            "src":    request.Query1(nil, "./saml:Issuer"),
+            "us":     destination,
+            "ip":     r.RemoteAddr,
+            "ts":     strconv.FormatInt(time.Now().Unix(), 10),
+            "host":   hostName,
+            "logtag": strconv.FormatInt(time.Now().UnixNano(), 10),
+        }
+
+        legacyStatJsonLog(jsonlog)
+    }
+
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -1462,7 +1479,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		ard, err = aCSServiceHandler(birkMd, hubRequestedAttributes, spMd, request, response)
+		ard, err = aCSServiceHandler(birkMd, hubRequestedAttributes, spMd, request, response, sRequest.Brk)
 		if err != nil {
 			return goxml.Wrap(err)
 		}
@@ -1940,7 +1957,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 31536000})
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK-", "", "", false, nil)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK-", "", "", false, false, nil)
 		return err
 	}
 	return
