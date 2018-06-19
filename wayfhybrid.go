@@ -904,7 +904,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
 
-	eppn, eppnForEptid, securitydomain, err := checkScope(response, idpMd, destinationAttributes, "saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue")
+	eppn, eppnForEptid, securitydomain, err := checkScope(response, idpMd, destinationAttributes)
 	if err != nil {
 		return
 	}
@@ -960,22 +960,12 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		}
 	}
 
-	subsecuritydomain := "." + securitydomain
 	epsas := make(map[string]bool)
 
+    // scopes are checked for legality above
 	for _, epsa := range response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue`) {
 		if epsa == "" {
 			continue
-		}
-		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 3 {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
-			return
-		}
-		domain := epsaparts[1]+epsaparts[2]
-		if !strings.HasSuffix(domain, subsecuritydomain) && domain != securitydomain {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", epsa, securitydomain)
-			return
 		}
 		epsas[epsa] = true
 	}
@@ -1599,6 +1589,13 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 
+       	attrs := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
+
+        _, _, _, err = checkScope(response, birkMd, attrs)
+        if err != nil {
+            return
+        }
+
 		if _, err = SLOInfoHandler(w, r, origResponse, kribMd, response, spMd, gosaml.SPRole, "SLO"); err != nil {
 			return err
 		}
@@ -1904,8 +1901,8 @@ func handleAttributeNameFormat2(response, mdsp *goxml.Xp) {
 	}
 }
 
-func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, eppnForEptid, securityDomain string, err error) {
-	eppn = xp.Query1(context, xpath)
+func checkScope(xp, md *goxml.Xp, context types.Node) (eppn, eppnForEptid, securityDomain string, err error) {
+	eppn = xp.Query1(context, "saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue")
 	eppnForEptid = eppn
 	matches := scoped.FindStringSubmatch(eppn)
 	if len(matches) != 3 {
@@ -1922,6 +1919,24 @@ func checkScope(xp, md *goxml.Xp, context types.Node, xpath string) (eppn, eppnF
 
 	if matches[2] == "" && aauscope.MatchString(matches[1]) {
 		eppnForEptid += "@aau.dk"
+	}
+
+	subSecurityDomain := "." + securityDomain
+
+	for _, epsa := range xp.QueryMulti(context, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue`) {
+		if epsa == "" {
+			continue
+		}
+		epsaparts := scoped.FindStringSubmatch(epsa)
+		if len(epsaparts) != 3 {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
+			return
+		}
+		domain := epsaparts[1]+epsaparts[2]
+		if !strings.HasSuffix(domain, subSecurityDomain) && domain != securityDomain {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", epsa, securityDomain)
+			return
+		}
 	}
 	return
 }
