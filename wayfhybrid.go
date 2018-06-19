@@ -389,7 +389,7 @@ func legacyStatLog(tag, idp, sp, hash string) {
 // Mar 13 14:09:07 birk-03 birk[16805]: 5321bc0335b24 {} ...
 func legacyStatJsonLog(rec map[string]string) {
     b, _ := json.Marshal(rec)
-	log.Printf("[%d] %s\n", time.Now().UnixNano(), b)
+	log.Printf("%d %s\n", time.Now().UnixNano(), b)
 }
 
 func debugSetting(r *http.Request, name string) string {
