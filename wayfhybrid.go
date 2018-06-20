@@ -1900,8 +1900,8 @@ func handleAttributeNameFormat2(response, mdsp *goxml.Xp) {
 }
 
 func checkScope(xp, md *goxml.Xp, context types.Node) (eppn, eppnForEptid, securityDomain string, eppsas []string, err error) {
-	eppns := xp.QueryMulti(context, "saml:Attribute[@Name='eduPersonPrincipalName' or @Name=' 1.3.6.1.4.1.5923.1.1.1.6']/saml:AttributeValue")
-	eppsas = xp.QueryMulti(context, `saml:Attribute[@Name="eduPersonScopedAffiliation" or @Name='1.3.6.1.4.1.5923.1.1.1.9']/saml:AttributeValue`)
+	eppns := xp.QueryMulti(context, "saml:Attribute[@Name='eduPersonPrincipalName' or @Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.6']/saml:AttributeValue")
+	eppsas = xp.QueryMulti(context, `saml:Attribute[@Name="eduPersonScopedAffiliation" or @Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.9']/saml:AttributeValue`)
 	switch len(eppns) {
 	case 1:
 		eppn = eppns[0]
@@ -1934,7 +1934,6 @@ func checkScope(xp, md *goxml.Xp, context types.Node) (eppn, eppnForEptid, secur
 		err = fmt.Errorf("security domain '%s' does not match any scopes", securityDomain)
 		return
 	}
-
 
 	for _, eppsa := range eppsas {
 		eppsaparts := scoped.FindStringSubmatch(eppsa)
