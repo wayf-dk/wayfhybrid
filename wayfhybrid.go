@@ -728,17 +728,17 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-        _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0])
+		_, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0])
 
-        if err != nil {
-            return err
-        }
+		if err != nil {
+			return err
+		}
 
 		protocol := response.QueryString(nil, "local-name(/*)")
 		vals := attributeValues(response, destinationMd, hubRequestedAttributes)
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"),
-		Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
+			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
 		testSPForm.Execute(w, data)
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
@@ -904,7 +904,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
-	eppn, eppnForEptid, securitydomain, err := checkScope(response, idpMd, destinationAttributes)
+	eppn, eppnForEptid, securitydomain, epsaList, err := checkScope(response, idpMd, destinationAttributes)
 	if err != nil {
 		return
 	}
@@ -1287,7 +1287,6 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	idp = debify.ReplaceAllString(idp, "$1$2")
 
 	if rm, ok := remap[idp]; ok {
-	    q.Q(rm)
 		idpMd, err = Md.Internal.MDQ(rm.idp)
 		if err != nil {
 			return
@@ -1900,15 +1899,35 @@ func handleAttributeNameFormat2(response, mdsp *goxml.Xp) {
 	}
 }
 
-func checkScope(xp, md *goxml.Xp, context types.Node) (eppn, eppnForEptid, securityDomain string, err error) {
-	eppn = xp.Query1(context, "saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue")
-	eppnForEptid = eppn
-	matches := scoped.FindStringSubmatch(eppn)
-	if len(matches) != 3 {
-		err = fmt.Errorf("not a scoped value: %s", eppn)
+func checkScope(xp, md *goxml.Xp, context types.Node) (eppn, eppnForEptid, securityDomain string, eppsas []string, err error) {
+	eppns := xp.QueryMulti(context, "saml:Attribute[@Name='eduPersonPrincipalName' or @Name=' 1.3.6.1.4.1.5923.1.1.1.6']/saml:AttributeValue")
+	eppsas = xp.QueryMulti(context, `saml:Attribute[@Name="eduPersonScopedAffiliation" or @Name='1.3.6.1.4.1.5923.1.1.1.9']/saml:AttributeValue`)
+	switch len(eppns) {
+	case 1:
+		eppn = eppns[0]
+		eppnForEptid = eppn
+		matches := scoped.FindStringSubmatch(eppn)
+		if len(matches) != 3 {
+			err = fmt.Errorf("not a scoped value: %s", eppn)
+			return
+		}
+		securityDomain = matches[1] + matches[2] // rm matches[2] when @aau.dk goes away
+        if matches[2] == "" && aauscope.MatchString(matches[1]) { // legacy support for old @aau.dk scopes for persistent nameid and eptid
+            eppnForEptid += "@aau.dk"
+        }
+	case 0: // try to get a security domain from a epsa value
+		if len(eppsas) > 0 {
+			matches := scoped.FindStringSubmatch(eppsas[0])
+			if len(matches) != 3 {
+				err = fmt.Errorf("not a scoped value: %s", eppn)
+				return
+			}
+			securityDomain = matches[1] + matches[2] // rm matches[2] when @aau.dk goes away
+		}
+	default: // never more than one
+		err = fmt.Errorf("More than one 'eduPersonPrincipalName' value")
 		return
 	}
-	securityDomain = matches[1] + matches[2] // rm matches[2] when @aau.dk goes away
 
 	scope := md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securityDomain)+"]")
 	if len(scope) == 0 {
@@ -1916,24 +1935,15 @@ func checkScope(xp, md *goxml.Xp, context types.Node) (eppn, eppnForEptid, secur
 		return
 	}
 
-	if matches[2] == "" && aauscope.MatchString(matches[1]) {
-		eppnForEptid += "@aau.dk"
-	}
 
-	subSecurityDomain := "." + securityDomain
-
-	for _, epsa := range xp.QueryMulti(context, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue`) {
-		if epsa == "" {
-			continue
-		}
-		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 3 {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
+	for _, eppsa := range eppsas {
+		eppsaparts := scoped.FindStringSubmatch(eppsa)
+		if len(eppsaparts) != 3 {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", eppsa)
 			return
 		}
-		domain := epsaparts[1]+epsaparts[2]
-		if !strings.HasSuffix(domain, subSecurityDomain) && domain != securityDomain {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", epsa, securityDomain)
+		if eppsaparts[1] + eppsaparts[2] != securityDomain {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", eppsa, securityDomain)
 			return
 		}
 	}
