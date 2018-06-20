@@ -712,7 +712,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), destination, issuer)
 		}
 
-	} else if r.Form.Get("SAMLRequest") != "" || r.Form.Get("SAMLResponse") != "" {
+	} else if r.Form.Get("SAMLResponse") != "" {
 		// try to decode SAML message to ourselves or just another SP
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
@@ -724,11 +724,18 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
+
+        _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0])
+
+        if err != nil {
+            return err
+        }
+
 		protocol := response.QueryString(nil, "local-name(/*)")
 		vals := attributeValues(response, destinationMd, hubRequestedAttributes)
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"),
-			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
+		Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
 		testSPForm.Execute(w, data)
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
@@ -894,7 +901,6 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
-
 	eppn, eppnForEptid, securitydomain, err := checkScope(response, idpMd, destinationAttributes)
 	if err != nil {
 		return
@@ -1464,6 +1470,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return goxml.Wrap(err)
 		}
+
+  		if gosaml.DebugSetting(r, "scopingError") != "" {
+  		    eppnPath := `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonPrincipalName"]/saml:AttributeValue`
+  		    response.QueryDashP(nil, eppnPath, response.Query1(nil, eppnPath)+"1", nil)
+  		}
+
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
 
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
@@ -1489,7 +1501,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-  		if sigAlg := gosaml.DebugSetting(r, "SigAlg"); sigAlg != "" {
+  		if sigAlg := gosaml.DebugSetting(r, "sigAlg"); sigAlg != "" {
   		    signingMethod = sigAlg
   		}
 
@@ -1580,9 +1592,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 
-       	attrs := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
-
-        _, _, _, err = checkScope(response, birkMd, attrs)
+        _, _, _, err = checkScope(response, birkMd, response.Query(nil, `/saml:Assertion/saml:AttributeStatement`)[0])
         if err != nil {
             return
         }
@@ -1596,7 +1606,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
 		handleAttributeNameFormat(response, spMd)
 
-  		if sigAlg := gosaml.DebugSetting(r, "SigAlg"); sigAlg != "" {
+  		if sigAlg := gosaml.DebugSetting(r, "sigAlg"); sigAlg != "" {
   		    signingMethod = sigAlg
   		}
 
