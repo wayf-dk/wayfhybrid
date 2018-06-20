@@ -1465,7 +1465,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			return goxml.Wrap(err)
 		}
 
-  		if gosaml.DebugSetting(r, "ScopingError") != "" {
+  		if gosaml.DebugSetting(r, "scopingError") != "" {
   		    eppnPath := `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonPrincipalName"]/saml:AttributeValue`
   		    response.QueryDashP(nil, eppnPath, newresponse.Query1(nil, eppnPath)+"1", nil)
   		}
@@ -1495,7 +1495,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-  		if sigAlg := gosaml.DebugSetting(r, "SigAlg"); sigAlg != "" {
+  		if sigAlg := gosaml.DebugSetting(r, "sigAlg"); sigAlg != "" {
   		    signingMethod = sigAlg
   		}
 
@@ -1602,7 +1602,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
 		handleAttributeNameFormat(response, spMd)
 
-  		if sigAlg := gosaml.DebugSetting(r, "SigAlg"); sigAlg != "" {
+  		if sigAlg := gosaml.DebugSetting(r, "sigAlg"); sigAlg != "" {
   		    signingMethod = sigAlg
   		}
 
