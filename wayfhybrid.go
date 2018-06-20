@@ -1467,7 +1467,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
   		if gosaml.DebugSetting(r, "scopingError") != "" {
   		    eppnPath := `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonPrincipalName"]/saml:AttributeValue`
-  		    response.QueryDashP(nil, eppnPath, newresponse.Query1(nil, eppnPath)+"1", nil)
+  		    response.QueryDashP(nil, eppnPath, response.Query1(nil, eppnPath)+"1", nil)
   		}
 
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
