@@ -85,66 +85,79 @@
         </saml:AuthnStatement>
         <saml:AttributeStatement>
             <saml:Attribute Name="uid"
+                            FriendlyName="uid"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">madpe</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="mail"
+                            FriendlyName="mail"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">madpe@dtu.dk</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="gn"
+                            FriendlyName="gn"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">Mads Freek</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="sn"
+                            FriendlyName="sn"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">Petersen</saml:AttributeValue>
             </saml:Attribute>
-            <saml:Attribute Name="urn:oid:2.5.4.3"
+            <saml:Attribute Name="cn"
+                            FriendlyName="cn"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:uri"
                             >
                 <saml:AttributeValue xsi:type="xs:string">Mads Freek Petersen</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="preferredLanguage"
+                            FriendlyName="preferredLanguage"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">da-DK</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="organizationName"
+                            FriendlyName="organizationName"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">Danmarks Tekniske Universitet</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="eduPersonPrincipalName"
+                            FriendlyName="eduPersonPrincipalName"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">madpe@dtu.dk</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="eduPersonPrimaryAffiliation"
+                            FriendlyName="eduPersonPrimaryAffiliation"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">staff</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="eduPersonScopedAffiliation"
+                            FriendlyName="eduPersonScopedAffiliation"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">staff@just.testing.dtu.dk</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="schacPersonalUniqueID"
+                            FriendlyName="schacPersonalUniqueID"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">urn:mace:terena.org:schac:personalUniqueID:dk:CPR:2408588834</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="eduPersonAssurance"
+                            FriendlyName="eduPersonAssurance"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">2</saml:AttributeValue>
             </saml:Attribute>
             <saml:Attribute Name="eduPersonEntitlement"
+                            FriendlyName="eduPersonEntitlement"
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">urn:mace:terena.org:tcs:escience-user</saml:AttributeValue>
