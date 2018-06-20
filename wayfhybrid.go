@@ -392,15 +392,6 @@ func legacyStatJsonLog(rec map[string]string) {
 	log.Printf("%d %s\n", time.Now().UnixNano(), b)
 }
 
-func debugSetting(r *http.Request, name string) string {
-	cookie, err := r.Cookie("debug")
-	if err == nil {
-        vals,_ := url.ParseQuery(cookie.Value)
-        return vals.Get(name)
-    }
-    return ""
-}
-
 func prepareTables(attrs *goxml.Xp) {
 	basic2uri = make(map[string]attrName)
 	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
@@ -1404,7 +1395,7 @@ func eIdasExtras(idpMd, request *goxml.Xp) (algo string) {
 }
 
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
-	gosaml.DumpFile(response)
+	gosaml.DumpFile(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
 	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
 	if err != nil {
@@ -1498,7 +1489,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-  		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
+  		if sigAlg := gosaml.DebugSetting(r, "SigAlg"); sigAlg != "" {
   		    signingMethod = sigAlg
   		}
 
@@ -1513,12 +1504,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 
-  		if debugSetting(r, "signingError") == "1" {
+  		if gosaml.DebugSetting(r, "signingError") == "1" {
   		    newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
   		}
 
-		if debugSetting(r, "encryptAssertion") == "1" {
-	    	gosaml.DumpFile(newresponse)
+		if gosaml.DebugSetting(r, "encryptAssertion") == "1" {
+	    	gosaml.DumpFile(r, newresponse)
 		    cert := spMd.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
 		    _, publicKey, _ := gosaml.PublicKeyInfo(cert)
 		    ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
@@ -1542,7 +1533,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return goxml.Wrap(err)
 	}
-	gosaml.DumpFile(newresponse)
+	gosaml.DumpFile(r, newresponse)
 
 	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
@@ -1605,7 +1596,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
 		handleAttributeNameFormat(response, spMd)
 
-  		if sigAlg := debugSetting(r, "SigAlg"); sigAlg != "" {
+  		if sigAlg := gosaml.DebugSetting(r, "SigAlg"); sigAlg != "" {
   		    signingMethod = sigAlg
   		}
 
@@ -1616,12 +1607,12 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-  		if debugSetting(r, "signingError") == "1" {
+  		if gosaml.DebugSetting(r, "signingError") == "1" {
   		    response.QueryDashP(nil, `./saml:Assertion/saml:Issuer[2]`, "an extra fake issuer just to make the signature fail ...", nil)
   		}
 
-        if debugSetting(r, "encryptAssertion") == "1" {
-	    	gosaml.DumpFile(response)
+        if gosaml.DebugSetting(r, "encryptAssertion") == "1" {
+	    	gosaml.DumpFile(r, response)
 		    cert := spMd.Query1(nil, "./md:SPSSODescriptor" + gosaml.EncryptionCertQuery) // actual encryption key is always first
 		    _, publicKey, _ := gosaml.PublicKeyInfo(cert)
 		    ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
@@ -1637,7 +1628,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 
-	gosaml.DumpFile(response)
+	gosaml.DumpFile(r, response)
 	data := formdata{Acs: destination, Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: relayState}
 	postForm.Execute(w, data)
 	return
@@ -2030,7 +2021,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	// when consent as a service is ready - we will post to that
 	// acs := newresponse.Query1(nil, "@Destination")
 
-	gosaml.DumpFile(newresponse)
+	gosaml.DumpFile(r, newresponse)
 
 	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState}
 	postForm.Execute(w, data)
