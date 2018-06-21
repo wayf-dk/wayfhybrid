@@ -1348,6 +1348,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		}
 	}
 	algo := eIdasExtras(idpMd, newrequest)
+	algo = "sha256"
 	u, err := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", algo)
 	if err != nil {
 		return
