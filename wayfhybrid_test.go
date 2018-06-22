@@ -40,7 +40,7 @@ func printHashedDom(xp *goxml.Xp) {
 	hash := sha1.Sum([]byte(xp.C14n(nil, "")))
 	fmt.Println(base64.StdEncoding.EncodeToString(append(hash[:])))
 }
-
+/*
 func scopeCheckTest(scopes [][]string) {
 	for _, scope := range scopes {
 		response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
@@ -51,71 +51,66 @@ func scopeCheckTest(scopes [][]string) {
 				scopeList.QueryDashP(ext, `/shibmd:Scope[`+strconv.Itoa(i)+`]`, j, nil)
 			}
 			response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
+			response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonScopedAffiliation']/saml:AttributeValue`, scope[2], nil)
 		}
 		attrNode := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-		eppn, eppnForEptid, securitydomain, err := checkScope(response, scopeList, attrNode) // "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-		fmt.Println(eppn, eppnForEptid, securitydomain, err)
+		eppn, eppnForEptid, securitydomain, eppsas,err := checkScope(response, scopeList, attrNode, true) // "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+		fmt.Println(eppn, eppnForEptid, securitydomain, eppsas, err)
+	}
+}*/
+
+func scopeCheckTest(scopes [][]string, reqEppn bool) {
+	for _, scope := range scopes {
+		response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+		scopeList := goxml.NewXpFromFile("testdata/scope.xml")
+		ext := scopeList.Query(nil, "//md:EntityDescriptor/md:Extensions")[1]
+		exttest := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+		scopeList.QueryDashP(ext, `/shibmd:Scope`, scope[1], nil)
+		if (scope[0] == " "){
+		    response.QueryDashP(exttest, `/saml:Attribute[@FriendlyName='eduPersonPrincipalName']`, "\x1b", nil)
+		} else {
+            response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
+        }
+		for i, j := range scope[2:] {
+		    response.QueryDashP(exttest, `/saml:Attribute[@FriendlyName='eduPersonScopedAffiliation']/saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, j, nil)
+		}
+
+		attrNode := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
+		eppn, eppnForEptid, securitydomain, eppsas,err := checkScope(response, scopeList, attrNode, reqEppn) // "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+		fmt.Println(eppn, eppnForEptid, securitydomain, eppsas, err)
 	}
 }
 
 func ExampleCheckScope() {
-	scopes := [][]string{
-		{"mekhan@dtu.dk", "dtu.dk", "sdu.dk", "ku.dk"},
-		{"mekhan@student.aau.dk@aau.dk", "dtu.dk", "sdu.dk", "ku.dk", "student.aau.dk@aau.dk"},
-		{"mekhan@nu.edu.dk", "aau.dk", "sdu.dk"},
-		{"mh@kmduni.dans.kmd.dk", "kmduni.dans.kmd.dk", "sdu.dk"},
-		{"mh@kmduni.dans.kmd.dk", "dans.kmd.dk", "sdu.dk"},
-		{"mh@nybuni.dans.kmd.dk", "ku.dk", "sdu.dk", "nybuni.dans.kmd.dk"},
-		{"mh@dansidp-test2.stads.dk", "dansidp-test2.stads.dk", "sdu.dk", "ruc.dk"},
-		{"mh@dansidp-qa3.stads.dk", "ku.dk", "sdu.dk", "dansidp-qa3.stads.dk"},
-		{"mh@cphbusiness.dk", "cphbusiness.dk", "dtu.dk", "dansidp-test2.stads.dk"},
-		{"mh@cphbusiness.dk", "cph.dk", "dtu.dk", "dansidp-test2.stads.dk"},
-		{"mh@handelsskolen.com", "handelsskolen.com", "sdu.dk", "dansidp-test2.stads.dk"},
-		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "sdu.dk", "handelsskolen.com"},
-		{"mh@sikker-adgang.dk", "sikker.dk", "sdu.dk", "handelsskolen.com"},
-		{"mh@handelsskolen.com", "handelsskolen.com", "sdu.dk"},
-		{"mh@orphanage.wayf.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk"},
-		{"mh@plan.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
-		{"mh@plan.aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk"},
-		{"mekhan@student.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
-		{"mh@hst.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk"},
-		{"mh@hst.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
-		{"mh@adm.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "adm.aau.dk@aau.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "create.aau.dk@aau.dk"},
-		{"mh@create.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "create.aau.dk@aau.dk"},
-		{"mh@civil.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "civil.aau.dk@aau.dk"},
-		{"mh@civil.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "mk.aau.dk@aau.dk"},
-		{"mh@aub.aau.dk@aau.dk", "sikker-adgang.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk", "hst.aau.dk@aau.dk", "aub.aau.dk@aau.dk"},
-		{" ", "dtu.dk", "sdu.dk", "ku.dk"},
+    scopesEppn := [][]string{
+		{"mekhan@aau.dk", "aau.dk", "staff@aau.dk", "staff@zzz.aau.dk", "staff@xxx.aau.dk"},
+		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "staff@adgang.dk"},
+		{" ", "dtu.dk", "staff@aau.dk"},
 	}
-	scopeCheckTest(scopes)
+    scopeCheckTest(scopesEppn, true)
+
+	scopes := [][]string{
+	    {"mekhan@aau.dk", "dtu.dk", "staff@aau.dk", "staff@zzz.aau.dk", "staff@xxx.aau.dk"},
+		{"mekhan@aau.dk", "aau.dk", "staff@aau.dk", "staff@zzz.aau.dk", "staff@xxx.aau.dk"},
+		{"mh@kmduni.dans.kmd.dk", "kmduni.dans.kmd.dk", "staff@kmduni.dans.kmd.dk"},
+		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "sdu.dk", "staff@sikker-adgang.dk"},
+		{"mekhan@student.aau.dk@aau.dk", "student.aau.dk@aau.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
+		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "staff@adgang.dk"},
+	    {" ", "dtu.dk", "staff@aau.dk"},
+	}
+	scopeCheckTest(scopes, false)
 	// Output:
-	// mekhan@dtu.dk mekhan@dtu.dk dtu.dk <nil>
-	// mekhan@student.aau.dk@aau.dk mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'student.aau.dk@aau.dk' as a domain suffix
-	// mekhan@nu.edu.dk mekhan@nu.edu.dk nu.edu.dk security domain 'nu.edu.dk' does not match any scopes
-	// mh@kmduni.dans.kmd.dk mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'kmduni.dans.kmd.dk' as a domain suffix
-	// mh@kmduni.dans.kmd.dk mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk security domain 'kmduni.dans.kmd.dk' does not match any scopes
-	// mh@nybuni.dans.kmd.dk mh@nybuni.dans.kmd.dk nybuni.dans.kmd.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'nybuni.dans.kmd.dk' as a domain suffix
-	// mh@dansidp-test2.stads.dk mh@dansidp-test2.stads.dk dansidp-test2.stads.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'dansidp-test2.stads.dk' as a domain suffix
-	// mh@dansidp-qa3.stads.dk mh@dansidp-qa3.stads.dk dansidp-qa3.stads.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'dansidp-qa3.stads.dk' as a domain suffix
-	// mh@cphbusiness.dk mh@cphbusiness.dk cphbusiness.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'cphbusiness.dk' as a domain suffix
-	// mh@cphbusiness.dk mh@cphbusiness.dk cphbusiness.dk security domain 'cphbusiness.dk' does not match any scopes
-	// mh@handelsskolen.com mh@handelsskolen.com handelsskolen.com eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'handelsskolen.com' as a domain suffix
-	// mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'sikker-adgang.dk' as a domain suffix
-	// mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk security domain 'sikker-adgang.dk' does not match any scopes
-	// mh@handelsskolen.com mh@handelsskolen.com handelsskolen.com eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'handelsskolen.com' as a domain suffix
-	// mh@orphanage.wayf.dk mh@orphanage.wayf.dk orphanage.wayf.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'orphanage.wayf.dk' as a domain suffix
-	// mh@plan.aau.dk@aau.dk mh@plan.aau.dk@aau.dk plan.aau.dk@aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'plan.aau.dk@aau.dk' as a domain suffix
-	// mh@plan.aau.dk mh@plan.aau.dk@aau.dk plan.aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'plan.aau.dk' as a domain suffix
-	// mekhan@student.aau.dk@aau.dk mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk security domain 'student.aau.dk@aau.dk' does not match any scopes
-	// mh@hst.aau.dk@aau.dk mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'hst.aau.dk@aau.dk' as a domain suffix
-	// mh@hst.aau.dk@aau.dk mh@hst.aau.dk@aau.dk hst.aau.dk@aau.dk security domain 'hst.aau.dk@aau.dk' does not match any scopes
-	// mh@adm.aau.dk@aau.dk mh@adm.aau.dk@aau.dk adm.aau.dk@aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'adm.aau.dk@aau.dk' as a domain suffix
-	// mh@create.aau.dk@aau.dk mh@create.aau.dk@aau.dk create.aau.dk@aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'create.aau.dk@aau.dk' as a domain suffix
-	// mh@civil.aau.dk@aau.dk mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'civil.aau.dk@aau.dk' as a domain suffix
-	// mh@civil.aau.dk@aau.dk mh@civil.aau.dk@aau.dk civil.aau.dk@aau.dk security domain 'civil.aau.dk@aau.dk' does not match any scopes
-	// mh@aub.aau.dk@aau.dk mh@aub.aau.dk@aau.dk aub.aau.dk@aau.dk eduPersonScopedAffiliation: staff@just.testing.dtu.dk has not 'aub.aau.dk@aau.dk' as a domain suffix
-	//    not a scoped value:
-}
+    // mekhan@aau.dk mekhan@aau.dk aau.dk [staff@aau.dk staff@zzz.aau.dk staff@xxx.aau.dk] <nil>
+    // mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk [staff@adgang.dk] eduPersonScopedAffiliation: staff@adgang.dk has not 'sikker-adgang.dk' as security sub domain
+    //    [staff@aau.dk] Mandatory 'eduPersonPrincipalName' attribute missing
+    // mekhan@aau.dk mekhan@aau.dk aau.dk [staff@aau.dk staff@zzz.aau.dk staff@xxx.aau.dk] security domain 'aau.dk' does not match any scopes
+    // mekhan@aau.dk mekhan@aau.dk aau.dk [staff@aau.dk staff@zzz.aau.dk staff@xxx.aau.dk] eduPersonScopedAffiliation: staff@zzz.aau.dk has not 'aau.dk' as security domain
+    // mh@kmduni.dans.kmd.dk mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk [staff@kmduni.dans.kmd.dk] <nil>
+    // mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk [sdu.dk staff@sikker-adgang.dk] eduPersonScopedAffiliation: sdu.dk does not end with a domain
+    // mekhan@student.aau.dk@aau.dk mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk [sdu.dk orphanage.wayf.dk plan.aau.dk@aau.dk] eduPersonScopedAffiliation: sdu.dk does not end with a domain
+    // mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk [staff@adgang.dk] eduPersonScopedAffiliation: staff@adgang.dk has not 'sikker-adgang.dk' as security domain
+    //   aau.dk [staff@aau.dk] security domain 'aau.dk' does not match any scopes
+    }
 
 /**
   ExampleNewMetadata tests that the lock preventing race conditions when
