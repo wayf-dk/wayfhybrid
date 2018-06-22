@@ -1913,13 +1913,13 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 			err = fmt.Errorf("not a scoped value: %s", eppn)
 			return
 		}
-		securityDomain = matches[1] + matches[2] // rm matches[2] when @aau.dk goes away
-        if matches[2] == "" && aauscope.MatchString(matches[1]) { // legacy support for old @aau.dk scopes for persistent nameid and eptid
-            eppnForEptid += "@aau.dk"
-        }
-    case requireEppn:
-		    err = fmt.Errorf("Mandatory 'eduPersonPrincipalName' attribute missing")
-		    return
+		securityDomain = matches[1] + matches[2]                  // rm matches[2] when @aau.dk goes away
+		if matches[2] == "" && aauscope.MatchString(matches[1]) { // legacy support for old @aau.dk scopes for persistent nameid and eptid
+			eppnForEptid += "@aau.dk"
+		}
+	case requireEppn:
+		err = fmt.Errorf("Mandatory 'eduPersonPrincipalName' attribute missing")
+		return
 	case l == 0: // try to get a security domain from a epsa value
 		if len(eppsas) > 0 {
 			matches := scoped.FindStringSubmatch(eppsas[0])
@@ -1941,7 +1941,6 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 	}
 
 	subSecurityDomain := "." + securityDomain
-
 	for _, eppsa := range eppsas {
 		eppsaparts := scoped.FindStringSubmatch(eppsa)
 		if len(eppsaparts) != 3 {
@@ -1949,9 +1948,17 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 			return
 		}
 		domain := eppsaparts[1] + eppsaparts[2]
-		if domain != securityDomain || (requireEppn && !strings.HasSuffix(domain, subSecurityDomain)) {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as a domain suffix", eppsa, securityDomain)
-			return
+		if requireEppn {
+			if domain != securityDomain && !strings.HasSuffix(domain, subSecurityDomain) {
+				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security sub domain", eppsa, securityDomain)
+				return
+
+			}
+		} else {
+			if domain != securityDomain {
+				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security domain", eppsa, securityDomain)
+				return
+			}
 		}
 	}
 	return
