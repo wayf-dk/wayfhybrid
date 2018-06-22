@@ -1347,8 +1347,17 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 			return
 		}
 	}
-	algo := eIdasExtras(idpMd, newrequest)
-	algo = "sha256"
+
+	algo := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+
+    if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
+        algo = sigAlg
+    }
+
+	if idpMd.Query1(nil, "@entityID") == "https://eidasconnector.test.eid.digst.dk/idp" {
+        eIdasExtras(newrequest)
+    }
+
 	u, err := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", algo)
 	if err != nil {
 		return
@@ -1374,28 +1383,25 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	return
 }
 
-func eIdasExtras(idpMd, request *goxml.Xp) (algo string) {
-	if idpMd.Query1(nil, "@entityID") == "https://eidasconnector.test.eid.digst.dk/idp" {
-		request.QueryDashP(nil, "@ForceAuthn", "true", nil)
-		request.QueryDashP(nil, "@IsPassive", "false", nil)
-		request.Rm(nil, "@ProtocolBinding")
-		request.Rm(nil, "@AssertionConsumerServiceURL")
-		//        nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
-		//        extensions := request.QueryDashP(nil, "./samlp:Extensions", "", nameIDPolicyNode)
-		//        request.QueryDashP(extensions, "./eidas:SPType", "public", nil)
-		//        ras := request.QueryDashP(extensions, "./eidas:RequestedAttributes", "", nil)
-		//        for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
-		//            ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
-		//            request.QueryDashP(ra, "./@FriendlyName", n, nil)
-		//            request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:"+n, nil)
-		//            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
-		//            request.QueryDashP(ra, "@isRequired", "true", nil)
-		//        }
-		request.Rm(nil, "./samlp:NameIDPolicy")
-		//request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
-		request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
-		algo = "sha256"
-	}
+func eIdasExtras(request *goxml.Xp) {
+    request.QueryDashP(nil, "@ForceAuthn", "true", nil)
+    request.QueryDashP(nil, "@IsPassive", "false", nil)
+    request.Rm(nil, "@ProtocolBinding")
+    request.Rm(nil, "@AssertionConsumerServiceURL")
+    //        nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
+    //        extensions := request.QueryDashP(nil, "./samlp:Extensions", "", nameIDPolicyNode)
+    //        request.QueryDashP(extensions, "./eidas:SPType", "public", nil)
+    //        ras := request.QueryDashP(extensions, "./eidas:RequestedAttributes", "", nil)
+    //        for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
+    //            ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
+    //            request.QueryDashP(ra, "./@FriendlyName", n, nil)
+    //            request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:"+n, nil)
+    //            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
+    //            request.QueryDashP(ra, "@isRequired", "true", nil)
+    //        }
+    request.Rm(nil, "./samlp:NameIDPolicy")
+    //request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
+    request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
 	return
 }
 
@@ -1500,7 +1506,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		if sigAlg := gosaml.DebugSetting(r, "sigAlg"); sigAlg != "" {
+		if sigAlg := gosaml.DebugSetting(r, "spSigAlg"); sigAlg != "" {
 			signingMethod = sigAlg
 		}
 
