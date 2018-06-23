@@ -231,7 +231,7 @@ func Main() {
 	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
 
 	str, err := refreshAllMetadataFeeds()
-	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+	log.Printf("refreshAllMetadataFeedsx: %s %s\n", str, err)
 
 	for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
 		err := md.(*lMDQ.MDQ).Open()
