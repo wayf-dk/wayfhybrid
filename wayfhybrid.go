@@ -158,7 +158,7 @@ var (
 	remap = map[string]idpsppair{
 		"https://nemlogin.wayf.dk":                     {"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
 		"https://eidasconnector.test.eid.digst.dk/idp": {"https://eidasconnector.test.eid.digst.dk/idp", "https://saml.eidas.wayf.dk"},
-		"https://orphanage2.wayf.dk": idpsppair{"https://orphanage.wayf.dk", "https://wayf.wayf.dk"},
+		"https://orphanage2.wayf.dk": idpsppair{"http://fs4.supportcenter.dk/adfs/services/trust", "https://wayf.wayf.dk"},
 	}
 
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
