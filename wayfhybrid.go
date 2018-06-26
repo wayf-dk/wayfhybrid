@@ -633,7 +633,6 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	q.Q(r)
 	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, false, strings.Split(r.Form.Get("idplist"), ","))
 	return err
 }
@@ -1285,7 +1284,6 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	idp = debify.ReplaceAllString(idp, "$1$2")
-q.Q(remap, idp)
 	if rm, ok := remap[idp]; ok {
 		idpMd, err = Md.Internal.MDQ(rm.Idp)
 		if err != nil {
