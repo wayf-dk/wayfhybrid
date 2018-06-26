@@ -40,24 +40,6 @@ func printHashedDom(xp *goxml.Xp) {
 	hash := sha1.Sum([]byte(xp.C14n(nil, "")))
 	fmt.Println(base64.StdEncoding.EncodeToString(append(hash[:])))
 }
-/*
-func scopeCheckTest(scopes [][]string) {
-	for _, scope := range scopes {
-		response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-		scopeList := goxml.NewXpFromFile("testdata/scope.xml")
-		ext := scopeList.Query(nil, "//md:EntityDescriptor/md:Extensions")[1]
-		for i, j := range scope {
-			if i > 0 {
-				scopeList.QueryDashP(ext, `/shibmd:Scope[`+strconv.Itoa(i)+`]`, j, nil)
-			}
-			response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
-			response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonScopedAffiliation']/saml:AttributeValue`, scope[2], nil)
-		}
-		attrNode := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-		eppn, eppnForEptid, securitydomain, eppsas,err := checkScope(response, scopeList, attrNode, true) // "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
-		fmt.Println(eppn, eppnForEptid, securitydomain, eppsas, err)
-	}
-}*/
 
 func scopeCheckTest(scopes [][]string, reqEppn bool) {
 	for _, scope := range scopes {
@@ -66,7 +48,12 @@ func scopeCheckTest(scopes [][]string, reqEppn bool) {
 		ext := scopeList.Query(nil, "//md:EntityDescriptor/md:Extensions")[1]
 		exttest := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
 		scopeList.QueryDashP(ext, `/shibmd:Scope`, scope[1], nil)
-        response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
+
+        if scope[0] == "\x1b" {     // Testing the case by removing eppn
+			response.QueryDashP(exttest, `/saml:Attribute[@FriendlyName='eduPersonPrincipalName']`, "\x1b", nil)
+		} else {
+			response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
+		}
 		for i, j := range scope[2:] {
 		    response.QueryDashP(exttest, `/saml:Attribute[@FriendlyName='eduPersonScopedAffiliation']/saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, j, nil)
 		}
