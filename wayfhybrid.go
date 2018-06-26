@@ -81,7 +81,7 @@ type (
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
 		SpBackendTenants                                                                         map[string]struct{ EntityID, Secret string }
-		IdPRemap                                                                                 map[string]struct{ Idp, Sp string }
+		IdPRemap                                                                                 map[string]struct{ IdP, SP string }
 	}
 
 	logWriter struct {
@@ -1277,11 +1277,11 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	idp = debify.ReplaceAllString(idp, "$1$2")
 
 	if rm, ok := config.IdPRemap[idp]; ok {
-		idpMd, err = Md.Internal.MDQ(rm.Idp)
+		idpMd, err = Md.Internal.MDQ(rm.IdP)
 		if err != nil {
 			return
 		}
-		hubMd, err = Md.Hub.MDQ(rm.Sp)
+		hubMd, err = Md.Hub.MDQ(rm.SP)
 		if err != nil {
 			return
 		}
