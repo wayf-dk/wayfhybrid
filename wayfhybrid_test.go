@@ -66,11 +66,7 @@ func scopeCheckTest(scopes [][]string, reqEppn bool) {
 		ext := scopeList.Query(nil, "//md:EntityDescriptor/md:Extensions")[1]
 		exttest := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
 		scopeList.QueryDashP(ext, `/shibmd:Scope`, scope[1], nil)
-		if (scope[0] == ""){
-		    response.QueryDashP(exttest, `/saml:Attribute[@FriendlyName='eduPersonPrincipalName']`, "\x1b", nil)
-		} else {
-            response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
-        }
+        response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]/saml:Attribute[@FriendlyName='eduPersonPrincipalName']/saml:AttributeValue`, scope[0], nil)
 		for i, j := range scope[2:] {
 		    response.QueryDashP(exttest, `/saml:Attribute[@FriendlyName='eduPersonScopedAffiliation']/saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, j, nil)
 		}
@@ -85,7 +81,7 @@ func ExampleCheckScope() {
     scopesEppn := [][]string{
 		{"mekhan@aau.dk", "aau.dk", "staff@aau.dk", "staff@zzz.aau.dk", "staff@xxx.aau.dk"},
 		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "staff@adgang.dk"},
-		{"", "dtu.dk", "staff@aau.dk"},
+		{"\x1b", "dtu.dk", "staff@aau.dk"},
 	}
     scopeCheckTest(scopesEppn, true)
 
@@ -96,9 +92,9 @@ func ExampleCheckScope() {
 		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "sdu.dk", "staff@sikker-adgang.dk"},
 		{"mekhan@student.aau.dk@aau.dk", "student.aau.dk@aau.dk", "sdu.dk", "orphanage.wayf.dk", "plan.aau.dk@aau.dk"},
 		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "staff@adgang.dk"},
-	    {"", "aau.dk", "staff@aau.dk"},
-	    {"", "aau.dk", "staff@aau.dk", "member@aau.dk"},
-	    {"", "dtu.dk", "staff@aau.dk"},
+	    {"\x1b", "aau.dk", "staff@aau.dk"},
+	    {"\x1b", "aau.dk", "staff@aau.dk", "member@aau.dk"},
+	    {"\x1b", "dtu.dk", "staff@aau.dk"},
 	}
 	scopeCheckTest(scopes, false)
 	// Output:
