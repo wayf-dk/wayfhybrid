@@ -1275,7 +1275,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	idp = debify.ReplaceAllString(idp, "$1$2")
-
+q.Q(config.IdPRemap, idp)
 	if rm, ok := config.IdPRemap[idp]; ok {
 		idpMd, err = Md.Internal.MDQ(rm.IdP)
 		if err != nil {
