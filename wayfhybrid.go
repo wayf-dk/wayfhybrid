@@ -81,11 +81,7 @@ type (
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
 		SpBackendTenants                                                                         map[string]struct{ EntityID, Secret string }
-	}
-
-	idpsppair struct {
-		idp string
-		sp  string
+		IdPRemap                                                                                 map[string]struct{ Idp, Sp string }
 	}
 
 	logWriter struct {
@@ -154,12 +150,6 @@ var (
 	_ = fmt.Printf
 
 	config = wayfHybridConfig{Path: "/opt/wayf/"}
-
-	remap = map[string]idpsppair{
-		"https://nemlogin.wayf.dk":                     {"https://saml.nemlog-in.dk", "https://saml.nemlogin.wayf.dk"},
-		"https://eidasconnector.test.eid.digst.dk/idp": {"https://eidasconnector.test.eid.digst.dk/idp", "https://saml.eidas.wayf.dk"},
-		"https://orphanage2.wayf.dk": idpsppair{"http://fs4.supportcenter.dk/adfs/services/trust", "https://wayf.wayf.dk"},
-	}
 
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
 	debify        = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
@@ -1286,12 +1276,12 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	idp = debify.ReplaceAllString(idp, "$1$2")
 
-	if rm, ok := remap[idp]; ok {
-		idpMd, err = Md.Internal.MDQ(rm.idp)
+	if rm, ok := config.IdPRemap[idp]; ok {
+		idpMd, err = Md.Internal.MDQ(rm.Idp)
 		if err != nil {
 			return
 		}
-		hubMd, err = Md.Hub.MDQ(rm.sp)
+		hubMd, err = Md.Hub.MDQ(rm.Sp)
 		if err != nil {
 			return
 		}
