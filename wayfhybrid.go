@@ -81,7 +81,7 @@ type (
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
 		SpBackendTenants                                                                         map[string]struct{ EntityID, Secret string }
-		IdpRemapSource                                                                           []struct{ Key, IdP, Sp string }
+		IdpRemapSource                                                                           []struct{ Key, Idp, Sp string }
 	}
 
 	idpsppair struct {
@@ -215,7 +215,7 @@ func Main() {
 	}
 
     for _, r := range config.IdpRemapSource { // toml does not allow arbitrary chars in keys for mapss
-        remap[r.Key] = idpsppair{Idp: r.IdP, Sp: r.Sp}
+        remap[r.Key] = idpsppair{Idp: r.Idp, Sp: r.Sp}
     }
 
 	metadataUpdateGuard = make(chan int, 1)
