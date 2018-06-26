@@ -81,7 +81,12 @@ type (
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
 		SpBackendTenants                                                                         map[string]struct{ EntityID, Secret string }
-		IdPRemap                                                                                 map[string]struct{ Idp, Sx string }
+		IdpRemapSource                                                                           []struct{ Key, IdP, Sp string }
+	}
+
+	idpsppair struct {
+		Idp string
+		Sp  string
 	}
 
 	logWriter struct {
@@ -150,6 +155,7 @@ var (
 	_ = fmt.Printf
 
 	config = wayfHybridConfig{Path: "/opt/wayf/"}
+    remap = map[string]idpsppair{}
 
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
 	debify        = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
@@ -207,6 +213,10 @@ func Main() {
 			"GOELEVEN_MAXSESSIONS":   c.Maxsessions,
 		})
 	}
+
+    for _, r := range config.IdpRemapSource { // toml does not allow arbitrary chars in keys for mapss
+        remap[r.Key] = idpsppair{Idp: r.IdP, Sp: r.Sp}
+    }
 
 	metadataUpdateGuard = make(chan int, 1)
 	postForm = template.Must(template.New("PostForm").Parse(config.PostFormTemplate))
@@ -1275,14 +1285,13 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	idp = debify.ReplaceAllString(idp, "$1$2")
-q.Q(config.SpBackendTenants)
-q.Q(config.IdPRemap, idp)
-	if rm, ok := config.IdPRemap[idp]; ok {
+q.Q(remap, idp)
+	if rm, ok := remap[idp]; ok {
 		idpMd, err = Md.Internal.MDQ(rm.Idp)
 		if err != nil {
 			return
 		}
-		hubMd, err = Md.Hub.MDQ(rm.Sx)
+		hubMd, err = Md.Hub.MDQ(rm.Sp)
 		if err != nil {
 			return
 		}
