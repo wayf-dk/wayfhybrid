@@ -903,7 +903,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
-	eppn, eppnForEptid, securitydomain, epsaList, err := checkScope(response, idpMd, destinationAttributes, true)
+	eppn, eppnForEptid, securitydomain, eppsaList, err := checkScope(response, idpMd, destinationAttributes, true)
 	if err != nil {
 		return
 	}
@@ -959,42 +959,42 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		}
 	}
 
-	epsas := make(map[string]bool)
+	eppsas := make(map[string]bool)
 	// scopes are checked for legality above
-	for _, epsa := range epsaList {
-		epsas[epsa] = true
+	for _, eppsa := range eppsaList {
+		eppsas[eppsa] = true
 	}
 
 	// primaryaffiliation => affiliation
 	eppa := response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonPrimaryAffiliation"]/saml:AttributeValue`)
-	epas := response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue`)
-	epaset := make(map[string]bool)
-	for _, epa := range epas {
-		epaset[epa] = true
+	eppas := response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue`)
+	eppaset := make(map[string]bool)
+	for _, eppa := range eppas {
+		eppaset[eppa] = true
 	}
-	if !epaset[eppa] {
-		epaset[eppa] = true
+	if !eppaset[eppa] && eppa != "" {
+		eppaset[eppa] = true
 	}
 	// 'student', 'faculty', 'staff', 'employee' => member
-	if epaset["student"] || epaset["faculty"] || epaset["staff"] || epaset["employee"] {
-		epaset["member"] = true
+	if eppaset["student"] || eppaset["faculty"] || eppaset["staff"] || eppaset["employee"] {
+		eppaset["member"] = true
 	}
 
 	i := 1
-	for epa := range epaset {
+	for eppa := range eppaset {
 		name := hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]/@Name`)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@Name`, name, nil)
-		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, epa, nil)
+		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i+1)+`]`, eppa, nil)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
 	}
 	i = 1
-	for epa := range epaset {
-		if epsas[epa] {
+	for eppa := range eppaset {
+		if eppsas[eppa] {
 			continue
 		}
 		name := hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`, name, nil)
-		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i)+`]`, epa+"@"+securitydomain, nil)
+		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i)+`]`, eppa+"@"+securitydomain, nil)
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
 		i += 1
 	}
@@ -1941,7 +1941,6 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 		err = fmt.Errorf("More than one 'eduPersonPrincipalName' value")
 		return
 	}
-q.Q(md.PP(), securityDomain)
 
 	scope := md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securityDomain)+"]")
 	if len(scope) == 0 {
