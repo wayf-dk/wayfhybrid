@@ -1453,18 +1453,21 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
-q.Q(sRequest)
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
-	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
-	issuerMd := birkMd
-	if err != nil {
-		birkMd = idpMd
-		issuerMd, err = Md.Hub.MDQ(config.HubEntityID)
-	}
+	birkMd := idpMd
+	issuerMd, err := Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
 		return
 	}
+
+    if sRequest.Brk {
+    	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
+        if err != nil {
+            return
+        }
+    	issuerMd := birkMd
+    }
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
