@@ -19,7 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net/http"
+	//"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -154,7 +154,6 @@ func Wrap(err error, ctx ...string) error {
 		werr.Cause = err
 		return Wrap(werr, ctx...)
 	}
-	return err
 }
 
 func PublicError(e Werror, ctx ...string) error {
@@ -969,10 +968,10 @@ func callHSM(function string, data []byte, privatekey, mech, digest string) (res
 		Sharedkey string `json:"sharedkey"`
 	}
 
-	var response struct {
+	/*	var response struct {
 		Signed []byte `json:"signed"`
 	}
-
+	*/
 	parts := strings.SplitN(strings.TrimSpace(privatekey), ":", 3)
 
 	//	payload := request{
@@ -985,7 +984,7 @@ func callHSM(function string, data []byte, privatekey, mech, digest string) (res
 	}
 
 	return goeleven.Dispatch(parts[2], payload)
-
+	/*
 	jsontxt, err := json.Marshal(payload)
 	if err != nil {
 		return nil, Wrap(err)
@@ -1003,6 +1002,7 @@ func callHSM(function string, data []byte, privatekey, mech, digest string) (res
 		return nil, Wrap(err)
 	}
 	return response.Signed, err
+	*/
 }
 
 /*
