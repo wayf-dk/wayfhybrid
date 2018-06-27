@@ -1445,7 +1445,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, idpMd, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub, "https://"+r.Host+r.URL.Path)
+	response, _, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -1453,20 +1453,21 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
+
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
-	birkMd := idpMd
+    birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
+	if err != nil {
+		return
+	}
+
 	issuerMd, err := Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
 		return
 	}
 
     if sRequest.Brk {
-    	birkMd, err = Md.ExternalIdP.MDQ(sRequest.De)
-        if err != nil {
-            return
-        }
-    	issuerMd = birkMd
+        issuerMd = birkMd
     }
 
 	var newresponse *goxml.Xp
