@@ -1464,7 +1464,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
     if sRequest.Brk {
     	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
         if err != nil {
-            return
+            return err
         }
     	issuerMd := birkMd
     }
