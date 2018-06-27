@@ -1230,7 +1230,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, sp2, relayState, "SSO-", "", config.Domain, true, false, nil)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp2, relayState, "SSO-", "", config.Domain, true, false, nil)
 		return err
 	}
 	return
