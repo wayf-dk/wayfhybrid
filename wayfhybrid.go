@@ -1453,7 +1453,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
-
+q.Q(sRequest)
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
 	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
@@ -1937,6 +1937,7 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 		err = fmt.Errorf("More than one 'eduPersonPrincipalName' value")
 		return
 	}
+q.Q(md.PP(), securitydDomain)
 
 	scope := md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securityDomain)+"]")
 	if len(scope) == 0 {
