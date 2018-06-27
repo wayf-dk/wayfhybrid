@@ -1462,11 +1462,11 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
     if sRequest.Brk {
-    	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
+    	birkMd, err = Md.ExternalIdP.MDQ(sRequest.De)
         if err != nil {
-            return err
+            return
         }
-    	issuerMd := birkMd
+    	issuerMd = birkMd
     }
 
 	var newresponse *goxml.Xp
