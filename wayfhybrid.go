@@ -1937,7 +1937,7 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 		err = fmt.Errorf("More than one 'eduPersonPrincipalName' value")
 		return
 	}
-q.Q(md.PP(), securitydDomain)
+q.Q(md.PP(), securityDomain)
 
 	scope := md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securityDomain)+"]")
 	if len(scope) == 0 {
