@@ -182,12 +182,12 @@ func ExampleCheckCprCentury() {
 
 func ExampleWayfAttributeHandler() {
 	sourceResponse := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
-	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
-	hub_md := goxml.NewXpFromFile("testdata/hub_md.xml")
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-	prepareTables(hub_md)
+	idpMd := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	hubMd := goxml.NewXpFromFile("testdata/hub_md.xml")
+	spMd := goxml.NewXpFromFile("testdata/sp_md.xml")
+	prepareTables(hubMd)
 
-	WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, sourceResponse, false)
+	WayfACSServiceHandler(idpMd, hubMd, spMd, nil, sourceResponse, false)
 	gosaml.AttributeCanonicalDump(os.Stdout, sourceResponse)
 
 	// Output:
@@ -235,12 +235,12 @@ func ExampleWayfAttributeHandler() {
 
 func ExampleNemLoginAttributeHandler() {
 	nemloginResponse := goxml.NewXpFromFile("testdata/nemloginresponse.xml")
-	idp_md := goxml.NewXpFromFile("testdata/idp_md_nemlogin.xml")
-	hub_md := goxml.NewXpFromFile("testdata/hub_md.xml")
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-	prepareTables(hub_md)
+	idpMd := goxml.NewXpFromFile("testdata/idp_md_nemlogin.xml")
+	hubMd := goxml.NewXpFromFile("testdata/hub_md.xml")
+	spMd := goxml.NewXpFromFile("testdata/sp_md.xml")
+	prepareTables(hubMd)
 
-	WayfACSServiceHandler(idp_md, hub_md, sp_md, nil, nemloginResponse, false)
+	WayfACSServiceHandler(idpMd, hubMd, spMd, nil, nemloginResponse, false)
 
 	gosaml.AttributeCanonicalDump(os.Stdout, nemloginResponse)
 	// Output:
@@ -308,19 +308,19 @@ func ExampleSamlError() {
 }
 
 func ExampleCheckForCommonFederations() {
-	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-	err := checkForCommonFederations(idp_md, sp_md)
+	idpMd := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	spMd := goxml.NewXpFromFile("testdata/sp_md.xml")
+	err := checkForCommonFederations(idpMd, spMd)
 	fmt.Println(err)
 	// Output:
 	// <nil>
 }
 
 func ExampleNoCommonFederations() {
-	idp_md := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
-	sp_md.QueryDashP(nil, "./md:Extensions/wayf:wayf/wayf:feds", "ExampleFed", nil)
-	err := checkForCommonFederations(idp_md, sp_md)
+	idpMd := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	spMd := goxml.NewXpFromFile("testdata/sp_md.xml")
+	spMd.QueryDashP(nil, "./md:Extensions/wayf:wayf/wayf:feds", "ExampleFed", nil)
+	err := checkForCommonFederations(idpMd, spMd)
 	fmt.Println(err)
 	// Output:
 	// no common federations
@@ -337,11 +337,11 @@ func ExampleSetAttribute() {
 }
 
 func ExampleHandleAttributeNameFormat() {
-	sp_md := goxml.NewXpFromFile("testdata/sp_md.xml")
+	spMd := goxml.NewXpFromFile("testdata/sp_md.xml")
 	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	requestedAttr := goxml.NewXpFromFile("testdata/requestedattr.xml")
 	prepareTables(requestedAttr)
-	handleAttributeNameFormat(response, sp_md)
+	handleAttributeNameFormat(response, spMd)
 	// Output:
 	//
 }
