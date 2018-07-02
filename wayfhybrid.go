@@ -1512,7 +1512,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			signingMethod = sigAlg
 		}
 
-		for _, q := range config.ElementsToSign {
+        elementsToSign := config.ElementsToSign
+        if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+            elementsToSign = []string{"/samlp:Response"}
+        }
+
+		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
 			if err != nil {
 				return err
@@ -1616,7 +1621,12 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 			signingMethod = sigAlg
 		}
 
-		for _, q := range config.ElementsToSign {
+        elementsToSign := config.ElementsToSign
+        if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+            elementsToSign = []string{"/samlp:Response"}
+        }
+
+		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(response, q, hubMd, signingMethod, gosaml.SAMLSign)
 			if err != nil {
 				return err
@@ -2043,7 +2053,12 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
 		}
 
-		for _, q := range config.ElementsToSign {
+        elementsToSign := config.ElementsToSign
+        if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+            elementsToSign = []string{"/samlp:Response"}
+        }
+
+		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
 			if err != nil {
 				return err
