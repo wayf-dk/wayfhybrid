@@ -1223,7 +1223,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			if err != nil {
 				return err
 			}
-			sp2 = config.HubEntityID
 		}
 
 		if err = checkForCommonFederations(spMd, idp2Md); err != nil {
@@ -1799,6 +1798,9 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		data, err := session.Get(w, r, key, sloInfoCookie)
 		if err == nil {
 			err = json.Unmarshal(data, &sloinfo)
+			if err != nil {
+				return
+			}
 		}
 		session.Del(w, r, key, sloInfoCookie)
 		key = fmt.Sprintf("%s-%d-%s", tag, (role+1)%2, idHash(sloinfo.Na))
@@ -1806,6 +1808,9 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		data, err = session.Get(w, r, key, sloInfoCookie)
 		if err == nil {
 			err = json.Unmarshal(data, &sloinfo2)
+			if err != nil {
+				return
+			}
 		}
 		session.Del(w, r, key, sloInfoCookie)
 		switch role {
@@ -1831,6 +1836,9 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		data, err := session.Get(w, r, spIdPHash, sloInfoCookie)
 		if err == nil {
 			err = json.Unmarshal(data, &unique)
+			if err != nil {
+				return
+			}
 		}
 		session.Del(w, r, unique.HashIn, sloInfoCookie)
 		session.Del(w, r, unique.HashOut, sloInfoCookie)
@@ -1838,6 +1846,10 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		unique.HashIn = hashIn
 		unique.HashOut = hashOut
 		bytes, err := json.Marshal(&unique)
+		if err != nil {
+			return
+		}
+
 		session.Set(w, r, spIdPHash, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 
 		slo := gosaml.NewSLOInfo(samlIn, destinationInMd)
