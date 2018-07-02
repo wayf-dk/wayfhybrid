@@ -478,7 +478,13 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("OK")
 	}
 
-	log.Printf("%s %s %s %+v %1.3f %d %s", r.RemoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
+    remoteAddr := r.RemoteAddr
+    if ra, ok := r.Header["X-Forwarded-For"]; ok {
+        remoteAddr = ra[0]
+    }
+
+    log.Printf("%s %s %s %+v %1.3f %d %s", remoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
+
 	switch x := err.(type) {
 	case goxml.Werror:
 		log.Print(x.FullError())
