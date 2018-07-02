@@ -1456,7 +1456,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
-    birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
+	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
 	if err != nil {
 		return
 	}
@@ -1466,9 +1466,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    if sRequest.Brk {
-        issuerMd = birkMd
-    }
+	if sRequest.Brk {
+		issuerMd = birkMd
+	}
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
@@ -1512,10 +1512,10 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			signingMethod = sigAlg
 		}
 
-        elementsToSign := config.ElementsToSign
-        if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
-            elementsToSign = []string{"/samlp:Response"}
-        }
+		elementsToSign := config.ElementsToSign
+		if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+			elementsToSign = []string{"/samlp:Response"}
+		}
 
 		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
@@ -1621,10 +1621,10 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 			signingMethod = sigAlg
 		}
 
-        elementsToSign := config.ElementsToSign
-        if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
-            elementsToSign = []string{"/samlp:Response"}
-        }
+		elementsToSign := config.ElementsToSign
+		if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+			elementsToSign = []string{"/samlp:Response"}
+		}
 
 		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(response, q, hubMd, signingMethod, gosaml.SAMLSign)
@@ -2053,10 +2053,10 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
 		}
 
-        elementsToSign := config.ElementsToSign
-        if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
-            elementsToSign = []string{"/samlp:Response"}
-        }
+		elementsToSign := config.ElementsToSign
+		if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+			elementsToSign = []string{"/samlp:Response"}
+		}
 
 		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
