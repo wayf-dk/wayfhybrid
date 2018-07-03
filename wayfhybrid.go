@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-    "flag"
+	"flag"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/securecookie"
@@ -186,8 +186,8 @@ func Main() {
 	log.SetFlags(0) // no predefined time
 	//log.SetOutput(new(logWriter))
 
-    bypassMdUpdate := flag.Bool("nomd", false, "bypass MD update at start")
-    flag.Parse()
+	bypassMdUpdate := flag.Bool("nomd", false, "bypass MD update at start")
+	flag.Parse()
 
 	hostName, _ = os.Hostname()
 
@@ -483,12 +483,12 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("OK")
 	}
 
-    remoteAddr := r.RemoteAddr
-    if ra, ok := r.Header["X-Forwarded-For"]; ok {
-        remoteAddr = ra[0]
-    }
+	remoteAddr := r.RemoteAddr
+	if ra, ok := r.Header["X-Forwarded-For"]; ok {
+		remoteAddr = ra[0]
+	}
 
-    log.Printf("%s %s %s %+v %1.3f %d %s", remoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
+	log.Printf("%s %s %s %+v %1.3f %d %s", remoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
 
 	switch x := err.(type) {
 	case goxml.Werror:
@@ -510,9 +510,9 @@ func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
-    if !refresh {
-        return "bypassed", nil
-    }
+	if !refresh {
+		return "bypassed", nil
+	}
 	select {
 	case metadataUpdateGuard <- 1:
 		{
@@ -945,7 +945,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	if tmp := spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
 		spPEID = tmp
 	}
-    spPEID = deproxy.ReplaceAllString(debify.ReplaceAllString(spPEID, "$1$2"), "$1") // Transition hack - old BIRK new hub interaction
+	spPEID = deproxy.ReplaceAllString(debify.ReplaceAllString(spPEID, "$1$2"), "$1") // Transition hack - old BIRK new hub interaction
 
 	uidhashbase := "uidhashbase" + config.EptidSalt
 	uidhashbase += strconv.Itoa(len(idpPEID)) + ":" + idpPEID
@@ -2078,7 +2078,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 		}
-    } else {
+	} else {
 		newresponse = gosaml.NewErrorResponse(issuerMd, spMd, request, response)
 
 		err = gosaml.SignResponse(newresponse, "/samlp:Response", issuerMd, signingMethod, gosaml.SAMLSign)
