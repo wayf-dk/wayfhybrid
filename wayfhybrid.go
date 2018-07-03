@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+    "flag"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/securecookie"
@@ -184,6 +185,9 @@ func Main() {
 	log.SetFlags(0) // no predefined time
 	//log.SetOutput(new(logWriter))
 
+    bypassMdUpdate := flag.Bool("nomd", false, "bypass MD update at start")
+    flag.Parse()
+
 	hostName, _ = os.Hostname()
 
 	overrideConfig(&config, []string{"Path"})
@@ -230,7 +234,7 @@ func Main() {
 	Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table}
 	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
 
-	str, err := refreshAllMetadataFeeds()
+	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
 	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
 	for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
@@ -498,13 +502,16 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
-	if str, err := refreshAllMetadataFeeds(); err == nil {
+	if str, err := refreshAllMetadataFeeds(true); err == nil {
 		io.WriteString(w, str)
 	}
 	return
 }
 
-func refreshAllMetadataFeeds() (str string, err error) {
+func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
+    if !refresh {
+        return "bypassed", nil
+    }
 	select {
 	case metadataUpdateGuard <- 1:
 		{
