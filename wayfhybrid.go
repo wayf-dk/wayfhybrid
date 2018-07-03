@@ -160,6 +160,7 @@ var (
 
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
 	debify        = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
+	deproxy       = regexp.MustCompile("(.+)-proxy$")
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
 	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
 	aauscope      = regexp.MustCompile(`[@\.]aau\.dk$`)
@@ -944,6 +945,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	if tmp := spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
 		spPEID = tmp
 	}
+    spPEID = deproxy.ReplaceAllString(debify.ReplaceAllString(spPEID, "$1$2"), "$1")) // transion hack - old BIRK new hub interaction
 
 	uidhashbase := "uidhashbase" + config.EptidSalt
 	uidhashbase += strconv.Itoa(len(idpPEID)) + ":" + idpPEID
