@@ -1972,6 +1972,11 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 		return
 	}
 
+    // special case for ku.dk
+    if strings.HasSuffix(securityDomain, ".ku.dk") {
+        securityDomain = "ku.dk"
+    }
+
 	subSecurityDomain := "." + securityDomain
 	for _, eppsa := range eppsas {
 		eppsaparts := scoped.FindStringSubmatch(eppsa)

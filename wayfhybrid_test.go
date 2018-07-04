@@ -68,6 +68,7 @@ func ExampleCheckScope() {
 	scopesEppn := [][]string{
 		{"mekhan@aau.dk", "aau.dk", "staff@aau.dk", "staff@zzz.aau.dk", "staff@xxx.aau.dk"},
 		{"mh@sikker-adgang.dk", "sikker-adgang.dk", "staff@adgang.dk"},
+		{"xx@alumne.ku.dk", "alumne.ku.dk", "student@ku.dk"},
 		{"\x1b", "dtu.dk", "staff@aau.dk"},
 	}
 	scopeCheckTest(scopesEppn, true)
@@ -87,6 +88,7 @@ func ExampleCheckScope() {
 	// Output:
 	// mekhan@aau.dk mekhan@aau.dk aau.dk [staff@aau.dk staff@zzz.aau.dk staff@xxx.aau.dk] <nil>
 	// mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk [staff@adgang.dk] eduPersonScopedAffiliation: staff@adgang.dk has not 'sikker-adgang.dk' as security sub domain
+	// xx@alumne.ku.dk xx@alumne.ku.dk ku.dk [student@ku.dk] <nil>
 	//    [staff@aau.dk] Mandatory 'eduPersonPrincipalName' attribute missing
 	// mekhan@aau.dk mekhan@aau.dk aau.dk [staff@aau.dk staff@zzz.aau.dk staff@xxx.aau.dk] security domain 'aau.dk' does not match any scopes
 	// mekhan@aau.dk mekhan@aau.dk aau.dk [staff@aau.dk staff@zzz.aau.dk staff@xxx.aau.dk] eduPersonScopedAffiliation: staff@zzz.aau.dk has not 'aau.dk' as security domain
