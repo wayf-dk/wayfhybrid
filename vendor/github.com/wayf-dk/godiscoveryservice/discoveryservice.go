@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	// 	_ "github.com/mattn/go-sqlite3" for handling sqlite3
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
@@ -16,6 +17,7 @@ import (
 )
 
 type (
+	// Conf struct for reading the metadata feed
 	Conf struct {
 		DiscoMetaData string
 		SpMetaData    string
@@ -34,7 +36,7 @@ type (
 	spInfoOut struct {
 		EntityID     string            `json:"entityID"`
 		DisplayNames map[string]string `json:"DisplayNames"`
-		Logo         string            `json:Logo`
+		Logo         string            `json:"Logo"`
 	}
 
 	displayName struct {
@@ -55,7 +57,8 @@ type (
 )
 
 var (
-	_                    = q.Q
+	_ = q.Q
+	// Config initialisation
 	Config               = Conf{}
 	dotdashpling         = regexp.MustCompile("[\\.\\-\\']")
 	notword              = regexp.MustCompile("[^\\w]")
@@ -64,12 +67,13 @@ var (
 	spDB, idpDB          *sql.DB
 )
 
-// Only for logging response
+// DSTiming used for only logging response
 func DSTiming(w http.ResponseWriter, r *http.Request) (err error) {
 	w.Header().Set("Content-Type", "text/plain")
 	return
 }
 
+// DSBackend takes the request extracts the entityID and returns an IDP
 func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
 	var md []byte
 	var spMetaData *goxml.Xp
