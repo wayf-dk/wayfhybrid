@@ -1261,7 +1261,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		var err2 error
 		e, ok := err.(goxml.Werror)
-		if ok && (e.Cause == gosaml.ErrAcs || e.Cause == lMDQ.MetaDataNotFoundError) {
+		if ok && (e.Cause == gosaml.ACSError || e.Cause == lMDQ.MetaDataNotFoundError) {
 			// or is it coming directly from a SP
 			request, spMd, birkIdpMd, relayState, err2 = gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
 			if err2 != nil {
@@ -1975,6 +1975,10 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 	// special case for ku.dk
 	if strings.HasSuffix(securityDomain, ".ku.dk") {
 		securityDomain = "ku.dk"
+	}
+
+	if strings.HasSuffix(securityDomain, ".aau.dk@aau.dk") {
+		securityDomain = "aau.dk@aau.dk"
 	}
 
 	subSecurityDomain := "." + securityDomain
