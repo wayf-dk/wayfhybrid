@@ -94,7 +94,7 @@ func ExampleCheckScope() {
 	// mekhan@aau.dk mekhan@aau.dk aau.dk [staff@aau.dk staff@zzz.aau.dk staff@xxx.aau.dk] eduPersonScopedAffiliation: staff@zzz.aau.dk has not 'aau.dk' as security domain
 	// mh@kmduni.dans.kmd.dk mh@kmduni.dans.kmd.dk kmduni.dans.kmd.dk [staff@kmduni.dans.kmd.dk] <nil>
 	// mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk [sdu.dk staff@sikker-adgang.dk] eduPersonScopedAffiliation: sdu.dk does not end with a domain
-	// mekhan@student.aau.dk@aau.dk mekhan@student.aau.dk@aau.dk student.aau.dk@aau.dk [sdu.dk orphanage.wayf.dk plan.aau.dk@aau.dk] eduPersonScopedAffiliation: sdu.dk does not end with a domain
+	// mekhan@student.aau.dk@aau.dk mekhan@student.aau.dk@aau.dk aau.dk@aau.dk [sdu.dk orphanage.wayf.dk plan.aau.dk@aau.dk] eduPersonScopedAffiliation: sdu.dk does not end with a domain
 	// mh@sikker-adgang.dk mh@sikker-adgang.dk sikker-adgang.dk [staff@adgang.dk] eduPersonScopedAffiliation: staff@adgang.dk has not 'sikker-adgang.dk' as security domain
 	//   aau.dk [staff@aau.dk] <nil>
 	//   aau.dk [staff@aau.dk member@aau.dk] <nil>
