@@ -529,6 +529,7 @@ func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 					panic(err)
 				}
 			}
+			godiscoveryservice.MetadataUpdated()
 			<-metadataUpdateGuard
 			return "Pong", nil
 		}
