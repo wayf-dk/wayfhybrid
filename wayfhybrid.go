@@ -164,6 +164,7 @@ var (
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
 	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
 	aauscope      = regexp.MustCompile(`[@\.]aau\.dk$`)
+	dkcprpreg     = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
 
 	metadataUpdateGuard chan int
 
@@ -957,7 +958,6 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	eptid := "WAYF-DK-" + hex.EncodeToString(append(hash[:]))
 	setAttribute("eduPersonTargetedID", eptid, response, destinationAttributes)
 
-	dkcprpreg := regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
 	for _, cpr := range response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="schacPersonalUniqueID"]`) {
 		// schacPersonalUniqueID is multi - use the first DK cpr found
 		if matches := dkcprpreg.FindStringSubmatch(cpr); len(matches) > 0 {
