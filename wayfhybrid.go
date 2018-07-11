@@ -326,12 +326,32 @@ func Main() {
 		}
 	}()
 
+/*
 	mdUpdateMux := http.NewServeMux()
 	mdUpdateMux.Handle("/", appHandler(updateMetadataService)) // need a root "/" for routing
 
 	go func() {
 		log.Println("listening on 0.0.0.0:9000")
 		err = http.ListenAndServe(":9000", mdUpdateMux)
+		if err != nil {
+			log.Printf("main(): %s\n", err)
+		}
+	}()
+*/
+
+	pprofMux := http.NewServeMux()
+    pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+    pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+    pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+    pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+    pprofMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+    pprofMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+    pprofMux.Handle("/debug/pprof/block", pprof.Handler("block"))
+    pprofMux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+
+	go func() {
+		log.Println("listening on 0.0.0.0:9000")
+		err = http.ListenAndServe(":9000", pprofMux)
 		if err != nil {
 			log.Printf("main(): %s\n", err)
 		}
