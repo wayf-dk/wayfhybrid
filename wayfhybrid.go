@@ -24,7 +24,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	_ "net/http/pprof"
+	"net/http/pprof"
 	"net/url"
 	"os"
 	"path"
