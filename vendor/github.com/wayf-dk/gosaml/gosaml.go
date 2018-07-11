@@ -113,6 +113,7 @@ var (
 	NameIDList = []string{"", Transient, Persistent, X509, Email, Unspecified}
 	// 	NameIDMap refers to mapping the nameid formats
 	NameIDMap = map[string]int{"": 1, Transient: 1, Persistent: 2, X509: 3, Email: 4, Unspecified: 5} // Unspecified accepted but not sent upstream
+	whitespace = regexp.MustCompile("\\s")
 )
 
 // DebugSetting for debugging cookies
@@ -141,7 +142,7 @@ func dump(msgType string, blob []byte) (logtag string)  {
     }
     logtag = now.Format("2006-01-02T15:04:05.0000000") // local time with microseconds
     if err := ioutil.WriteFile(fmt.Sprintf("log/%s-%s", logtag, msgType), blob, 0644); err != nil {
-    	log.Panic(err)
+		//log.Panic(err)
 	}
 	return
 }
@@ -150,7 +151,7 @@ func dump(msgType string, blob []byte) (logtag string)  {
 // The keyname is computed from the public key corresponding to running this command: openssl x509 -modulus -noout -in <cert> | openssl sha1.
 func PublicKeyInfo(cert string) (keyname string, publickey *rsa.PublicKey, err error) {
 	// no pem so no pem.Decode
-	key, err := base64.StdEncoding.DecodeString(regexp.MustCompile("\\s").ReplaceAllString(cert, ""))
+	key, err := base64.StdEncoding.DecodeString(whitespace.ReplaceAllString(cert, ""))
 	pk, err := x509.ParseCertificate(key)
 	if err != nil {
 		return
@@ -840,7 +841,7 @@ func VerifyTiming(xp *goxml.Xp) (verifiedXp *goxml.Xp, err error) {
 	return
 }
 
-// IdAndTiming
+// IdAndTiming for checking the validity
 func IdAndTiming() (issueInstant, id, assertionId, assertionNotOnOrAfter, sessionNotOnOrAfter string) {
 	now := TestTime
 	if now.IsZero() {
@@ -988,7 +989,6 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, idPList []string) (
 			request.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry[0]/@ProviderID", providerID, nil)
 		}
 	}
-	found := false
 	nameIDFormat := ""
 	nameIDFormats := NameIDList
 
@@ -1009,7 +1009,7 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, idPList []string) (
 	}
 
 	for _, nameIDFormat = range nameIDFormats {
-		if found = spMd.Query1(nil, "./md:SPSSODescriptor/md:NameIDFormat[.="+strconv.Quote(nameIDFormat)+"]") != ""; found {
+		if found := spMd.Query1(nil, "./md:SPSSODescriptor/md:NameIDFormat[.="+strconv.Quote(nameIDFormat)+"]") != ""; found {
 			request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", nameIDFormat, nil)
 			break
 		}
