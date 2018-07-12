@@ -24,7 +24,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/http/pprof"
+	//"net/http/pprof"
 	"net/url"
 	"os"
 	"path"
@@ -326,7 +326,6 @@ func Main() {
 		}
 	}()
 
-/*
 	mdUpdateMux := http.NewServeMux()
 	mdUpdateMux.Handle("/", appHandler(updateMetadataService)) // need a root "/" for routing
 
@@ -337,8 +336,8 @@ func Main() {
 			log.Printf("main(): %s\n", err)
 		}
 	}()
-*/
 
+/*
 	pprofMux := http.NewServeMux()
     pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
     pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
@@ -356,6 +355,7 @@ func Main() {
 			log.Printf("main(): %s\n", err)
 		}
 	}()
+*/
 
 	<-finish
 }
