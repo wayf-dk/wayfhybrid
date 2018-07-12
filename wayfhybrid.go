@@ -1181,16 +1181,7 @@ func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
 	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10})
-
-    origin := r.Header.Get("Origin")
-    if origin == "" {
-        origin = r.URL.Query().Get("origin")
-    }
-    if origin == "" {
-        origin = "https://dans.stads.dk"
-    }
-
-	w.Header().Set("Access-Control-Allow-Origin", origin) //r.Header.Get("Origin"))
+	w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Content-Type", "text/plain")
 	io.WriteString(w, hostName+"\n")
