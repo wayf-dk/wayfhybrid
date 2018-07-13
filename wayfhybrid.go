@@ -1752,7 +1752,14 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.Na+fmt.Sprintf(" async:%t", async))
 			// always sign if a private key is available - ie. ignore missing keys
 			privatekey, _ := gosaml.GetPrivateKey(finalIssuer)
-			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", "")
+
+	        algo := finalDestination.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+
+            if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
+                algo = sigAlg
+            }
+
+			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", algo)
 			http.Redirect(w, r, u.String(), http.StatusFound)
 		} else {
 			err = fmt.Errorf("no Logout info found")
