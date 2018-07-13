@@ -1751,7 +1751,11 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
 			legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.Na+fmt.Sprintf(" async:%t", async))
 			// always sign if a private key is available - ie. ignore missing keys
-			privatekey, _ := gosaml.GetPrivateKey(finalIssuer)
+			privatekey, err := gosaml.GetPrivateKey(finalIssuer)
+
+            if err != nil {
+                return err
+            }
 
 	        algo := finalDestination.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
@@ -1795,7 +1799,14 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		if err != nil {
 			return err
 		}
-		u, _ := gosaml.SAMLRequest2Url(newResponse, relayState, string(privatekey), "-", "")
+
+        algo := destinationMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+
+        if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
+            algo = sigAlg
+        }
+
+        u, _ := gosaml.SAMLRequest2Url(newResponse, relayState, string(privatekey), "-", algo)
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		// forward the LogoutResponse to orig sender
 	} else {
