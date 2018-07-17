@@ -749,8 +749,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		} else {
 			SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), destination, issuer)
 		}
-
-	} else if r.Form.Get("SAMLResponse") != "" {
+    } else if r.Form.Get("SAMLRequest") != "" || r.Form.Get("SAMLResponse") != "" {
 		// try to decode SAML message to ourselves or just another SP
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
