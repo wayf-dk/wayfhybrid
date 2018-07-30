@@ -10,6 +10,7 @@ import (
 	"github.com/y0ssar1an/q"
 	"log"
 	"os"
+    "runtime"
 	"sort"
 	"strconv"
 	"testing"
@@ -183,15 +184,20 @@ func ExampleCheckCprCentury() {
 }
 
 func ExampleWayfAttributeHandler() {
-	sourceResponse := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	idpMd := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	hubMd := goxml.NewXpFromFile("testdata/hub_md.xml")
 	spMd := goxml.NewXpFromFile("testdata/sp_md.xml")
 	prepareTables(hubMd)
-
-	WayfACSServiceHandler(idpMd, hubMd, spMd, nil, sourceResponse, false)
-	gosaml.AttributeCanonicalDump(os.Stdout, sourceResponse)
-
+    sourceResponse := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+    for i := 0; i < 1; i++ {
+        for j := 0; j < 1; j++ {
+            WayfACSServiceHandler(idpMd, hubMd, spMd, nil, sourceResponse.CpXp(), false)
+            gosaml.AttributeCanonicalDump(os.Stdout, sourceResponse)
+        }
+//        log.Println(i)
+//        runtime.GC()
+//        PrintMemUsage()
+    }
 	// Output:
 	// cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Mads Freek Petersen
@@ -346,4 +352,18 @@ func ExampleHandleAttributeNameFormat() {
 	handleAttributeNameFormat(response, spMd)
 	// Output:
 	//
+}
+
+func PrintMemUsage() {
+        var m runtime.MemStats
+        runtime.ReadMemStats(&m)
+        // For info on each, see: https://golang.org/pkg/runtime/#MemStats
+        log.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+        log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+        log.Printf("\tSys = %v MiB", bToMb(m.Sys))
+        log.Printf("\tNumGC = %v\n", m.NumGC)
+}
+
+func bToMb(b uint64) uint64 {
+    return b / 1024 / 1024
 }
