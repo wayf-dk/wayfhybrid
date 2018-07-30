@@ -932,8 +932,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		}
 	}
 
-	parent, _ := sourceAttributes.ParentNode()
-	goxml.RemoveChild(parent, sourceAttributes)
+	goxml.RmElement(sourceAttributes)
 
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
