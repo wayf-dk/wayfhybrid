@@ -762,14 +762,16 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		_, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
-
-		if err != nil {
-			return err
-		}
-
+        var vals []attrValue
 		protocol := response.QueryString(nil, "local-name(/*)")
-		vals := attributeValues(response, destinationMd, hubRequestedAttributes)
+		if protocol == "Response" {
+            _, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
+
+            if err != nil {
+                return err
+            }
+    		vals = attributeValues(response, destinationMd, hubRequestedAttributes)
+        }
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"),
 			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
