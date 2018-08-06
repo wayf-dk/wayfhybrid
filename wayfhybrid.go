@@ -1759,6 +1759,10 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			if err != nil {
 				return err
 			}
+
+    		_, msgId, _, _, _ := gosaml.IdAndTiming()
+    		newRequest.QueryDashP(nil, "./@ID", msgId, nil)
+
 			async := request.QueryBool(nil, "boolean(./samlp:Extensions/aslo:Asynchronous)")
 			if !async {
 				session.Set(w, r, "SLO-"+idHash(sloinfo.Is), config.Domain, request.Dump(), authnRequestCookie, 60)
