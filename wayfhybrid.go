@@ -1334,7 +1334,23 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 		if err != nil {
 			return
 		}
-		hubMd, err = Md.Hub.MDQ(config.HubEntityID)
+
+        // both IdP and SP comes from original IdP
+		mappedIdP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:mapIdP")
+		mappedSP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:mapSP")
+
+		if mappedIdP != "" {
+            idpMd, err = Md.Internal.MDQ(mappedIdP)
+            if err != nil {
+                return
+            }
+		}
+
+		if mappedSP == "" {
+		    mappedSP = config.HubEntityID
+		}
+
+		hubMd, err = Md.Hub.MDQ(mappedSP)
 		if err != nil {
 			return
 		}
