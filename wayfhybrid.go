@@ -1456,7 +1456,7 @@ func eIdasExtras(request *goxml.Xp) {
 }
 
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
-	gosaml.DumpFile(r, response)
+	gosaml.DumpFileIfTracing(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
 	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
 	if err != nil {
@@ -1584,7 +1584,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if gosaml.DebugSetting(r, "encryptAssertion") == "1" {
-			gosaml.DumpFile(r, newresponse)
+			gosaml.DumpFileIfTracing(r, newresponse)
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
 			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
@@ -1608,7 +1608,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return goxml.Wrap(err)
 	}
-	gosaml.DumpFile(r, newresponse)
+	gosaml.DumpFileIfTracing(r, newresponse)
 
 	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
@@ -1690,7 +1690,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if gosaml.DebugSetting(r, "encryptAssertion") == "1" {
-			gosaml.DumpFile(r, response)
+			gosaml.DumpFileIfTracing(r, response)
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
 			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
@@ -1706,7 +1706,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 
-	gosaml.DumpFile(r, response)
+	gosaml.DumpFileIfTracing(r, response)
 	data := formdata{Acs: destination, Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: relayState}
 	postForm.Execute(w, data)
 	return
@@ -2155,7 +2155,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	// when consent as a service is ready - we will post to that
 	// acs := newresponse.Query1(nil, "@Destination")
 
-	gosaml.DumpFile(r, newresponse)
+	gosaml.DumpFileIfTracing(r, newresponse)
 
 	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState}
 	postForm.Execute(w, data)
