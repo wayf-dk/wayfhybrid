@@ -483,13 +483,6 @@ func (h *WrapHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 */
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	/*	ctx := make(map[string]string)
-		contextmutex.Lock()
-		context[r] = ctx
-		contextmutex.Unlock()
-		w.Header().Set("content-Security-Policy", "referrer no-referrer;")
-	*/
-
 	starttime := time.Now()
 	err := fn(w, r)
 
@@ -513,14 +506,13 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch x := err.(type) {
 	case goxml.Werror:
+	    if x.Xp != nil {
+	        logtag := gosaml.DumpFile(r, x.Xp)
+    		log.Print("logtag: " + logtag)
+	    }
 		log.Print(x.FullError())
 		log.Print(x.Stack(5))
 	}
-
-	/*	contextmutex.Lock()
-		delete(context, r)
-		contextmutex.Unlock()
-	*/
 }
 
 func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
