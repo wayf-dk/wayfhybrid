@@ -375,12 +375,14 @@ func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.mux.ServeHTTP(w, r)
 }
 
+// Set responsible for setting a cookie values
 func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domain string, data []byte, secCookie *securecookie.SecureCookie, maxAge int) (err error) {
 	cookie, err := secCookie.Encode(id, gosaml.Deflate(data))
 	http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge})
 	return
 }
 
+// Get responsible for getting the cookie values
 func (s wayfHybridSession) Get(w http.ResponseWriter, r *http.Request, id string, secCookie *securecookie.SecureCookie) (data []byte, err error) {
 	cookie, err := r.Cookie(id)
 	if err == nil && cookie.Value != "" {
@@ -390,17 +392,20 @@ func (s wayfHybridSession) Get(w http.ResponseWriter, r *http.Request, id string
 	return
 }
 
+// Del responsible for deleting a cookie values
 func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id string, secCookie *securecookie.SecureCookie) (err error) {
 	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: "", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
 	return
 }
 
+// GetDel responsible for getting and then deleting cookie values
 func (s wayfHybridSession) GetDel(w http.ResponseWriter, r *http.Request, id string, secCookie *securecookie.SecureCookie) (data []byte, err error) {
 	data, err = s.Get(w, r, id, secCookie)
 	s.Del(w, r, id, secCookie)
 	return
 }
 
+// Write refers to writing log data
 func (writer logWriter) Write(bytes []byte) (int, error) {
 	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ")+string(bytes))
 }
@@ -523,6 +528,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	*/
 }
 
+// updateMetadataService is service for updating metadata feed
 func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
 	if str, err := refreshAllMetadataFeeds(true); err == nil {
 		io.WriteString(w, str)
@@ -530,6 +536,7 @@ func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+// refreshAllMetadataFeeds is responsible for referishing all metadata feed(internal, external)
 func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 	if !refresh {
 		return "bypassed", nil
@@ -560,6 +567,7 @@ func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 	}
 }
 
+// refreshMetadataFeed is responsible for referishing a metadata feed
 func refreshMetadataFeed(mddbpath, url string) (err error) {
 	dir := path.Dir(mddbpath)
 	tempmddb, err := ioutil.TempFile(dir, "")
@@ -589,6 +597,7 @@ func samlTime2JwtTime(xmlTime string) int64 {
 	return samlTime.Unix()
 }
 
+// saml2jwt handles saml2jwt request
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
@@ -787,6 +796,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+// SloRequest generates a single logout request
 func SloRequest(w http.ResponseWriter, r *http.Request, response, issuer, destination *goxml.Xp, pk string) {
 	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                      xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
@@ -813,6 +823,7 @@ func SloRequest(w http.ResponseWriter, r *http.Request, response, issuer, destin
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
+// SloResponse generates a single logout reponse
 func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destination *goxml.Xp) {
 	template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                       xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
@@ -840,6 +851,7 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
+// attributeValues returns all the attribute values
 func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrValue) {
 	requestedAttributes := hubMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute`) // [@isRequired='true' or @isRequired='1']`)
 	for _, requestedAttribute := range requestedAttributes {
@@ -855,6 +867,7 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 	return
 }
 
+// checkForCommonFederations checks for common federation in sp and idp
 func checkForCommonFederations(idpMd, spMd *goxml.Xp) (err error) {
 	idpFeds := idpMd.QueryMulti(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds")
 	tmp := idpFeds[:0]
@@ -1107,6 +1120,7 @@ func WayfKribHandler(response, birkMd, kribMd *goxml.Xp) (destination string, er
 	return
 }
 
+// nemloginAttributeHandler handles nemlogin attributes
 func nemloginAttributeHandler(response *goxml.Xp) {
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
 	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.3"]/saml:AttributeValue`)
@@ -1130,6 +1144,7 @@ func nemloginAttributeHandler(response *goxml.Xp) {
 	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
 }
 
+// eidasAttributeHandler handles eidas attributes
 func eidasAttributeHandler(response *goxml.Xp) {
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
 	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:CurrentFamilyName"]/saml:AttributeValue`)
@@ -1145,7 +1160,7 @@ func eidasAttributeHandler(response *goxml.Xp) {
 }
 
 /* see http://www.cpr.dk/cpr_artikler/Files/Fil1/4225.pdf or http://da.wikipedia.org/wiki/CPR-nummer for algorithm */
-
+// yearfromyearandcifferseven returns a year for CPR
 func yearfromyearandcifferseven(year, c7 int) int {
 	cpr2year := [][]int{
 		{99, 1900},
@@ -1180,6 +1195,7 @@ func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+// VeryVeryPoorMansScopingService handles poors man scoping
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
 	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10})
 	w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
@@ -1224,6 +1240,7 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 	return
 }
 
+// SSOService handles single sign on requests
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	request, spMd, _, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.Hub)
@@ -1270,6 +1287,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+// BirkService refers to handling the request at Birk
 func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	// use incoming request for crafting the new one
 	// remember to add the Scoping element to inform the IdP of requesterID - if stated in metadata for the IdP
@@ -1415,6 +1433,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	return
 }
 
+// eIdasExtras
 func eIdasExtras(request *goxml.Xp) {
 	request.QueryDashP(nil, "@ForceAuthn", "true", nil)
 	request.QueryDashP(nil, "@IsPassive", "false", nil)
@@ -1477,6 +1496,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	return
 }
 
+// ACSService handles all the stuff related to receiving response and attribute handling
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	response, _, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub, "https://"+r.Host+r.URL.Path)
@@ -1597,6 +1617,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+// KribService handles all the request at Krib part. Returns an error if something goes wrong.
 func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
@@ -1694,22 +1715,27 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+// SPSLOService refers to SP single logout service. Takes request as a parameter and returns an error if any
 func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, Md.Internal, Md.Hub, []gosaml.Md{Md.ExternalIdP, Md.Hub}, []gosaml.Md{Md.ExternalSP, Md.Internal}, gosaml.SPRole, "SLO")
 }
 
+// BirkSLOService refers to birk single logout service. Takes request as a parameter and returns an error if any
 func BirkSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, Md.ExternalSP, Md.ExternalIdP, []gosaml.Md{Md.Hub}, []gosaml.Md{Md.Internal}, gosaml.IdPRole, "SLO")
 }
 
+// KribSLOService refers to krib single logout service. Takes request as a parameter and returns an error if any
 func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, Md.ExternalIdP, Md.ExternalSP, []gosaml.Md{Md.Hub}, []gosaml.Md{Md.Internal}, gosaml.SPRole, "SLO")
 }
 
+// IdPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
 func IdPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, Md.Internal, Md.Hub, []gosaml.Md{Md.ExternalSP, Md.Hub}, []gosaml.Md{Md.ExternalIdP, Md.Internal}, gosaml.IdPRole, "SLO")
 }
 
+// SLOService refers to single logout service. Takes request and issuer and destination metadata sets, role refers to if it as IDP or SP.
 func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destinationMdSet gosaml.Md, finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, role int, tag string) (err error) {
 	req := []string{"idpreq", "spreq"}
 	res := []string{"idpres", "spres"}
@@ -1813,7 +1839,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	return
 }
 
-// finds a pair of metdata in the metadatasets - both must come from the corresponding paris in the sets
+// findMdPair finds a pair of metdata in the metadatasets - both must come from the corresponding paris in the sets
 func findMdPair(finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, issuer, destination string) (issuerMd, destinationMd *goxml.Xp, err error) {
 	for i := range finalIssuerMdSets {
 		issuerMd, err = finalIssuerMdSets[i].MDQ(issuer)
@@ -1908,10 +1934,12 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 	return
 }
 
+// idHash to create hash of the id
 func idHash(data string) string {
 	return fmt.Sprintf("%.5x", sha1.Sum([]byte(data)))
 }
 
+// handleAttributeNameFormat handles attribute name format
 func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 	const (
 		basic  = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
@@ -1970,6 +1998,7 @@ func handleAttributeNameFormat2(response, mdsp *goxml.Xp) {
 	}
 }
 
+// checkScope checks for scope. Takes an xp, metadata. requireppn refers to as bolean if it is required. Returns eppn, securitydomain and list of epsas.
 func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, eppnForEptid, securityDomain string, epsas []string, err error) {
 	eppns := xp.QueryMulti(context, "saml:Attribute[@Name='eduPersonPrincipalName' or @Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.6']/saml:AttributeValue")
 	epsas = xp.QueryMulti(context, `saml:Attribute[@Name="eduPersonScopedAffiliation" or @Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.9']/saml:AttributeValue`)
