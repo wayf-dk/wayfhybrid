@@ -488,13 +488,6 @@ func (h *WrapHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 */
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	/*	ctx := make(map[string]string)
-		contextmutex.Lock()
-		context[r] = ctx
-		contextmutex.Unlock()
-		w.Header().Set("content-Security-Policy", "referrer no-referrer;")
-	*/
-
 	starttime := time.Now()
 	err := fn(w, r)
 
@@ -518,14 +511,13 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch x := err.(type) {
 	case goxml.Werror:
+	    if x.Xp != nil {
+	        logtag := gosaml.DumpFile(r, x.Xp)
+    		log.Print("logtag: " + logtag)
+	    }
 		log.Print(x.FullError())
 		log.Print(x.Stack(5))
 	}
-
-	/*	contextmutex.Lock()
-		delete(context, r)
-		contextmutex.Unlock()
-	*/
 }
 
 // updateMetadataService is service for updating metadata feed
@@ -771,14 +763,16 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		_, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
-
-		if err != nil {
-			return err
-		}
-
+        var vals []attrValue
 		protocol := response.QueryString(nil, "local-name(/*)")
-		vals := attributeValues(response, destinationMd, hubRequestedAttributes)
+		if protocol == "Response" {
+            _, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
+
+            if err != nil {
+                return err
+            }
+    		vals = attributeValues(response, destinationMd, hubRequestedAttributes)
+        }
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"),
 			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
@@ -1350,7 +1344,23 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 		if err != nil {
 			return
 		}
-		hubMd, err = Md.Hub.MDQ(config.HubEntityID)
+
+        // both IdP and SP comes from original IdP
+		mappedIdP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:map2IdP")
+		mappedSP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:map2SP")
+
+		if mappedIdP != "" {
+            idpMd, err = Md.Internal.MDQ(mappedIdP)
+            if err != nil {
+                return
+            }
+		}
+
+		if mappedSP == "" {
+		    mappedSP = config.HubEntityID
+		}
+
+		hubMd, err = Md.Hub.MDQ(mappedSP)
 		if err != nil {
 			return
 		}
@@ -1457,7 +1467,7 @@ func eIdasExtras(request *goxml.Xp) {
 }
 
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
-	gosaml.DumpFile(r, response)
+	gosaml.DumpFileIfTracing(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
 	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
 	if err != nil {
@@ -1586,7 +1596,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if gosaml.DebugSetting(r, "encryptAssertion") == "1" {
-			gosaml.DumpFile(r, newresponse)
+			gosaml.DumpFileIfTracing(r, newresponse)
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
 			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
@@ -1610,7 +1620,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return goxml.Wrap(err)
 	}
-	gosaml.DumpFile(r, newresponse)
+	gosaml.DumpFileIfTracing(r, newresponse)
 
 	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
@@ -1693,7 +1703,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if gosaml.DebugSetting(r, "encryptAssertion") == "1" {
-			gosaml.DumpFile(r, response)
+			gosaml.DumpFileIfTracing(r, response)
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
 			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
@@ -1709,7 +1719,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 
-	gosaml.DumpFile(r, response)
+	gosaml.DumpFileIfTracing(r, response)
 	data := formdata{Acs: destination, Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: relayState}
 	postForm.Execute(w, data)
 	return
@@ -2166,7 +2176,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	// when consent as a service is ready - we will post to that
 	// acs := newresponse.Query1(nil, "@Destination")
 
-	gosaml.DumpFile(r, newresponse)
+	gosaml.DumpFileIfTracing(r, newresponse)
 
 	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState}
 	postForm.Execute(w, data)
