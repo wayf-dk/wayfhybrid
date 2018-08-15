@@ -880,12 +880,12 @@ func checkForCommonFederations(idpMd, spMd *goxml.Xp) (err error) {
 
 func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk bool) (ard AttributeReleaseData, err error) {
 	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
-	idp := response.Query1(nil, "/samlp:Response/saml:Issuer")
+	idp := idpMd.Query1(nil, "@entityID")
 
 	base64encodedIn := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
 
 	switch idp {
-	case "https://saml.nemlog-in.dk", "https://saml.test-nemlog-in.dk/":
+	case "https://nemlogin.wayf.dk":
 		base64encodedIn = false
 		nemloginAttributeHandler(response)
 	case "https://eidasconnector.test.eid.digst.dk/idp":
