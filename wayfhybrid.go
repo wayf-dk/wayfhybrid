@@ -1263,16 +1263,17 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		sp2 := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
 		sp2Md, _ := Md.ExternalSP.MDQ(sp2)
 
+        // check for common feds before remapping!
+		if err = checkForCommonFederations(spMd, idp2Md); err != nil {
+			return err
+		}
+
 		altIdp := debify.ReplaceAllString(idp2, "$1$2")
 		if idp2 != altIdp { // an internal IdP
 			sp2Md, idp2Md, err = remapper(idp2)
 			if err != nil {
 				return err
 			}
-		}
-
-		if err = checkForCommonFederations(spMd, idp2Md); err != nil {
-			return err
 		}
 
 		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp2, relayState, "SSO-", "", config.Domain, true, false, nil)
