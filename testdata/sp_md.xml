@@ -11,6 +11,7 @@
       <wayf:feds>WAYF</wayf:feds>
       <wayf:federation>WAYF</wayf:federation>
       <wayf:federation>nemlog-in.dk</wayf:federation>
+      <wayf:feds>nemlog-in.dk</wayf:feds>
       <wayf:federation>qa.kmd.dk</wayf:federation>
       <wayf:icon>1324561724_logo.png</wayf:icon>
       <wayf:kalmar>0</wayf:kalmar>

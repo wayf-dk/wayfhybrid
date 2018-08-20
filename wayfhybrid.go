@@ -885,7 +885,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	base64encodedIn := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
 
 	switch idp {
-	case "https://nemlogin.wayf.dk", "https://saml.nemlog-in.dk": // last one for testing only
+	case "https://nemlogin.wayf.dk":
 		base64encodedIn = false
 		nemloginAttributeHandler(response)
 	case "https://eidasconnector.test.eid.digst.dk/idp":

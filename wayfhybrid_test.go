@@ -268,7 +268,7 @@ func ExampleNemLoginAttributeHandler() {
 	// eduPersonScopedAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     member@sikker-adgang.dk
 	// eduPersonTargetedID urn:oid:1.3.6.1.4.1.5923.1.1.1.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     WAYF-DK-d00398ea98ce6cac598a317dfe8a9e5145b3b5df
+	//     WAYF-DK-da0dc65f1297726d1dbf0019d729e047148f81c4
 	// gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     Anton Banton
 	// mail urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri

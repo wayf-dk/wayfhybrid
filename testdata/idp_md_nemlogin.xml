@@ -1,236 +1,157 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<EntityDescriptor ID="_3a1451c9-ba37-4e6a-a3b0-47167ddf832a" entityID="https://saml.nemlog-in.dk" xmlns="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:a="urn:oasis:names:tc:SAML:2.0:assertion">
+<?xml version="1.0"?>
+<md:EntityDescriptor xmlns:mdrpi="urn:oasis:names:tc:SAML:metadata:rpi" xmlns:wayf="http://wayf.dk/2014/08/wayf" xmlns:shibmd="urn:mace:shibboleth:metadata:1.0" xmlns:mdui="urn:oasis:names:tc:SAML:metadata:ui" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://birk.wayf.dk/birk.php/nemlogin.wayf.dk" ID="BIRK-WAYF000079">
   <md:Extensions xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata">
+    <mdrpi:RegistrationInfo xmlns:mdrpi="urn:oasis:names:tc:SAML:metadata:rpi" registrationInstant="2012-01-11T13:25:09Z" registrationAuthority="https://www.wayf.dk">
+      <mdrpi:RegistrationPolicy xml:lang="en">https://wayf.dk/sites/default/files/uploads/PDF/MDRPS.pdf</mdrpi:RegistrationPolicy>
+    </mdrpi:RegistrationInfo>
     <wayf:wayf xmlns:wayf="http://wayf.dk/2014/08/wayf">
-      <wayf:federation>WAYF</wayf:federation>
-      <wayf:feds>WAYF</wayf:feds>
+      <wayf:phphfeed>birk-idp</wayf:phphfeed>
+      <wayf:active>yes</wayf:active>
+      <wayf:AttributeNameFormat/>
+      <wayf:base64attributes>1</wayf:base64attributes>
+      <wayf:certFingerprint>42c77536887167fccc7f3b88022d316e7b4cfc07</wayf:certFingerprint>
+      <wayf:consent.disable>https://wayfsp.wayf.dk</wayf:consent.disable>
+      <wayf:consent.disable>https://nemid.sdu.dk/module.php/saml/sp/metadata.php/nemid</wayf:consent.disable>
+      <wayf:consent.disable>https://wayf.ruc.dk/spnc</wayf:consent.disable>
+      <wayf:consent.disable>https://bekraft.ucsyd.dk/sink</wayf:consent.disable>
+      <wayf:eduGAIN/>
+      <wayf:eid>79</wayf:eid>
+      <wayf:env>prod</wayf:env>
+      <wayf:ExportAsKRIB>0</wayf:ExportAsKRIB>
+      <wayf:feds>nemlog-in.dk</wayf:feds>
+      <wayf:federation>nemlog-in.dk</wayf:federation>
+      <wayf:federation>HUBIDP</wayf:federation>
+      <wayf:icon>1401093427_19711-250x161crop0.png</wayf:icon>
+      <wayf:kalmar>0</wayf:kalmar>
+      <wayf:modified>2018-07-13T12:08:12Z</wayf:modified>
+      <wayf:redirect.sign>1</wayf:redirect.sign>
+      <wayf:redirect.validate>1</wayf:redirect.validate>
+      <wayf:revisionid>725</wayf:revisionid>
+      <wayf:RegistrationInstant2>2012-01-11T13:25:09Z</wayf:RegistrationInstant2>
+      <wayf:type>saml20-idp</wayf:type>
+      <wayf:wayf_access_accept>https://wayf-sp.ruc.dk/sp</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://wayfsp.wayf.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://bibliotek.dk/simplesaml/www/module.php/saml/sp/metadata.php/default-sp</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://dans-qa.stads.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://nemid.dtu.dk/</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://wayf.ruc.dk/spnc</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://minryg.nu</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://www.aakb.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://saml.stadsvip.au.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://bibliotek.kk.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://wayf-test.zitelab.eu/module.php/saml/sp/metadata.php/default-sp</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://disco-saml.statsbiblioteket.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://birk.wayf.dk/birk.php/europe.wiseflow.net-proxy</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://birk.wayf.dk/birk.php/dans.stads.dk-proxy</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://stapvip.aau.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://eksamen.dtu.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://integrabib.dk/simplesaml/www/module.php/saml/sp/metadata.php/default-sp</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://aucfwlp.au.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://cas-selvopret-saml.statsbiblioteket.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://digex.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://www.koldingbib.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://smartarkivering.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://dtuprodtest1.digitaleksamen.arcanic.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://saml.vejlebib.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://federation-sp.ku.dk/adfs/services/trust</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://testeksamen.ait.dtu.dk/</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://ruccensorlogin.onlineeksamen.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://bibliotekssystem-saml.statsbiblioteket.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://itu.dk/password</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://handlingsplaner.cphbusiness.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://uendeliglykke.eu.ngrok.io/nemlogin</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://wayf.zitelab.dk/module.php/saml/sp/metadata.php/default-sp</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>http://wayf.inddatering.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://fkb.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://tkt-login.e-grant.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://preprod-login.e-grant.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://dans.stads.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://saml.sso2.phmetropol.dk/adfs/services/trust</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://login.e-grant.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://bibzoom-saml.statsbiblioteket.dk/module.php/saml/sp/metadata.php/bibzoom</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://bibzoom-saml.statsbiblioteket.dk/module.php/saml/sp/metadata.php/auxillary</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://midtx.dk/simplesamlphp/module.php/saml/sp/metadata.php/wayf</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://mediestream-saml.statsbiblioteket.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://anmodningerogsamtykke.cphbusiness.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://www.censor-it.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://saml.reset-staging.aau.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://stadsvip.sdu.dk/vip</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://saml.reset.aau.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://eksamen.au.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://pp16-login.e-grant.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://eksamen.ruc.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://saml.sbstads.au.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://consentmgt.wayf.dk/</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://cbstest1.digitaleksamen.arcanic.dk/bedoemmer</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://internetbehandling.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://digitaleksamen.aau.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://europe.wiseflow.net</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://dokk1.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://eksamen.au.dk/bedoemmer/dokumentannotering/LoginAnnotering/</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://login-alumnimember.test.erm-au.dk/runtime/</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://login-alumnimember.erm-au.dk/runtime/</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://birk.wayf.dk/birk.php/login-alumnimember.test.erm-au.dk/runtime/-proxy</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://birk.wayf.dk/birk.php/login-alumnimember.erm-au.dk/runtime/-proxy</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept/>
+      <wayf:wayf_access_accept/>
+      <wayf:wayf_access_accept/>
+      <wayf:wayf_access_accept>https://odensebib.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>http://evalgwlsp.e-vote.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://eksamen.cbs.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://nemid.sdu.dk/module.php/saml/sp/metadata.php/nemid</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://ruc-prodtest.digitaleksamen.arcanic.dk/</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://bekraft.ucsyd.dk/sink</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://tilsyn.cphbusiness.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://autestprod.digitaleksamen.arcanic.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://learnit2.itu.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://learnit.itu.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://optag.cphbusiness.dk</wayf:wayf_access_accept>
+      <wayf:wayf_access_accept>https://wayf-test.zitelab.dk/module.php/saml/sp/metadata.php/default-sp</wayf:wayf_access_accept>
       <wayf:wayf_schacHomeOrganization>sikker-adgang.dk</wayf:wayf_schacHomeOrganization>
       <wayf:wayf_schacHomeOrganizationType>urn:mace:terena.org:schac:homeOrganizationType:int:other</wayf:wayf_schacHomeOrganizationType>
     </wayf:wayf>
   </md:Extensions>
- <IDPSSODescriptor  xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" WantAuthnRequestsSigned="true" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+  <md:IDPSSODescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
     <md:Extensions>
       <shibmd:Scope xmlns:shibmd="urn:mace:shibboleth:metadata:1.0" regexp="false">sikker-adgang.dk</shibmd:Scope>
+      <mdui:UIInfo xmlns:mdui="urn:oasis:names:tc:SAML:metadata:ui">
+        <mdui:DisplayName xml:lang="da">NemID</mdui:DisplayName>
+        <mdui:DisplayName xml:lang="en">NemID</mdui:DisplayName>
+        <mdui:Logo width="250" height="100">data:image/png;base64,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</mdui:Logo>
+      </mdui:UIInfo>
     </md:Extensions>
-
-    <KeyDescriptor use="encryption">
-      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-        <X509Data>
-          <X509Certificate>MIIGJDCCBQygAwIBAgIEV1mE2jANBgkqhkiG9w0BAQsFADBAMQswCQYDVQQGEwJE
-SzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NFUyBD
-QSBJSTAeFw0xNzA4MTYxMTAwNTZaFw0yMDA4MTUxMTM1MDJaMIGXMQswCQYDVQQG
-EwJESzExMC8GA1UECgwoRGlnaXRhbGlzZXJpbmdzc3R5cmVsc2VuIC8vIENWUjoz
-NDA1MTE3ODFVMCAGA1UEBRMZQ1ZSOjM0MDUxMTc4LVVJRDo3NzM3MTE4NDAxBgNV
-BAMMKkRpZ2l0YWxpc2VyaW5nc3N0eXJlbHNlbiAtIE5lbUxvZy1pbiBMb2dpbjCC
-ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOnmd9Lu84uZyyhxxwDiC9JJ
-ZeEN8Y1c/XSiLhGBNHfqHlBQzvREFLPsSHOc6MKUl0o594VpvLFKbwMF+sPETdKY
-JkoLlFDWGxRBf2x+lrEMYq5E43yPoRuqP2p/kj5Afuz08xDTtSWuC+4naM6VVv7O
-2fwGA5Ql+plI8q93bUJx0zeiALDGLD3TyPPGah9+0+UEfkJMolmsLihkmf4YE1gO
-M1FkiKs8p0qfqBErnNsk5e3AumD5pF/wl0k8FsRFQRSZYmbjO03qavqGdhK2kTHr
-S2ls/1YHuL2pyZunr5VsV4pP5PzfiQ3SapKiwaT4SZrw0ULrRiece8ASJLiSrjkC
-AwEAAaOCAswwggLIMA4GA1UdDwEB/wQEAwIDuDCBiQYIKwYBBQUHAQEEfTB7MDUG
-CCsGAQUFBzABhilodHRwOi8vb2NzcC5pY2EwMi50cnVzdDI0MDguY29tL3Jlc3Bv
-bmRlcjBCBggrBgEFBQcwAoY2aHR0cDovL3YuYWlhLmljYTAyLnRydXN0MjQwOC5j
-b20vb2Nlcy1pc3N1aW5nMDItY2EuY2VyMIIBQwYDVR0gBIIBOjCCATYwggEyBgoq
-gVCBKQEBAQMEMIIBIjAvBggrBgEFBQcCARYjaHR0cDovL3d3dy50cnVzdDI0MDgu
-Y29tL3JlcG9zaXRvcnkwge4GCCsGAQUFBwICMIHhMBAWCVRSVVNUMjQwODADAgEB
-GoHMRm9yIGFudmVuZGVsc2UgYWYgY2VydGlmaWthdGV0IGfmbGRlciBPQ0VTIHZp
-bGvlciwgQ1BTIG9nIE9DRVMgQ1AsIGRlciBrYW4gaGVudGVzIGZyYSB3d3cudHJ1
-c3QyNDA4LmNvbS9yZXBvc2l0b3J5LiBCZW3mcmssIGF0IFRSVVNUMjQwOCBlZnRl
-ciB2aWxr5XJlbmUgaGFyIGV0IGJlZ3LmbnNldCBhbnN2YXIgaWZ0LiBwcm9mZXNz
-aW9uZWxsZSBwYXJ0ZXIuMIGXBgNVHR8EgY8wgYwwLqAsoCqGKGh0dHA6Ly9jcmwu
-aWNhMDIudHJ1c3QyNDA4LmNvbS9pY2EwMi5jcmwwWqBYoFakVDBSMQswCQYDVQQG
-EwJESzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NF
-UyBDQSBJSTEQMA4GA1UEAwwHQ1JMOTM0NDAfBgNVHSMEGDAWgBSZj7oNia4hGkJ6
-Cq4aTE4i/xDrjDAdBgNVHQ4EFgQU/D8kwqc7oepMGkXD91DR85DA630wCQYDVR0T
-BAIwADANBgkqhkiG9w0BAQsFAAOCAQEAhLNG+pa6m3Ck3/udsKM0TP0yX6sTlYyV
-wzpJIlmt05aG32eP1o3QYb393xytADivXhIMizOhqnASnGmACbWvb/8QsKgURDW5
-P8t6/Cdp0wHsdZOcIVuw8WjeuJYAsagL/hT9hclVH8cu0QaBmfXz+hhoS/dK+jHT
-MS62DLLnRVESsX3/x9MgVe+TfxHqRpo+w2um3F7gRV6LtTendWKKHtSI7QizWo0H
-ns4L1cvHVDQZiQTGa1ZyZf6rZnwaMbbVe+2CpxPNpi9mOKwv2Gp3vCZvV0BMHUHx
-aJjNFnI/SErZG73N7hsNT3s1pOVoFkuXJ8IXVxentlo1BbluRSUbLg==</X509Certificate>
-        </X509Data>
-      </KeyInfo>
-    </KeyDescriptor>
-    <KeyDescriptor use="signing">
-      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-        <X509Data>
-          <X509Certificate>MIIGJDCCBQygAwIBAgIEV1mE2jANBgkqhkiG9w0BAQsFADBAMQswCQYDVQQGEwJE
-SzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NFUyBD
-QSBJSTAeFw0xNzA4MTYxMTAwNTZaFw0yMDA4MTUxMTM1MDJaMIGXMQswCQYDVQQG
-EwJESzExMC8GA1UECgwoRGlnaXRhbGlzZXJpbmdzc3R5cmVsc2VuIC8vIENWUjoz
-NDA1MTE3ODFVMCAGA1UEBRMZQ1ZSOjM0MDUxMTc4LVVJRDo3NzM3MTE4NDAxBgNV
-BAMMKkRpZ2l0YWxpc2VyaW5nc3N0eXJlbHNlbiAtIE5lbUxvZy1pbiBMb2dpbjCC
-ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOnmd9Lu84uZyyhxxwDiC9JJ
-ZeEN8Y1c/XSiLhGBNHfqHlBQzvREFLPsSHOc6MKUl0o594VpvLFKbwMF+sPETdKY
-JkoLlFDWGxRBf2x+lrEMYq5E43yPoRuqP2p/kj5Afuz08xDTtSWuC+4naM6VVv7O
-2fwGA5Ql+plI8q93bUJx0zeiALDGLD3TyPPGah9+0+UEfkJMolmsLihkmf4YE1gO
-M1FkiKs8p0qfqBErnNsk5e3AumD5pF/wl0k8FsRFQRSZYmbjO03qavqGdhK2kTHr
-S2ls/1YHuL2pyZunr5VsV4pP5PzfiQ3SapKiwaT4SZrw0ULrRiece8ASJLiSrjkC
-AwEAAaOCAswwggLIMA4GA1UdDwEB/wQEAwIDuDCBiQYIKwYBBQUHAQEEfTB7MDUG
-CCsGAQUFBzABhilodHRwOi8vb2NzcC5pY2EwMi50cnVzdDI0MDguY29tL3Jlc3Bv
-bmRlcjBCBggrBgEFBQcwAoY2aHR0cDovL3YuYWlhLmljYTAyLnRydXN0MjQwOC5j
-b20vb2Nlcy1pc3N1aW5nMDItY2EuY2VyMIIBQwYDVR0gBIIBOjCCATYwggEyBgoq
-gVCBKQEBAQMEMIIBIjAvBggrBgEFBQcCARYjaHR0cDovL3d3dy50cnVzdDI0MDgu
-Y29tL3JlcG9zaXRvcnkwge4GCCsGAQUFBwICMIHhMBAWCVRSVVNUMjQwODADAgEB
-GoHMRm9yIGFudmVuZGVsc2UgYWYgY2VydGlmaWthdGV0IGfmbGRlciBPQ0VTIHZp
-bGvlciwgQ1BTIG9nIE9DRVMgQ1AsIGRlciBrYW4gaGVudGVzIGZyYSB3d3cudHJ1
-c3QyNDA4LmNvbS9yZXBvc2l0b3J5LiBCZW3mcmssIGF0IFRSVVNUMjQwOCBlZnRl
-ciB2aWxr5XJlbmUgaGFyIGV0IGJlZ3LmbnNldCBhbnN2YXIgaWZ0LiBwcm9mZXNz
-aW9uZWxsZSBwYXJ0ZXIuMIGXBgNVHR8EgY8wgYwwLqAsoCqGKGh0dHA6Ly9jcmwu
-aWNhMDIudHJ1c3QyNDA4LmNvbS9pY2EwMi5jcmwwWqBYoFakVDBSMQswCQYDVQQG
-EwJESzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NF
-UyBDQSBJSTEQMA4GA1UEAwwHQ1JMOTM0NDAfBgNVHSMEGDAWgBSZj7oNia4hGkJ6
-Cq4aTE4i/xDrjDAdBgNVHQ4EFgQU/D8kwqc7oepMGkXD91DR85DA630wCQYDVR0T
-BAIwADANBgkqhkiG9w0BAQsFAAOCAQEAhLNG+pa6m3Ck3/udsKM0TP0yX6sTlYyV
-wzpJIlmt05aG32eP1o3QYb393xytADivXhIMizOhqnASnGmACbWvb/8QsKgURDW5
-P8t6/Cdp0wHsdZOcIVuw8WjeuJYAsagL/hT9hclVH8cu0QaBmfXz+hhoS/dK+jHT
-MS62DLLnRVESsX3/x9MgVe+TfxHqRpo+w2um3F7gRV6LtTendWKKHtSI7QizWo0H
-ns4L1cvHVDQZiQTGa1ZyZf6rZnwaMbbVe+2CpxPNpi9mOKwv2Gp3vCZvV0BMHUHx
-aJjNFnI/SErZG73N7hsNT3s1pOVoFkuXJ8IXVxentlo1BbluRSUbLg==</X509Certificate>
-        </X509Data>
-      </KeyInfo>
-    </KeyDescriptor>
-    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://login.nemlog-in.dk/adfs/ls/"/>
-    <SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="https://login.nemlog-in.dk/adfs/ls/"/>
-    <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName</NameIDFormat>
-    <NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:persistent</NameIDFormat>
-    <SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://login.nemlog-in.dk/adfs/ls/"/>
-    <a:Attribute Name="dk:gov:saml:attribute:AssuranceLevel" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Assurance Level"/>
-    <a:Attribute Name="urn:oid:2.5.29.29" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Certificate Issuer DN"/>
-    <a:Attribute Name="urn:oid:2.5.4.3" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Common Name"/>
-    <a:Attribute Name="dk:gov:saml:attribute:CprNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="CPR Number Identifier"/>
-    <a:Attribute Name="dk:gov:saml:attribute:CvrNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="CVR Number Identifier"/>
-    <a:Attribute Name="urn:oid:0.9.2342.19200300.100.1.3" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="email"/>
-    <a:Attribute Name="dk:gov:saml:attribute:IsYouthCert" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Is Youth Certificate"/>
-    <a:Attribute Name="urn:oid:2.5.4.65" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="OCES Pseudonym"/>
-    <a:Attribute Name="urn:oid:2.5.4.10" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Organisation Name"/>
-    <a:Attribute Name="urn:oid:2.5.4.11" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Organisation Unit"/>
-    <a:Attribute Name="dk:gov:saml:attribute:PidNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="PID Number Identifier"/>
-    <a:Attribute Name="urn:oid:2.5.4.16" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Postal Address"/>
-    <a:Attribute Name="dk:gov:saml:attribute:RidNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="RID Number Identifier"/>
-    <a:Attribute Name="urn:oid:2.5.4.5" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Serialnumber"/>
-    <a:Attribute Name="dk:gov:saml:attribute:SpecVer" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Specification Version"/>
-    <a:Attribute Name="urn:oid:0.9.2342.19200300.100.1.1" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="SubjectSerialNumber"/>
-    <a:Attribute Name="urn:oid:2.5.4.4" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Surname"/>
-    <a:Attribute Name="urn:oid:2.5.4.12" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Title"/>
-    <a:Attribute Name="urn:oid:1.3.6.1.4.1.1466.115.121.1.8" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="User Certificate"/>
-    <a:Attribute Name="dk:gov:saml:attribute:ProductionUnitIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="ProductionUnitIdentifier"/>
-    <a:Attribute Name="dk:gov:saml:attribute:UserAdministratorIndicator" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="UserAdministratorIndicator"/>
-    <a:Attribute Name="dk:gov:saml:attribute:seNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="SeNumberIdentifier"/>
-    <a:Attribute Name="dk:gov:saml:attribute:UniqueAccountKey" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="UniqueAccountKey"/>
-    <a:Attribute Name="dk:gov:saml:attribute:Privileges_intermediate" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Privileges"/>
-	<a:Attribute Name="urn:liberty:disco:2006-08:DiscoveryEPR" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="STS Bootstrap Token" />
-  </IDPSSODescriptor>
-  <AttributeAuthorityDescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
-    <KeyDescriptor use="encryption">
-      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-        <X509Data>
-          <X509Certificate>MIIGJDCCBQygAwIBAgIEV1mE2jANBgkqhkiG9w0BAQsFADBAMQswCQYDVQQGEwJE
-SzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NFUyBD
-QSBJSTAeFw0xNzA4MTYxMTAwNTZaFw0yMDA4MTUxMTM1MDJaMIGXMQswCQYDVQQG
-EwJESzExMC8GA1UECgwoRGlnaXRhbGlzZXJpbmdzc3R5cmVsc2VuIC8vIENWUjoz
-NDA1MTE3ODFVMCAGA1UEBRMZQ1ZSOjM0MDUxMTc4LVVJRDo3NzM3MTE4NDAxBgNV
-BAMMKkRpZ2l0YWxpc2VyaW5nc3N0eXJlbHNlbiAtIE5lbUxvZy1pbiBMb2dpbjCC
-ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOnmd9Lu84uZyyhxxwDiC9JJ
-ZeEN8Y1c/XSiLhGBNHfqHlBQzvREFLPsSHOc6MKUl0o594VpvLFKbwMF+sPETdKY
-JkoLlFDWGxRBf2x+lrEMYq5E43yPoRuqP2p/kj5Afuz08xDTtSWuC+4naM6VVv7O
-2fwGA5Ql+plI8q93bUJx0zeiALDGLD3TyPPGah9+0+UEfkJMolmsLihkmf4YE1gO
-M1FkiKs8p0qfqBErnNsk5e3AumD5pF/wl0k8FsRFQRSZYmbjO03qavqGdhK2kTHr
-S2ls/1YHuL2pyZunr5VsV4pP5PzfiQ3SapKiwaT4SZrw0ULrRiece8ASJLiSrjkC
-AwEAAaOCAswwggLIMA4GA1UdDwEB/wQEAwIDuDCBiQYIKwYBBQUHAQEEfTB7MDUG
-CCsGAQUFBzABhilodHRwOi8vb2NzcC5pY2EwMi50cnVzdDI0MDguY29tL3Jlc3Bv
-bmRlcjBCBggrBgEFBQcwAoY2aHR0cDovL3YuYWlhLmljYTAyLnRydXN0MjQwOC5j
-b20vb2Nlcy1pc3N1aW5nMDItY2EuY2VyMIIBQwYDVR0gBIIBOjCCATYwggEyBgoq
-gVCBKQEBAQMEMIIBIjAvBggrBgEFBQcCARYjaHR0cDovL3d3dy50cnVzdDI0MDgu
-Y29tL3JlcG9zaXRvcnkwge4GCCsGAQUFBwICMIHhMBAWCVRSVVNUMjQwODADAgEB
-GoHMRm9yIGFudmVuZGVsc2UgYWYgY2VydGlmaWthdGV0IGfmbGRlciBPQ0VTIHZp
-bGvlciwgQ1BTIG9nIE9DRVMgQ1AsIGRlciBrYW4gaGVudGVzIGZyYSB3d3cudHJ1
-c3QyNDA4LmNvbS9yZXBvc2l0b3J5LiBCZW3mcmssIGF0IFRSVVNUMjQwOCBlZnRl
-ciB2aWxr5XJlbmUgaGFyIGV0IGJlZ3LmbnNldCBhbnN2YXIgaWZ0LiBwcm9mZXNz
-aW9uZWxsZSBwYXJ0ZXIuMIGXBgNVHR8EgY8wgYwwLqAsoCqGKGh0dHA6Ly9jcmwu
-aWNhMDIudHJ1c3QyNDA4LmNvbS9pY2EwMi5jcmwwWqBYoFakVDBSMQswCQYDVQQG
-EwJESzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NF
-UyBDQSBJSTEQMA4GA1UEAwwHQ1JMOTM0NDAfBgNVHSMEGDAWgBSZj7oNia4hGkJ6
-Cq4aTE4i/xDrjDAdBgNVHQ4EFgQU/D8kwqc7oepMGkXD91DR85DA630wCQYDVR0T
-BAIwADANBgkqhkiG9w0BAQsFAAOCAQEAhLNG+pa6m3Ck3/udsKM0TP0yX6sTlYyV
-wzpJIlmt05aG32eP1o3QYb393xytADivXhIMizOhqnASnGmACbWvb/8QsKgURDW5
-P8t6/Cdp0wHsdZOcIVuw8WjeuJYAsagL/hT9hclVH8cu0QaBmfXz+hhoS/dK+jHT
-MS62DLLnRVESsX3/x9MgVe+TfxHqRpo+w2um3F7gRV6LtTendWKKHtSI7QizWo0H
-ns4L1cvHVDQZiQTGa1ZyZf6rZnwaMbbVe+2CpxPNpi9mOKwv2Gp3vCZvV0BMHUHx
-aJjNFnI/SErZG73N7hsNT3s1pOVoFkuXJ8IXVxentlo1BbluRSUbLg==</X509Certificate>
-        </X509Data>
-      </KeyInfo>
-    </KeyDescriptor>
-    <KeyDescriptor use="signing">
-      <KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-        <X509Data>
-          <X509Certificate>MIIGJDCCBQygAwIBAgIEV1mE2jANBgkqhkiG9w0BAQsFADBAMQswCQYDVQQGEwJE
-SzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NFUyBD
-QSBJSTAeFw0xNzA4MTYxMTAwNTZaFw0yMDA4MTUxMTM1MDJaMIGXMQswCQYDVQQG
-EwJESzExMC8GA1UECgwoRGlnaXRhbGlzZXJpbmdzc3R5cmVsc2VuIC8vIENWUjoz
-NDA1MTE3ODFVMCAGA1UEBRMZQ1ZSOjM0MDUxMTc4LVVJRDo3NzM3MTE4NDAxBgNV
-BAMMKkRpZ2l0YWxpc2VyaW5nc3N0eXJlbHNlbiAtIE5lbUxvZy1pbiBMb2dpbjCC
-ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOnmd9Lu84uZyyhxxwDiC9JJ
-ZeEN8Y1c/XSiLhGBNHfqHlBQzvREFLPsSHOc6MKUl0o594VpvLFKbwMF+sPETdKY
-JkoLlFDWGxRBf2x+lrEMYq5E43yPoRuqP2p/kj5Afuz08xDTtSWuC+4naM6VVv7O
-2fwGA5Ql+plI8q93bUJx0zeiALDGLD3TyPPGah9+0+UEfkJMolmsLihkmf4YE1gO
-M1FkiKs8p0qfqBErnNsk5e3AumD5pF/wl0k8FsRFQRSZYmbjO03qavqGdhK2kTHr
-S2ls/1YHuL2pyZunr5VsV4pP5PzfiQ3SapKiwaT4SZrw0ULrRiece8ASJLiSrjkC
-AwEAAaOCAswwggLIMA4GA1UdDwEB/wQEAwIDuDCBiQYIKwYBBQUHAQEEfTB7MDUG
-CCsGAQUFBzABhilodHRwOi8vb2NzcC5pY2EwMi50cnVzdDI0MDguY29tL3Jlc3Bv
-bmRlcjBCBggrBgEFBQcwAoY2aHR0cDovL3YuYWlhLmljYTAyLnRydXN0MjQwOC5j
-b20vb2Nlcy1pc3N1aW5nMDItY2EuY2VyMIIBQwYDVR0gBIIBOjCCATYwggEyBgoq
-gVCBKQEBAQMEMIIBIjAvBggrBgEFBQcCARYjaHR0cDovL3d3dy50cnVzdDI0MDgu
-Y29tL3JlcG9zaXRvcnkwge4GCCsGAQUFBwICMIHhMBAWCVRSVVNUMjQwODADAgEB
-GoHMRm9yIGFudmVuZGVsc2UgYWYgY2VydGlmaWthdGV0IGfmbGRlciBPQ0VTIHZp
-bGvlciwgQ1BTIG9nIE9DRVMgQ1AsIGRlciBrYW4gaGVudGVzIGZyYSB3d3cudHJ1
-c3QyNDA4LmNvbS9yZXBvc2l0b3J5LiBCZW3mcmssIGF0IFRSVVNUMjQwOCBlZnRl
-ciB2aWxr5XJlbmUgaGFyIGV0IGJlZ3LmbnNldCBhbnN2YXIgaWZ0LiBwcm9mZXNz
-aW9uZWxsZSBwYXJ0ZXIuMIGXBgNVHR8EgY8wgYwwLqAsoCqGKGh0dHA6Ly9jcmwu
-aWNhMDIudHJ1c3QyNDA4LmNvbS9pY2EwMi5jcmwwWqBYoFakVDBSMQswCQYDVQQG
-EwJESzESMBAGA1UECgwJVFJVU1QyNDA4MR0wGwYDVQQDDBRUUlVTVDI0MDggT0NF
-UyBDQSBJSTEQMA4GA1UEAwwHQ1JMOTM0NDAfBgNVHSMEGDAWgBSZj7oNia4hGkJ6
-Cq4aTE4i/xDrjDAdBgNVHQ4EFgQU/D8kwqc7oepMGkXD91DR85DA630wCQYDVR0T
-BAIwADANBgkqhkiG9w0BAQsFAAOCAQEAhLNG+pa6m3Ck3/udsKM0TP0yX6sTlYyV
-wzpJIlmt05aG32eP1o3QYb393xytADivXhIMizOhqnASnGmACbWvb/8QsKgURDW5
-P8t6/Cdp0wHsdZOcIVuw8WjeuJYAsagL/hT9hclVH8cu0QaBmfXz+hhoS/dK+jHT
-MS62DLLnRVESsX3/x9MgVe+TfxHqRpo+w2um3F7gRV6LtTendWKKHtSI7QizWo0H
-ns4L1cvHVDQZiQTGa1ZyZf6rZnwaMbbVe+2CpxPNpi9mOKwv2Gp3vCZvV0BMHUHx
-aJjNFnI/SErZG73N7hsNT3s1pOVoFkuXJ8IXVxentlo1BbluRSUbLg==</X509Certificate>
-        </X509Data>
-      </KeyInfo>
-    </KeyDescriptor>
-    <AttributeService Binding="urn:oasis:names:tc:SAML:2.0:bindings:SOAP" Location="https://attributequery.nemlog-in.dk/AttributeQuery.svc"/>
-    <NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName</NameIDFormat>
-    <a:Attribute Name="urn:oid:2.5.29.29" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Certificate Issuer DN"/>
-    <a:Attribute Name="urn:oid:2.5.4.3" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Common Name"/>
-    <a:Attribute Name="dk:gov:saml:attribute:CprNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="CPR Number Identifier"/>
-    <a:Attribute Name="dk:gov:saml:attribute:CvrNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="CVR Number Identifier"/>
-    <a:Attribute Name="urn:oid:0.9.2342.19200300.100.1.3" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="email"/>
-    <a:Attribute Name="dk:gov:saml:attribute:IsYouthCert" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Is Youth Certificate"/>
-    <a:Attribute Name="urn:oid:2.5.4.10" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Organisation Name"/>
-    <a:Attribute Name="urn:oid:2.5.4.11" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Organisation Unit"/>
-    <a:Attribute Name="dk:gov:saml:attribute:PidNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="PID Number Identifier"/>
-    <a:Attribute Name="urn:oid:2.5.4.16" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Postal Address"/>
-    <a:Attribute Name="dk:gov:saml:attribute:RidNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="RID Number Identifier"/>
-    <a:Attribute Name="urn:oid:2.5.4.5" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Serialnumber"/>
-    <a:Attribute Name="dk:gov:saml:attribute:SpecVer" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Specification Version"/>
-    <a:Attribute Name="urn:oid:0.9.2342.19200300.100.1.1" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="SubjectSerialNumber"/>
-    <a:Attribute Name="urn:oid:2.5.4.4" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Surname"/>
-    <a:Attribute Name="urn:oid:2.5.4.12" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Title"/>
-    <a:Attribute Name="urn:oid:1.3.6.1.4.1.1466.115.121.1.8" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="User Certificate"/>
-    <a:Attribute Name="dk:gov:saml:attribute:ProductionUnitIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="ProductionUnitIdentifier"/>
-    <a:Attribute Name="dk:gov:saml:attribute:UserAdministratorIndicator" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="UserAdministratorIndicator"/>
-    <a:Attribute Name="dk:gov:saml:attribute:seNumberIdentifier" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="SeNumberIdentifier"/>
-    <a:Attribute Name="dk:gov:saml:attribute:UniqueAccountKey" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="UniqueAccountKey"/>
-    <a:Attribute Name="dk:gov:saml:attribute:Privileges_intermediate" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" FriendlyName="Privileges"/>
-  </AttributeAuthorityDescriptor>
-  <ContactPerson contactType="administrative">
-    <Company>NemLog-in</Company>
-    <GivenName>Kenneth</GivenName>
-    <SurName>Mose Kruuse</SurName>
-    <EmailAddress>nemlogin@digst.dk</EmailAddress>
-    <TelephoneNumber>40733354</TelephoneNumber>
-  </ContactPerson>
-</EntityDescriptor>
+    <md:KeyDescriptor>
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>MIICnjCCAYYCAQcwDQYJKoZIhvcNAQELBQAwFTETMBEGA1UEAwwKQklSSzAwMDA3
+OTAeFw0xNTAxMDEwMDAwMDBaFw0yNTEyMzEyMzU5NTlaMBUxEzARBgNVBAMMCkJJ
+UkswMDAwNzkwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDngretRPjv
+dPY63lVFdbRR0HvZt4etdlt/Dmrln7VVa8B9AiaWAhRgDFAXAxZD4KHAPl6Qdqmn
+Rfv3ZxKyA201YMasnsAdEzlpjKKjJJ65JktMdAIkRyAbZMyFhWpvhMBrRRgOR8N7
+Ixj6A14OHBk+99bqApLbB+RC7fnhQ10gTlIMcis2X/DU10Wy5LCHT8TYGdOHuSWs
+BaNXJ2G01WEHJXjKjmGN6yA18QPAU5uGWAjZMSztL+2Cu/pnxeU9UOQuxV4r6ECP
+gNpov6hpcC7fqA/NY3WJIv7+wKV2YtLHXEaLwPR+MhQr+LU+X/z5bvGCfGl0hqSf
+IAEz7ZGPbpfXAgMBAAEwDQYJKoZIhvcNAQELBQADggEBACTrdQsxIhmXTyLb4qZW
+fNgHWVILz2o77YqHFSX1djDCgEHIssrF1b4nQw/zfa/BNSOolOn0silvKqZqrFEn
+SLkKYy32xCwi/mRzleNPmDIggkGIvdYlMeyvCHTkzXzsb2MqJqV4IPsRi3QUuqei
+0VrL+xhQ7UZ3tlQahTYjkWRT8kpIY5K/yj3n0Eq1nKHfSpP54L1K1NpuESocfgn+
+32PGJgc8lKN3saX6TRPIoCa9JIpKVc/+f+QzIALiCr5vu1Xxm6MPJTdc43DwBnrs
+L26ueSqqz2rPhR2dmIcz01pW2JELEsF5kXHBH1RRA25jCOonxBvTEfNwy/GTfD17
+X8M=
+</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </md:KeyDescriptor>
+    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://birk.wayf.dk/SLO/birk.php/nemlogin.wayf.dk/saml2/idp/SingleLogoutService.php"/>
+    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>
+    <md:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="https://birk.wayf.dk/birk.php/nemlogin.wayf.dk/saml2/idp/SSOService.php"/>
+  </md:IDPSSODescriptor>
+  <md:Organization xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata">
+    <md:OrganizationName xml:lang="da">NemID</md:OrganizationName>
+    <md:OrganizationName xml:lang="en">NemID</md:OrganizationName>
+    <md:OrganizationDisplayName xml:lang="da">NemID</md:OrganizationDisplayName>
+    <md:OrganizationDisplayName xml:lang="en">NemID</md:OrganizationDisplayName>
+    <md:OrganizationURL xml:lang="da">https://digst.dk/it-loesninger/nemlog-in/</md:OrganizationURL>
+    <md:OrganizationURL xml:lang="en">https://en.digst.dk/digitisation/nemlog-in/</md:OrganizationURL>
+  </md:Organization>
+</md:EntityDescriptor>
