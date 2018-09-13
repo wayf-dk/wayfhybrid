@@ -1669,7 +1669,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 
-		_, _, _, _, err = checkScope(response, birkMd, response.Query(nil, `/saml:Assertion/saml:AttributeStatement`)[0], false)
+		_, _, _, _, err = checkScope(response, birkMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
 		if err != nil {
 			return
 		}
