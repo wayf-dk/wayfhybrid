@@ -2038,6 +2038,8 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 				return
 			}
 			securityDomain = matches[1] + matches[2] // rm matches[2] when @aau.dk goes away
+		} else {
+		    return // no scoped values found and we don't require eppn so just return with no error
 		}
 	default: // never more than one
 		err = fmt.Errorf("More than one 'eduPersonPrincipalName' value")
