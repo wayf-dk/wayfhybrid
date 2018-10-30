@@ -221,7 +221,7 @@ func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
 			if err != nil {
 				return err
 			}
-			var f idpInfoOut
+			var f idpInfoIn
 			err = json.Unmarshal(entityInfo, &f)
 			if err != nil {
 				return err
