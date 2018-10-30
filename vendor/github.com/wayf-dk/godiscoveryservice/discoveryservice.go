@@ -120,18 +120,9 @@ func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
         //defer db.Close()
     }
 
-    fedsquery := ""
-    delim := "("
-    for _, fed := range res.Feds {
-        fed = notwordnorwhitespace.ReplaceAllLiteralString(fed, "0")
-        fedsquery += delim + "feds:" + fed
-        delim = " OR "
-    }
-    fedsquery += ")"
-
     providerIDsquery := ""
     if providerIDs[0] != "" {
-        delim = "("
+        delim := "("
         for _, providerID := range providerIDs {
             providerID = notwordnorwhitespace.ReplaceAllLiteralString(providerID, "0")
             providerIDsquery += delim + "entityid:" + providerID
@@ -160,7 +151,18 @@ func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
 		if res.Feds[0] == "" {
 			res.Feds = spMetaData.QueryMulti(nil, "md:Extensions/wayf:wayf/wayf:feds")
 		}
+	}
 
+    fedsquery := ""
+    delim := "("
+    for _, fed := range res.Feds {
+        fed = notwordnorwhitespace.ReplaceAllLiteralString(fed, "0")
+        fedsquery += delim + "feds:" + fed
+        delim = " OR "
+    }
+    fedsquery += ")"
+
+	if entityID != "" {
 		chosenquery := ""
 		if chosen[0] != "" {
 			delim = "("
