@@ -170,7 +170,7 @@ func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
 				delim = " OR "
 			}
 			chosenquery += ")"
-			//fmt.Fprintln(w, "chosenquery", chosenquery + fedsquery)
+			fmt.Fprintln(w, "chosenquery", chosenquery)
 		}
 
 		if idpDB == nil {
@@ -206,7 +206,7 @@ func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 
 			res.Chosen = append(res.Chosen, x)
-			//fmt.Fprintln(w, "f", f)
+			fmt.Fprintln(w, "chosen", res.Chosen)
 		}
         // Find if earlier chosen IdPs are relevant
 		rows, err = idpDB.Query("select json from disco where entityid MATCH ? limit 10", chosenquery+fedsquery+providerIDsquery)
