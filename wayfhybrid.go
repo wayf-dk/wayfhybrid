@@ -770,7 +770,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if protocol == "Response" {
             _, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
             if err != nil {
-        		messages += err
+        		messages = err.Error()
             }
     		vals = attributeValues(response, destinationMd, hubRequestedAttributes)
         }
