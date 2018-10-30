@@ -680,6 +680,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	type testSPFormData struct {
 		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP string
+		Messages                                                                   []string
 		AttrValues                                                                 []attrValue
 	}
 
@@ -767,15 +768,12 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		protocol := response.QueryString(nil, "local-name(/*)")
 		if protocol == "Response" {
             _, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
-
-            if err != nil {
-                return err
-            }
     		vals = attributeValues(response, destinationMd, hubRequestedAttributes)
         }
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"),
 			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
+		data.Messages = append(data.Messages, err)
 		testSPForm.Execute(w, data)
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
