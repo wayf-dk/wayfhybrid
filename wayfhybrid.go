@@ -42,6 +42,8 @@ var (
 const (
 	authnRequestTTL = 180
 	sloInfoTTL      = 8 * 3600
+    basic  = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
+	claims = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
 )
 
 type (
@@ -1563,7 +1565,6 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
 		}
 
-		handleAttributeNameFormat(newresponse, spMd)
 
 		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
 		if spMd.QueryBool(nil, "count(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds[.='eduGAIN']) > 0") {
@@ -1583,12 +1584,17 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
+        // We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
+	    nameFormat := spMd.Query1(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute[1]/@AttributeNameformat")
 	    signingType := gosaml.SAMLSign
 		if (sRequest.WsFed) {
 		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
             signingType = gosaml.WSFedSign
-            elementsToSign = []string{"//saml:Assertion"}
+            elementsToSign = []string{"./t:RequestedSecurityToken/saml:Assertion"}
+            nameFormat = claims
 		}
+
+		handleAttributeNameFormat(newresponse, spMd, nameFormat)
 
 		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, signingType)
@@ -1689,7 +1695,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		// Krib always receives attributes with nameformat=urn. Before sending to the real SP we need to look into
 		// the metadata for SP to determine the actual nameformat - as WAYF supports both for Md.Internal SPs.
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
-		handleAttributeNameFormat(response, spMd)
+		handleAttributeNameFormat(response, spMd, "")
 
 		if sigAlg := gosaml.DebugSetting(r, "sigAlg"); sigAlg != "" {
 			signingMethod = sigAlg
@@ -1959,11 +1965,7 @@ func idHash(data string) string {
 }
 
 // handleAttributeNameFormat handles attribute name format
-func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
-	const (
-		basic  = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
-		claims = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
-	)
+func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
 	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml:Assertion/saml:AttributeStatement)")
 	if len(attributestatements) != 0 {
@@ -1973,39 +1975,12 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 			uriname := basic2uri[basicname].uri
 			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name="+strconv.Quote(uriname)+"]")
 			if len(responseattribute) > 0 {
-				switch mdsp.Query1(attr, "@NameFormat") {
+				switch nameFormat {
+//				switch mdsp.Query1(attr, "@NameFormat") {
 				case basic:
 					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)
 					response.QueryDashP(responseattribute[0], "@Name", basicname, nil)
 				case claims:
-					response.QueryDashP(responseattribute[0], "@AttributeNamespace", claims, nil)
-					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[basicname].claim, nil)
-					responseattribute[0].(types.Element).RemoveAttribute("Name")
-					responseattribute[0].(types.Element).RemoveAttribute("NameFormat")
-					responseattribute[0].(types.Element).RemoveAttribute("FriendlyName")
-				}
-			}
-		}
-	}
-}
-
-func handleAttributeNameFormat2(response, mdsp *goxml.Xp) {
-	const (
-		basic  = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
-		claims = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
-	)
-	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
-	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml:Assertion/saml:AttributeStatement)")
-
-	if len(attributestatements) != 0 {
-		attributestatement := attributestatements[0]
-		for _, attr := range requestedattributes {
-			basicname := mdsp.Query1(attr, "@FriendlyName")
-			uriname := basic2uri[basicname].uri
-			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name="+strconv.Quote(uriname)+"]")
-			if len(responseattribute) > 0 {
-				switch mdsp.Query1(attr, "@NameFormat") {
-				default:
 					response.QueryDashP(responseattribute[0], "@AttributeNamespace", claims, nil)
 					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[basicname].claim, nil)
 					responseattribute[0].(types.Element).RemoveAttribute("Name")
