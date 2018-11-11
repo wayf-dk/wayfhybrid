@@ -1551,10 +1551,6 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
-		if (sRequest.WsFed) {
-		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
-		}
-
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
 		// The response at this time contains a full attribute set
@@ -1588,7 +1584,11 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 	    signingType := gosaml.SAMLSign
-	    if sRequest.WsFed { signingType = gosaml.WSFedSign }
+		if (sRequest.WsFed) {
+		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
+            signingType = gosaml.WSFedSign
+		}
+
 		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, signingType)
 			if err != nil {
