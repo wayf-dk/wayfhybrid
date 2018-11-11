@@ -147,7 +147,7 @@ type (
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
 		Fo                   int
-		DtS, Brk             bool
+		DtS, Brk, WsFed      bool
 	}
 )
 
@@ -1396,6 +1396,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Acs: request.Query1(nil, "./@AssertionConsumerServiceIndex"),
 		DtS: directToSP,
 		Brk: birk,
+		WsFed: r.Form.Get("wa") == "wsignin1.0",
 	}
 	bytes, err := json.Marshal(&sRequest)
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
@@ -1550,6 +1551,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
+		if (sRequest.WsFed) {
+		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
+		}
 
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
@@ -1583,8 +1587,10 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
+	    signingType := gosaml.SAMLSign
+	    if sRequest.WsFed { signingType = gosaml.WSFedSign }
 		for _, q := range elementsToSign {
-			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
+			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, signingType)
 			if err != nil {
 				return err
 			}
