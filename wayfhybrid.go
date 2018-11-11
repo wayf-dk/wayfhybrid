@@ -1566,7 +1566,6 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
 		}
 
-
 		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
 		if spMd.QueryBool(nil, "count(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds[.='eduGAIN']) > 0") {
 			if eptidAttr := newresponse.Query(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]`); eptidAttr != nil {
@@ -1588,7 +1587,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
         // We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
 	    nameFormat := spMd.Query1(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute[1]/@AttributeNameformat")
 	    signingType := gosaml.SAMLSign
-		if (sRequest.WsFed) {
+		if sRequest.WsFed {
 		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
             signingType = gosaml.WSFedSign
             elementsToSign = []string{"./t:RequestedSecurityToken/saml:Assertion"}

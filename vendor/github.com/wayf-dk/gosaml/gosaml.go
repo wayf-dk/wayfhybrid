@@ -1125,9 +1125,11 @@ func wsfedRequest2samlRequest(r *http.Request, issuerMdSet, destinationMdSet Md)
 			return
 		}
 		samlrequest, _ := NewAuthnRequest(nil, issuerMd, destinationMd, nil)
-		if wreply := r.Form.Get("wreply"), wreplay != "" {
+		if wreply := r.Form.Get("wreply"); wreply != "" {
             samlrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", wreply, nil)
 		}
+
+        DumpFileIfTracing(r, samlrequest)
 		msg = base64.StdEncoding.EncodeToString(Deflate(samlrequest.Dump()))
 	}
 	return
