@@ -1587,6 +1587,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		if (sRequest.WsFed) {
 		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
             signingType = gosaml.WSFedSign
+            elementsToSign = []string{"//saml:Assertion"}
 		}
 
 		for _, q := range elementsToSign {
