@@ -99,6 +99,7 @@ type (
 		Acs          string
 		Samlresponse string
 		RelayState   string
+		WsFed        bool
 		Ard          template.JS
 	}
 
@@ -1637,7 +1638,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	gosaml.DumpFileIfTracing(r, newresponse)
 
-	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
+	data := formdata{WsFed: sRequest.WsFed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
 	return
 }
