@@ -1638,7 +1638,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	gosaml.DumpFileIfTracing(r, newresponse)
 
-    samlResponse = sRequest.WsFed ? base64.StdEncoding.EncodeToString(newresponse.Dump()) : newresponse.Dump()
+    samlResponse = sRequest.WsFed ? newresponse.Dump() : base64.StdEncoding.EncodeToString(newresponse.Dump())
 	data := formdata{WsFed: sRequest.WsFed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
 	return
