@@ -1640,9 +1640,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
     var samlResponse string
     if sRequest.WsFed {
-        samlResponse = base64.StdEncoding.EncodeToString(newresponse.Dump())
-    } else {
         samlResponse = string(newresponse.Dump())
+    } else {
+        samlResponse = base64.StdEncoding.EncodeToString(newresponse.Dump())
     }
 	data := formdata{WsFed: sRequest.WsFed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
