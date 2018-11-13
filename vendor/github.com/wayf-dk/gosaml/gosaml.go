@@ -1205,11 +1205,11 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
     nameIdFormat := sourceResponse.Query1(nameIdentifierElement, "./@Format")
 
 	response.QueryDashP(authstatement, "saml:Subject/saml:NameIdentifier", nameIdentifier, nil)
-	response.QueryDashP(authstatement, "saml:Subject/saml:NameIdentifier/@format", nameIdFormat, nil)
+	response.QueryDashP(authstatement, "saml:Subject/saml:NameIdentifier/@Format", nameIdFormat, nil)
 
 	authenticationStatement := response.Query(assertion, "saml:AuthenticationStatement")[0]
 	response.QueryDashP(authenticationStatement, "saml:Subject/saml:NameIdentifier", nameIdentifier, nil)
-	response.QueryDashP(authenticationStatement, "saml:Subject/saml:NameIdentifier/@format", nameIdFormat, nil)
+	response.QueryDashP(authenticationStatement, "saml:Subject/saml:NameIdentifier/@Format", nameIdFormat, nil)
 
 	authContext := sourceResponse.Query1(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef")
     response.QueryDashP(authenticationStatement, "./@AuthenticationMethod", authContext, nil)
