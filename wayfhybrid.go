@@ -1569,7 +1569,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
 		if nameidformat == gosaml.Persistent {
 			newresponse.QueryDashP(nameid, "@Format", gosaml.Persistent, nil)
-			eptid := newresponse.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]/saml:AttributeValue`)
+			eptid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]/saml:AttributeValue`)
 			newresponse.QueryDashP(nameid, ".", eptid, nil)
 		} else { // if nameidformat == gosaml.Transient
 			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
@@ -1594,7 +1594,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
         // We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
-	    nameFormat := spMd.Query1(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute[1]/@AttributeNameformat")
+	    nameFormat := spMd.Query1(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute[1]/@Nameformat")
 	    signingType := gosaml.SAMLSign
 		if sRequest.WsFed {
 		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
@@ -2022,15 +2022,12 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 		attrcache[basic2uri[name].AttributeName] = attr.(types.Element)
 	}
 
-q.Q(attrcache)
-
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
 
     assertion := response.Query(nil, "(./saml:Assertion | ./t:RequestedSecurityToken/saml:Assertion)")[0]
 	destinationAttributes := response.QueryDashP(assertion, `saml:AttributeStatement`, "", nil) // only if there are actually some requested attributes
 	for _, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
-q.Q(spMd.Query1(requestedAttribute, "@Name"), attribute)
 		if attribute == nil {
 			continue
 		}
