@@ -2020,7 +2020,7 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 		attrcache[basic2uri[name].AttributeName] = attr.(types.Element)
 	}
 
-Q(attrcache)
+q.Q(attrcache)
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
 
@@ -2028,7 +2028,7 @@ Q(attrcache)
 	destinationAttributes := response.QueryDashP(assertion, `saml:AttributeStatement`, "", nil) // only if there are actually some requested attributes
 	for _, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
-		Q(spMd.Query1(requestedAttribute, "@Name"), attribute)
+q.Q(spMd.Query1(requestedAttribute, "@Name"), attribute)
 		if attribute == nil {
 			continue
 		}
