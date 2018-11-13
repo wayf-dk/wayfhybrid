@@ -138,7 +138,7 @@ type (
 	}
 
 	attrName struct {
-		uri, basic, claim string
+		uri, basic, AttributeName string
 	}
 
 	attrValue struct {
@@ -432,8 +432,14 @@ func prepareTables(attrs *goxml.Xp) {
 	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
 		friendlyName := attrs.Query1(attr, "@FriendlyName")
 		uri := attrs.Query1(attr, "@Name")
-		basic2uri[friendlyName] = attrName{uri: uri, basic: friendlyName, claim: friendlyName} // attrs.Query1(attr, "@AttributeName")
-		basic2uri[uri] = attrName{uri: uri, basic: friendlyName, claim: friendlyName}          // attrs.Query1(attr, "@AttributeName")
+		attributeName := attrs.Query1(attr, "@AttributeName")
+		if attributeName == "" {
+		    attributeName = friendlyName
+		}
+		attributeNameMap := attrName{uri: uri, basic: friendlyName, AttributeName: attributeName}
+		basic2uri[friendlyName] = attributeNameMap
+		basic2uri[uri] = attributeNameMap
+		basic2uri[attributeName] = attributeNameMap
 	}
 }
 
@@ -1554,6 +1560,8 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
+		copyAttributes(response, newresponse, spMd)
+
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
 		// The response at this time contains a full attribute set
@@ -1974,7 +1982,7 @@ func idHash(data string) string {
 func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
 	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml:Assertion/saml:AttributeStatement)")
-	if len(attributestatements) != 0 {
+	if len(attributestatements) > 0 {
 		attributestatement := attributestatements[0]
 		for _, attr := range requestedattributes {
 			basicname := mdsp.Query1(attr, "@FriendlyName")
@@ -1988,14 +1996,59 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 					response.QueryDashP(responseattribute[0], "@Name", basicname, nil)
 				case claims:
 					response.QueryDashP(responseattribute[0], "@AttributeNamespace", claims, nil)
-					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[basicname].claim, nil)
+					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[basicname].AttributeName, nil)
 					responseattribute[0].(types.Element).RemoveAttribute("Name")
 					responseattribute[0].(types.Element).RemoveAttribute("NameFormat")
-					responseattribute[0].(types.Element).RemoveAttribute("FriendlyName")
+					//responseattribute[0].(types.Element).RemoveAttribute("FriendlyName")
 				}
 			}
 		}
 	}
+}
+
+// copyAttributes copies the attributes
+func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
+	base64encodedOut := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
+
+	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
+	attrcache := map[string]types.Element{}
+	for _, attr := range sourceAttributes {
+	    name := sourceResponse.Query1(attr, "@Name") // always uri, but cache in all 3 formats
+		attrcache[name] = attr.(types.Element)
+		attrcache[basic2uri[name].basic] = attr.(types.Element)
+		attrcache[basic2uri[name].AttributeName] = attr.(types.Element)
+	}
+
+	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
+
+    assertion := response.Query(nil, "(./saml:Assertion | ./t:RequestedSecurityToken/saml:Assertion)")[0]
+	destinationAttributes := response.QueryDashP(assertion, `saml:AttributeStatement`, "", nil) // only if there are actually some requested attributes
+	for _, requestedAttribute := range requestedAttributes {
+		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name,")]
+		if attribute == nil {
+			continue
+		}
+
+		newAttribute := response.CopyNode(attribute, 2)
+		destinationAttributes.AddChild(newAttribute)
+		allowedValues := spMd.QueryMulti(requestedAttribute, `saml:AttributeValue`)
+		allowedValuesMap := make(map[string]bool)
+		for _, value := range allowedValues {
+			allowedValuesMap[value] = true
+		}
+		i := 1
+		for _, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
+			if base64encodedOut {
+				v := base64.StdEncoding.EncodeToString([]byte(value))
+				value = string(v)
+			}
+			if len(allowedValues) == 0 || allowedValuesMap[value] {
+				response.QueryDashP(newAttribute, "saml:AttributeValue["+strconv.Itoa(i)+"]", value, nil)
+				i += 1
+			}
+		}
+	}
+	return
 }
 
 // checkScope checks for scope. Takes an xp, metadata. requireppn refers to as bolean if it is required. Returns eppn, securitydomain and list of epsas.
@@ -2132,6 +2185,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
+    	copyAttributes(response, newresponse, spMd)
 
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
