@@ -1993,7 +1993,6 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name="+strconv.Quote(uriname)+"]")
 			if len(responseattribute) > 0 {
 				switch nameFormat {
-//				switch mdsp.Query1(attr, "@NameFormat") {
 				case basic:
 					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)
 					response.QueryDashP(responseattribute[0], "@Name", name, nil)
