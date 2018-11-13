@@ -1594,7 +1594,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
         // We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
-	    nameFormat := spMd.Query1(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute[1]/@Nameformat")
+	    nameFormat := spMd.Query1(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute[1]/@NameFormat")
 	    signingType := gosaml.SAMLSign
 		if sRequest.WsFed {
 		    newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
