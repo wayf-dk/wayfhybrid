@@ -44,6 +44,7 @@ const (
 	sloInfoTTL      = 8 * 3600
     basic  = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
 	claims = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
+	unspecified = "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified"
 )
 
 type (
@@ -1985,8 +1986,8 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 	if len(attributestatements) > 0 {
 		attributestatement := attributestatements[0]
 		for _, attr := range requestedattributes {
-			basicname := mdsp.Query1(attr, "@FriendlyName")
-			uriname := basic2uri[basicname].uri
+			name := mdsp.Query1(attr, "@Name")
+			uriname := basic2uri[name].uri // maps to it self if already in uri format
 			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name="+strconv.Quote(uriname)+"]")
 			if len(responseattribute) > 0 {
 				switch nameFormat {
@@ -1994,7 +1995,7 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 				case basic:
 					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)
 					response.QueryDashP(responseattribute[0], "@Name", basicname, nil)
-				case claims:
+				case claims, unspecified:
 					response.QueryDashP(responseattribute[0], "@AttributeNamespace", claims, nil)
 					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[basicname].AttributeName, nil)
 					responseattribute[0].(types.Element).RemoveAttribute("Name")
