@@ -1994,10 +1994,10 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 //				switch mdsp.Query1(attr, "@NameFormat") {
 				case basic:
 					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)
-					response.QueryDashP(responseattribute[0], "@Name", basicname, nil)
+					response.QueryDashP(responseattribute[0], "@Name", name, nil)
 				case claims, unspecified:
 					response.QueryDashP(responseattribute[0], "@AttributeNamespace", claims, nil)
-					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[basicname].AttributeName, nil)
+					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[name].AttributeName, nil)
 					responseattribute[0].(types.Element).RemoveAttribute("Name")
 					responseattribute[0].(types.Element).RemoveAttribute("NameFormat")
 					//responseattribute[0].(types.Element).RemoveAttribute("FriendlyName")
