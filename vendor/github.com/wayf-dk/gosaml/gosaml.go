@@ -311,11 +311,21 @@ func ReceiveAuthnRequest(r *http.Request, issuerMdSet, destinationMdSet Md) (xp,
 		err = fmt.Errorf("subject not allowed in SAMLRequest")
 		return
 	}
-	nameIdPolicy := xp.Query1(nil, "./samlp:NameIDPolicy/@Format")
-	if NameIDMap[nameIdPolicy] == 0 {
-		err = fmt.Errorf("nameidpolicy format: '%s' is not supported", nameIdPolicy)
+	nameIDFormat := xp.Query1(nil, "./samlp:NameIDPolicy/@Format")
+	if NameIDMap[nameIDFormat] == 0 {
+		err = fmt.Errorf("nameidpolicy format: '%s' is not supported", nameIDFormat)
 		return
 	}
+
+	if nameIDFormat == Transient {
+	} else if nameIDFormat == Unspecified {
+		nameIDFormat = issuerMd.Query1(nil, "./md:SPSSODescriptor/md:NameIDFormat") // none ends up being Transient
+	} else if inArray(nameIDFormat, issuerMd.QueryMulti(nil, "./md:SPSSODescriptor/md:NameIDFormat")) {
+	} else {
+		nameIDFormat = Transient
+	}
+	xp.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", nameIDFormat)
+
 	/*
 		allowcreate := xp.Query1(nil, "./samlp:NameIDPolicy/@AllowCreate")
 		if allowcreate != "true" && allowcreate != "1" {
@@ -324,6 +334,15 @@ func ReceiveAuthnRequest(r *http.Request, issuerMdSet, destinationMdSet Md) (xp,
 		}
 	*/
 	return
+}
+
+func inArrray(item string, array []string) bool {
+	for _, i := range array {
+		if i == item {
+			return true
+		}
+	}
+	return false
 }
 
 // ReceiveSAMLResponse handles the SAML minutiae when receiving a SAMLResponse
@@ -412,12 +431,12 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSet, destinationMdSet Md, role int, 
 	}
 
 	destination := tmpXp.Query1(nil, "./@Destination")
-	if destination == "" {
+	if destination == "" && protocols[0] != "AuthnRequest" {
 		err = fmt.Errorf("no destination found in SAMLRequest/SAMLResponse")
 		return
 	}
 
-	if location != "" && destination != location {
+	if destination != "" && destination != location {
 		err = fmt.Errorf("destination: %s is not here, here is %s", destination, location)
 		return
 	}

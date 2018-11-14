@@ -1571,7 +1571,11 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nameid, "@Format", gosaml.Persistent, nil)
 			eptid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]/saml:AttributeValue`)
 			newresponse.QueryDashP(nameid, ".", eptid, nil)
-		} else { // if nameidformat == gosaml.Transient
+		} else if nameidformat == gosaml.Email {
+			newresponse.QueryDashP(nameid, "@Format", gosaml.Email, nil)
+			eppn := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonPrincipalName"]/saml:AttributeValue`)
+			newresponse.QueryDashP(nameid, ".", eppn, nil)
+		} else  { // if nameidformat == gosaml.Transient
 			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
 		}
 
