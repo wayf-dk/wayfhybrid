@@ -448,7 +448,7 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSet, destinationMdSet Md, role int, 
 	   q.Q(r.URL.Path, destination)
 	*/
 
-	destinationMd, err = destinationMdSet.MDQ(destination)
+	destinationMd, err = destinationMdSet.MDQ(location)
 	if err != nil {
 		return
 	}
