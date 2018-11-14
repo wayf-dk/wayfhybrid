@@ -318,13 +318,13 @@ func ReceiveAuthnRequest(r *http.Request, issuerMdSet, destinationMdSet Md) (xp,
 	}
 
 	if nameIDFormat == Transient {
-	} else if nameIDFormat == Unspecified {
+	} else if nameIDFormat == Unspecified || nameIDFormat == "" {
 		nameIDFormat = issuerMd.Query1(nil, "./md:SPSSODescriptor/md:NameIDFormat") // none ends up being Transient
 	} else if inArray(nameIDFormat, issuerMd.QueryMulti(nil, "./md:SPSSODescriptor/md:NameIDFormat")) {
 	} else {
 		nameIDFormat = Transient
 	}
-	xp.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", nameIDFormat)
+	xp.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", nameIDFormat, nil)
 
 	/*
 		allowcreate := xp.Query1(nil, "./samlp:NameIDPolicy/@AllowCreate")
@@ -336,7 +336,7 @@ func ReceiveAuthnRequest(r *http.Request, issuerMdSet, destinationMdSet Md) (xp,
 	return
 }
 
-func inArrray(item string, array []string) bool {
+func inArray(item string, array []string) bool {
 	for _, i := range array {
 		if i == item {
 			return true
