@@ -466,7 +466,7 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSet, destinationMdSet Md, role int, 
 		return
 	}
 
-	xp, err = checkDestinationAndACS(xp, issuerMd, destinationMd, role)
+	xp, err = checkDestinationAndACS(xp, issuerMd, destinationMd, role, location)
 	if err != nil {
 		return
 	}
@@ -690,10 +690,9 @@ findbinding:
 
 // checkDestinationAndACS checks for valid destination
 // Returns Error Otherwise
-func checkDestinationAndACS(message, issuerMd, destinationMd *goxml.Xp, role int) (checkedMessage *goxml.Xp, err error) {
+func checkDestinationAndACS(message, issuerMd, destinationMd *goxml.Xp, role int, location string) (checkedMessage *goxml.Xp, err error) {
 	var checkedDest string
 	var acsIndex string
-	dest := message.Query1(nil, "./@Destination")
 	mdRole := "./" + Roles[role]
 	protocol := message.QueryString(nil, "local-name(/*)")
 	switch protocol {
@@ -717,15 +716,13 @@ func checkDestinationAndACS(message, issuerMd, destinationMd *goxml.Xp, role int
 		message.QueryDashP(nil, "@ProtocolBinding", POST, nil)
 		message.QueryDashP(nil, "@AssertionConsumerServiceIndex", checkedAcs, nil)
 
-		checkedDest = destinationMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="`+REDIRECT+`" and @Location=`+strconv.Quote(dest)+`]/@Location`)
+		checkedDest = destinationMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="`+REDIRECT+`" and @Location=`+strconv.Quote(location)+`]/@Location`)
 		if checkedDest == "" {
-			checkedDest = destinationMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="`+POST+`" and @Location=`+strconv.Quote(dest)+`]/@Location`)
+			checkedDest = destinationMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="`+POST+`" and @Location=`+strconv.Quote(location)+`]/@Location`)
 		}
 	case "LogoutRequest", "LogoutResponse":
-		checkedDest = destinationMd.Query1(nil, mdRole+`/md:SingleLogoutService[@Binding="`+REDIRECT+`" and @Location=`+strconv.Quote(dest)+`]/@Location`)
+		checkedDest = destinationMd.Query1(nil, mdRole+`/md:SingleLogoutService[@Binding="`+REDIRECT+`" and @Location=`+strconv.Quote(location)+`]/@Location`)
 	case "Response":
-		destination := message.Query1(nil, "./@Destination") // already checked
-
 		recipient := message.Query1(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient")
 
 		if recipient == "" {
@@ -733,7 +730,7 @@ func checkDestinationAndACS(message, issuerMd, destinationMd *goxml.Xp, role int
 			return
 		}
 
-		if recipient != destination {
+		if recipient != location {
 			err = fmt.Errorf("response.Destination != SubjectConfirmationData.Recipient")
 			return
 		}
@@ -757,10 +754,10 @@ func checkDestinationAndACS(message, issuerMd, destinationMd *goxml.Xp, role int
 		if rInResponseTo != aInResponseTo {
 			return nil, goxml.NewWerror("cause:InResponseTo not the same in Response and Assertion")
 		}
-		checkedDest = destinationMd.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@Binding="`+POST+`" and @Location=`+strconv.Quote(dest)+`]/@Location`)
+		checkedDest = destinationMd.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@Binding="`+POST+`" and @Location=`+strconv.Quote(location)+`]/@Location`)
 	}
 	if checkedDest == "" {
-		return nil, goxml.NewWerror("Destination is not valid", "destination:"+dest)
+		return nil, goxml.NewWerror("Destination is not valid", "destination:"+location)
 	}
 	checkedMessage = message
 	return
