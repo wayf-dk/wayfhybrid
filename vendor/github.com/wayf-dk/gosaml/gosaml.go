@@ -460,7 +460,7 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSet, destinationMdSet Md, role int, 
 		}
 	}
 
-	xp, err = CheckSAMLMessage(r, tmpXp, issuerMd, destinationMd, role)
+	xp, err = CheckSAMLMessage(r, tmpXp, issuerMd, destinationMd, role, location)
 	if err != nil {
 		err = goxml.Wrap(err)
 		return
@@ -480,7 +480,7 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSet, destinationMdSet Md, role int, 
 
 // CheckSAMLMessage checks for Authentication Requests, Reponses and Logout Requests
 // Checks for invalid Bindings. Check for Certificates. Verify Signatures
-func CheckSAMLMessage(r *http.Request, xp, issuerMd, destinationMd *goxml.Xp, role int) (validatedMessage *goxml.Xp, err error) {
+func CheckSAMLMessage(r *http.Request, xp, issuerMd, destinationMd *goxml.Xp, role int, location string) (validatedMessage *goxml.Xp, err error) {
 	type protoCheckInfoStruct struct {
 		minSignatures     int
 		service           string
@@ -516,12 +516,11 @@ func CheckSAMLMessage(r *http.Request, xp, issuerMd, destinationMd *goxml.Xp, ro
 	}
 
 	var usedBinding string
-	destination := xp.Query1(nil, "./@Destination")
 	validBinding := false
 
 findbinding:
 	for _, usedBinding = range bindings[r.Method] {
-		for _, v := range destinationMd.QueryMulti(nil, `./`+Roles[role]+`/`+protoChecks[protocol].service+`[@Location=`+strconv.Quote(destination)+`]/@Binding`) {
+		for _, v := range destinationMd.QueryMulti(nil, `./`+Roles[role]+`/`+protoChecks[protocol].service+`[@Location=`+strconv.Quote(location)+`]/@Binding`) {
 			validBinding = v == usedBinding
 			if validBinding {
 				break findbinding
