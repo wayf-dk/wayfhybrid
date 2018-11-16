@@ -327,6 +327,9 @@ func NewHtmlXp(html []byte) (xp *Xp) {
 	return
 }
 
+/*
+  DocGetRootElement returns the root element of the document
+*/
 func (xp *Xp) DocGetRootElement() types.Node {
 	libxml2Lock.Lock()
 	defer libxml2Lock.Unlock()
@@ -334,6 +337,9 @@ func (xp *Xp) DocGetRootElement() types.Node {
 	return root
 }
 
+/*
+  RM removes the node
+*/
 func (xp *Xp) Rm(context types.Node, path string) {
 //	libxml2Lock.Lock()
 //	defer libxml2Lock.Unlock()
@@ -349,6 +355,9 @@ func (xp *Xp) Rm(context types.Node, path string) {
 	}
 }
 
+/*
+  RmElement removes an element in a Node
+*/
 func RmElement(element types.Node) {
 	libxml2Lock.Lock()
 	defer libxml2Lock.Unlock()
@@ -357,6 +366,9 @@ func RmElement(element types.Node) {
     element.Free()
 }
 
+/*
+  freeElement refers to freeing the memory
+*/
 func freeElement(element types.Node) {
 	libxml2Lock.Lock()
 	defer libxml2Lock.Unlock()
@@ -393,6 +405,9 @@ func (xp *Xp) C14n(node types.Node, nsPrefixes string) (s string) {
 	return
 }
 
+/*
+  Dump dumps the whole document
+*/
 func (xp *Xp) Dump() []byte {
 	libxml2Lock.Lock()
 	defer libxml2Lock.Unlock()
