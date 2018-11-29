@@ -94,6 +94,7 @@ var (
 		"mdrpi":      "urn:oasis:names:tc:SAML:metadata:rpi",
 		"mdui":       "urn:oasis:names:tc:SAML:metadata:ui",
 		"saml":       "urn:oasis:names:tc:SAML:2.0:assertion",
+		"saml1":      "urn:oasis:names:tc:SAML:1.0:assertion",
 		"samlp":      "urn:oasis:names:tc:SAML:2.0:protocol",
 		"sdss":       "http://sdss.ac.uk/2006/06/WAYF",
 		"shibmd":     "urn:mace:shibboleth:metadata:1.0",
@@ -1007,8 +1008,8 @@ func callHSM(function string, data []byte, privatekey, mech, digest string) (res
 	}
 
 	/*	var response struct {
-		Signed []byte `json:"signed"`
-	}
+			Signed []byte `json:"signed"`
+		}
 	*/
 	parts := strings.SplitN(strings.TrimSpace(privatekey), ":", 3)
 
@@ -1023,23 +1024,23 @@ func callHSM(function string, data []byte, privatekey, mech, digest string) (res
 
 	return goeleven.Dispatch(parts[2], payload)
 	/*
-	jsontxt, err := json.Marshal(payload)
-	if err != nil {
-		return nil, Wrap(err)
-	}
+		jsontxt, err := json.Marshal(payload)
+		if err != nil {
+			return nil, Wrap(err)
+		}
 
-	resp, err := http.Post(parts[2], "application/json", bytes.NewBuffer(jsontxt))
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+		resp, err := http.Post(parts[2], "application/json", bytes.NewBuffer(jsontxt))
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
 
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return nil, Wrap(err)
-	}
-	return response.Signed, err
+		err = json.Unmarshal(body, &response)
+		if err != nil {
+			return nil, Wrap(err)
+		}
+		return response.Signed, err
 	*/
 }
 

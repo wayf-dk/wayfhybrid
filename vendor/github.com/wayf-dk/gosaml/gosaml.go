@@ -111,7 +111,7 @@ var (
 	ACSError = errors.New("invalid AsssertionConsumerService or AsssertionConsumerServiceIndex")
 	// NameIDList list of supported nameid formats
 	NameIDList = []string{"", Transient, Persistent, X509, Email, Unspecified}
-	// 	NameIDMap refers to mapping the nameid formats
+	// NameIDMap refers to mapping the nameid formats
 	NameIDMap = map[string]int{"": 1, Transient: 1, Persistent: 2, X509: 3, Email: 4, Unspecified: 5} // Unspecified accepted but not sent upstream
 	whitespace = regexp.MustCompile("\\s")
 )
@@ -128,8 +128,8 @@ func DebugSetting(r *http.Request, name string) string {
 
 // DumpFile is for logging requests and responses
 func DumpFile(r *http.Request, xp *goxml.Xp) (logtag string) {
-		msgType := xp.QueryString(nil, "local-name(/*)")
-		logtag = dump(msgType, []byte(fmt.Sprintf("%s\n###\n%s", xp.PP(), goxml.NewWerror("").Stack(1))))
+	msgType := xp.QueryString(nil, "local-name(/*)")
+	logtag = dump(msgType, []byte(fmt.Sprintf("%s\n###\n%s", xp.PP(), goxml.NewWerror("").Stack(1))))
 	return
 }
 
@@ -140,13 +140,13 @@ func DumpFileIfTracing(r *http.Request, xp *goxml.Xp) (logtag string) {
 	return
 }
 
-func dump(msgType string, blob []byte) (logtag string)  {
-    now := TestTime
-    if now.IsZero() {
-        now = time.Now()
-    }
-    logtag = now.Format("2006-01-02T15:04:05.0000000") // local time with microseconds
-    if err := ioutil.WriteFile(fmt.Sprintf("log/%s-%s", logtag, msgType), blob, 0644); err != nil {
+func dump(msgType string, blob []byte) (logtag string) {
+	now := TestTime
+	if now.IsZero() {
+		now = time.Now()
+	}
+	logtag = now.Format("2006-01-02T15:04:05.0000000") // local time with microseconds
+	if err := ioutil.WriteFile(fmt.Sprintf("log/%s-%s", logtag, msgType), blob, 0644); err != nil {
 		//log.Panic(err)
 	}
 	return
@@ -403,7 +403,7 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSet, destinationMdSet Md, role int, 
 	//log.Println("stack", goxml.New().Stack(1))
 	_, err = tmpXp.SchemaValidate(Config.SamlSchema)
 	if err != nil {
-	    dump("raw", bmsg)
+		dump("raw", bmsg)
 		err = goxml.Wrap(err)
 		return
 	}
@@ -1151,37 +1151,37 @@ func wsfedRequest2samlRequest(r *http.Request, issuerMdSet, destinationMdSet Md)
 // NewWsFedResponse generates a Ws-fed response
 func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp) {
 	template := `<t:RequestSecurityTokenResponse xmlns:t="http://schemas.xmlsoap.org/ws/2005/02/trust" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
-    xmlns:wsp="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:wsa="http://www.w3.org/2005/08/addressing" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">
+    xmlns:wsp="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns:wsa="http://www.w3.org/2005/08/addressing" xmlns:saml1="urn:oasis:names:tc:SAML:1.0:assertion">
 	<t:Lifetime>
 		<wsu:Created></wsu:Created>
 		<wsu:Expires></wsu:Expires>
 	</t:Lifetime>
 	<wsp:AppliesTo><wsa:EndpointReference><wsa:Address></wsa:Address></wsa:EndpointReference></wsp:AppliesTo>
 	<t:RequestedSecurityToken>
-		<saml:Assertion MajorVersion="1" MinorVersion="1">
-			<saml:Conditions>
-				<saml:AudienceRestrictionCondition><saml:Audience></saml:Audience></saml:AudienceRestrictionCondition>
-			</saml:Conditions>
-			<saml:AttributeStatement>
-				<saml:Subject>
-				<saml:NameIdentifier></saml:NameIdentifier>
-					<saml:SubjectConfirmation>
-						<saml:ConfirmationMethod>
+		<saml1:Assertion MajorVersion="1" MinorVersion="1">
+			<saml1:Conditions>
+				<saml1:AudienceRestrictionCondition><saml1:Audience></saml1:Audience></saml1:AudienceRestrictionCondition>
+			</saml1:Conditions>
+			<saml1:AttributeStatement>
+				<saml1:Subject>
+				<saml1:NameIdentifier></saml1:NameIdentifier>
+					<saml1:SubjectConfirmation>
+						<saml1:ConfirmationMethod>
+							urn:oasis:names:tc:saml1:1.0:cm:bearer
+						</saml1:ConfirmationMethod>
+					</saml1:SubjectConfirmation>
+				</saml1:Subject>
+			</saml1:AttributeStatement>
+			<saml1:AuthenticationStatement>
+				<saml1:Subject>
+					<saml1:SubjectConfirmation>
+						<saml1:ConfirmationMethod>
 							urn:oasis:names:tc:SAML:1.0:cm:bearer
-						</saml:ConfirmationMethod>
-					</saml:SubjectConfirmation>
-				</saml:Subject>
-			</saml:AttributeStatement>
-			<saml:AuthenticationStatement>
-				<saml:Subject>
-					<saml:SubjectConfirmation>
-						<saml:ConfirmationMethod>
-							urn:oasis:names:tc:SAML:1.0:cm:bearer
-						</saml:ConfirmationMethod>
-					</saml:SubjectConfirmation>
-				</saml:Subject>
-			</saml:AuthenticationStatement>
-		</saml:Assertion>
+						</saml1:ConfirmationMethod>
+					</saml1:SubjectConfirmation>
+				</saml1:Subject>
+			</saml1:AuthenticationStatement>
+		</saml1:Assertion>
 	</t:RequestedSecurityToken>
 	<t:TokenType>urn:oasis:names:tc:SAML:1.0:assertion</t:TokenType>
 	<t:RequestType>http://schemas.xmlsoap.org/ws/2005/02/trust/Issue</t:RequestType>
@@ -1200,33 +1200,33 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 	response.QueryDashP(nil, "./t:Lifetime/wsu:Expires", assertionNotOnOrAfter, nil)
 	response.QueryDashP(nil, "./wsp:AppliesTo/wsa:EndpointReference/wsa:Address", spEntityID, nil)
 
-	assertion := response.Query(nil, "t:RequestedSecurityToken/saml:Assertion")[0]
+	assertion := response.Query(nil, "t:RequestedSecurityToken/saml1:Assertion")[0]
 	response.QueryDashP(assertion, "@AssertionID", assertionId, nil)
 	response.QueryDashP(assertion, "@IssueInstant", assertionIssueInstant, nil)
 	response.QueryDashP(assertion, "@Issuer", idpEntityID, nil)
 
-	conditions := response.Query(assertion, "saml:Conditions")[0]
+	conditions := response.Query(assertion, "saml1:Conditions")[0]
 	response.QueryDashP(conditions, "@NotBefore", assertionIssueInstant, nil)
 	response.QueryDashP(conditions, "@NotOnOrAfter", assertionNotOnOrAfter, nil)
-	response.QueryDashP(conditions, "saml:AudienceRestrictionCondition/saml:Audience", spEntityID, nil)
+	response.QueryDashP(conditions, "saml1:AudienceRestrictionCondition/saml1:Audience", spEntityID, nil)
 
-	authstatement := response.Query(assertion, "saml:AttributeStatement")[0]
+	authstatement := response.Query(assertion, "saml1:AttributeStatement")[0]
 	response.QueryDashP(authstatement, "@AuthenticationInstant", assertionIssueInstant, nil)
 	//response.QueryDashP(authstatement, "@SessionNotOnOrAfter", sessionNotOnOrAfter, nil)
 	//response.QueryDashP(authstatement, "@SessionIndex", "missing", nil)
 
-    nameIdentifierElement := sourceResponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
+    nameIdentifierElement := sourceResponse.Query(nil, "./saml1:Assertion/saml1:Subject/saml1:NameID")[0]
     nameIdentifier := sourceResponse.Query1(nameIdentifierElement, ".")
     nameIdFormat := sourceResponse.Query1(nameIdentifierElement, "./@Format")
 
-	response.QueryDashP(authstatement, "saml:Subject/saml:NameIdentifier", nameIdentifier, nil)
-	response.QueryDashP(authstatement, "saml:Subject/saml:NameIdentifier/@Format", nameIdFormat, nil)
+	response.QueryDashP(authstatement, "saml1:Subject/saml1:NameIdentifier", nameIdentifier, nil)
+	response.QueryDashP(authstatement, "saml1:Subject/saml1:NameIdentifier/@Format", nameIdFormat, nil)
 
-	authenticationStatement := response.Query(assertion, "saml:AuthenticationStatement")[0]
-	response.QueryDashP(authenticationStatement, "saml:Subject/saml:NameIdentifier", nameIdentifier, nil)
-	response.QueryDashP(authenticationStatement, "saml:Subject/saml:NameIdentifier/@Format", nameIdFormat, nil)
+	authenticationStatement := response.Query(assertion, "saml1:AuthenticationStatement")[0]
+	response.QueryDashP(authenticationStatement, "saml1:Subject/saml1:NameIdentifier", nameIdentifier, nil)
+	response.QueryDashP(authenticationStatement, "saml1:Subject/saml1:NameIdentifier/@Format", nameIdFormat, nil)
 
-	authContext := sourceResponse.Query1(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef")
+	authContext := sourceResponse.Query1(nil, "./saml1:Assertion/saml1:AuthnStatement/saml1:AuthnContext/saml1:AuthnContextClassRef")
     response.QueryDashP(authenticationStatement, "./@AuthenticationMethod", authContext, nil)
 
 	return
