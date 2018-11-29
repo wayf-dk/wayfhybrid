@@ -1988,13 +1988,13 @@ func idHash(data string) string {
 // handleAttributeNameFormat handles attribute name format
 func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
-	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml:Assertion/saml:AttributeStatement)")
+	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml1:Assertion/saml1:AttributeStatement)")
 	if len(attributestatements) > 0 {
 		attributestatement := attributestatements[0]
 		for _, attr := range requestedattributes {
 			name := mdsp.Query1(attr, "@Name")
 			uriname := basic2uri[name].uri // maps to it self if already in uri format
-			responseattribute := response.Query(attributestatement, "saml:Attribute[@Name="+strconv.Quote(uriname)+"]")
+			responseattribute := response.Query(attributestatement, "(saml:Attribute[@Name="+strconv.Quote(uriname)+" | saml1:Attribute[@Name="+strconv.Quote(uriname)+"]")
 			if len(responseattribute) > 0 {
 				switch nameFormat {
 				case basic:
