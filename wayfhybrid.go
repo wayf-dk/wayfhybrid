@@ -2005,7 +2005,7 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[name].AttributeName, nil)
 					responseattribute[0].(types.Element).RemoveAttribute("Name")
 					responseattribute[0].(types.Element).RemoveAttribute("NameFormat")
-					//responseattribute[0].(types.Element).RemoveAttribute("FriendlyName")
+					responseattribute[0].(types.Element).RemoveAttribute("FriendlyName")
 				}
 			}
 		}
@@ -2030,8 +2030,8 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
     saml := "saml"
     assertionList := response.Query(nil, "./saml:Assertion")
     if len(assertionList) == 0 {
-        assertionList = response.Query(nil, "./t:RequestedSecurityToken/saml1:Assertion")
         saml = "saml1"
+        assertionList = response.Query(nil, "./t:RequestedSecurityToken/saml1:Assertion")
     }
     assertion := assertionList[0]
 	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
@@ -2042,7 +2042,7 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 		}
 
 		newAttribute := response.CopyNode(attribute, 2)
-		newAttribute.(types.Element).SetNamespace(goxml.Namespaces[saml], saml)
+		newAttribute.(types.Element).SetNamespace(goxml.Namespaces[saml], saml, false)
 		destinationAttributes.AddChild(newAttribute)
 		allowedValues := spMd.QueryMulti(requestedAttribute, `saml:AttributeValue`)
 		allowedValuesMap := make(map[string]bool)
