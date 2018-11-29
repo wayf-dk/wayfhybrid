@@ -2027,7 +2027,13 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
 
-    assertion := response.Query(nil, "(./saml:Assertion | ./t:RequestedSecurityToken/saml:Assertion)")[0]
+    saml := "saml"
+    assertionList := response.Query(nil, "./saml:Assertion")
+    if len(assertionList) == 0 {
+        assertionList = response.Query(nil, "./t:RequestedSecurityToken/saml1:Assertion")
+        saml = "saml1"
+    }
+    assertion := assertionList[0]
 	destinationAttributes := response.QueryDashP(assertion, `saml:AttributeStatement`, "", nil) // only if there are actually some requested attributes
 	for _, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
@@ -2049,7 +2055,7 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 				value = string(v)
 			}
 			if len(allowedValues) == 0 || allowedValuesMap[value] {
-				response.QueryDashP(newAttribute, "saml:AttributeValue["+strconv.Itoa(i)+"]", value, nil)
+				response.QueryDashP(newAttribute, saml+":AttributeValue["+strconv.Itoa(i)+"]", value, nil)
 				i += 1
 			}
 		}
