@@ -2034,7 +2034,7 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
         saml = "saml1"
     }
     assertion := assertionList[0]
-	destinationAttributes := response.QueryDashP(assertion, `saml:AttributeStatement`, "", nil) // only if there are actually some requested attributes
+	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
 	for _, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
 		if attribute == nil {
