@@ -2043,6 +2043,8 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 
 		newAttribute := response.CopyNode(attribute, 2)
 		newAttribute.(types.Element).SetNamespace(goxml.Namespaces[saml], saml)
+		newAttribute.(types.Element).RemoveAttribute("xmlns:saml"); // This seem to be the only wayf to get rid of them ...
+		newAttribute.(types.Element).RemoveAttribute("xmlns:saml1");
 		destinationAttributes.AddChild(newAttribute)
 		allowedValues := spMd.QueryMulti(requestedAttribute, `saml:AttributeValue`)
 		allowedValuesMap := make(map[string]bool)
