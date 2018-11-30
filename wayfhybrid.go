@@ -2035,37 +2035,27 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
     }
     assertion := assertionList[0]
 	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
-	for i, requestedAttribute := range requestedAttributes {
+	for _, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
 		if attribute == nil {
 			continue
 		}
 
-        newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute["+strconv.Itoa(i+1)+"]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
+        newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
         response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
-/*
-		newAttribute := response.CopyNode(attribute, 2)
-		destinationAttributes.AddChild(newAttribute)
-
-
-		newAttribute.(types.Element).SetNamespace(goxml.Namespaces[saml], saml)
-		newAttribute.(types.Element).RemoveAttribute("xmlns:saml"); // This seem to be the only wayf to get rid of them ...
-		newAttribute.(types.Element).RemoveAttribute("xmlns:saml1");
-*/
 		allowedValues := spMd.QueryMulti(requestedAttribute, `saml:AttributeValue`)
 		allowedValuesMap := make(map[string]bool)
 		for _, value := range allowedValues {
 			allowedValuesMap[value] = true
 		}
 
-		for i, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
+		for _, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
 			if base64encodedOut {
 				v := base64.StdEncoding.EncodeToString([]byte(value))
 				value = string(v)
 			}
 			if len(allowedValues) == 0 || allowedValuesMap[value] {
-				response.QueryDashP(newAttribute, saml+":AttributeValue["+strconv.Itoa(i+1)+"]", value, nil)
-				i += 1
+				response.QueryDashP(newAttribute, saml+":AttributeValue[0]", value, nil)
 			}
 		}
 	}
