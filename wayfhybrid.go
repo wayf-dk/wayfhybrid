@@ -2041,8 +2041,8 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 			continue
 		}
 
-        newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute["+strconv.Itoa(i+1)+"]/@Name", spMd.Query1(requestedAttribute, "@Name"), nil)
-
+        newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute["+strconv.Itoa(i+1)+"]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
+        response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
 /*
 		newAttribute := response.CopyNode(attribute, 2)
 		destinationAttributes.AddChild(newAttribute)
