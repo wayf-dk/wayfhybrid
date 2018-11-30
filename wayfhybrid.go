@@ -2035,13 +2035,13 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
     }
     assertion := assertionList[0]
 	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
-	for _, requestedAttribute := range requestedAttributes {
+	for i, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
 		if attribute == nil {
 			continue
 		}
 
-        newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute/@Name", spMd.Query1(requestedAttribute, "@Name"), nil)
+        newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute["+strconv.Itoa(i+1)+"]/@Name", spMd.Query1(requestedAttribute, "@Name"), nil)
 
 /*
 		newAttribute := response.CopyNode(attribute, 2)
@@ -2057,14 +2057,14 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 		for _, value := range allowedValues {
 			allowedValuesMap[value] = true
 		}
-		i := 1
-		for _, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
+
+		for i, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
 			if base64encodedOut {
 				v := base64.StdEncoding.EncodeToString([]byte(value))
 				value = string(v)
 			}
 			if len(allowedValues) == 0 || allowedValuesMap[value] {
-				response.QueryDashP(newAttribute, saml+":AttributeValue["+strconv.Itoa(i)+"]", value, nil)
+				response.QueryDashP(newAttribute, saml+":AttributeValue["+strconv.Itoa(i+1)+"]", value, nil)
 				i += 1
 			}
 		}
