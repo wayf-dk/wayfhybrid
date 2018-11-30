@@ -1164,7 +1164,6 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 			</saml1:Conditions>
 			<saml1:AttributeStatement>
 				<saml1:Subject>
-				<saml1:NameIdentifier></saml1:NameIdentifier>
 					<saml1:SubjectConfirmation>
 						<saml1:ConfirmationMethod>
 							urn:oasis:names:tc:saml1:1.0:cm:bearer
