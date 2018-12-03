@@ -666,6 +666,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		w.Header().Set("Authorization", "Bearer "+tokenString)
+		w.Header().Set("X-Auth", "Bearer "+tokenString)
 		w.Header().Set("X-Accel-Redirect", string(app))
 		return err
 	}
