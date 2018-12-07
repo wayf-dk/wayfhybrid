@@ -84,7 +84,7 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
-		SpBackendTenants                                                                         map[string]struct{ EntityID, Secret string }
+		SpBackendTenants                                                                         map[string]struct{ EntityID, Key string }
 		IdpRemapSource                                                                           []struct{ Key, Idp, Sp string }
 	}
 
@@ -604,7 +604,12 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-	spMd, err := Md.Internal.MDQ(config.SpBackendTenants[r.Header.Get("X-Token")].EntityID)
+    entityID := r.Header.Get("X-Token")
+    tenant := config.SpBackendTenants[entityID]
+    if tenant.EntityID != "" {
+        entityID = tenant.EntityID
+    }
+	spMd, err := Md.Internal.MDQ(entityID)
 	if err != nil {
 		return
 	}
@@ -624,7 +629,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		names := response.QueryMulti(nil, "//saml:Attribute/@Name")
 		for _, name := range names {
 			basic := basic2uri[name].basic
-			attrs[basic] = response.QueryMulti(nil, "//saml:Attribute[@Name="+strconv.Quote(basic)+"]/saml:AttributeValue")
+			attrs[basic] = response.QueryMulti(nil, "//saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
 		}
 
 		type claim struct {
@@ -648,15 +653,34 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		// https://godoc.org/github.com/dgrijalva/jwt-go#example-New--Hmac
-		// Create a new token object, specifying signing method and the claims
-		// you would like it to contain.
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, attrs)
+        var tokenString string
+        if tenant.Key != "" {
+		    tokenString, err = jwt.NewWithClaims(jwt.SigningMethodHS256, attrs).SignedString([]byte(tenant.Key))
+            if err != nil {
+                return err
+            }
+		} else {
+            md, err := Md.Hub.MDQ(config.HubEntityID)
+            if err != nil {
+                return err
+            }
 
-		// Sign and get the complete encoded token as a string using the secret
-		tokenString, err := token.SignedString([]byte(config.SpBackendTenants[r.Header.Get("X-Token")].Secret))
-		if err != nil {
-			return err
+            cert := md.Query1(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) // actual signing key is always first
+        	var keyname string
+            keyname, _, err = gosaml.PublicKeyInfo(cert)
+            if err != nil {
+                return err
+            }
+            var privatekey []byte
+            privatekey, err = ioutil.ReadFile(config.CertPath + keyname + ".key")
+            if err != nil {
+                return err
+            }
+
+		    tokenString, err = jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString([]byte(privatekey))
+            if err != nil {
+                return err
+            }
 		}
 
 		var app []byte
