@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	SigningMethodHSM256 = &SigningMethodHSM{"HSM256", "SHA256"}
+	SigningMethodHSM256 = &SigningMethodHSM{"HSM256", "sha256"}
 	RegisterSigningMethod(SigningMethodHSM256.Alg(), func() SigningMethod {
 		return SigningMethodHSM256
 	})
