@@ -677,7 +677,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
                 return err
             }
 
-		    tokenString, err = jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString([]byte(privatekey))
+		    tokenString, err = jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString(privatekey)
             if err != nil {
                 return err
             }
