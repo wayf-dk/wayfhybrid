@@ -28,7 +28,7 @@ func (m *SigningMethodHSM) Alg() string {
 
 func (m *SigningMethodHSM) Sign(signingString string, key interface{}) (string, error) {
 	digest := goxml.Hash(goxml.Algos[m.Algo].Algo, signingString)
-	if sigBytes, err := goxml.Sign([]byte(digest), key.([]byte)), []byte(""), m.Algo); err == nil {
+	if sigBytes, err := goxml.Sign([]byte(digest), key.([]byte), []byte(""), m.Algo); err == nil {
 		return EncodeSegment(sigBytes), nil
 	} else {
 		return "", err
