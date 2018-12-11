@@ -16,7 +16,7 @@ var (
 )
 
 func init() {
-	SigningMethodHSM256 = &SigningMethodHSM{"HSM256", "sha256"}
+	SigningMethodHSM256 = &SigningMethodHSM{"RS256", "sha256"}
 	RegisterSigningMethod(SigningMethodHSM256.Alg(), func() SigningMethod {
 		return SigningMethodHSM256
 	})
@@ -28,7 +28,7 @@ func (m *SigningMethodHSM) Alg() string {
 
 func (m *SigningMethodHSM) Sign(signingString string, key interface{}) (string, error) {
 	digest := goxml.Hash(goxml.Algos[m.Algo].Algo, signingString)
-	if sigBytes, err := goxml.Sign([]byte(digest), []byte(key.(string)), []byte(""), m.Algo); err == nil {
+	if sigBytes, err := goxml.Sign([]byte(digest), key.([]byte)), []byte(""), m.Algo); err == nil {
 		return EncodeSegment(sigBytes), nil
 	} else {
 		return "", err
