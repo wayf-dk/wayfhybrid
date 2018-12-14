@@ -84,7 +84,6 @@ type (
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
-		SpBackendTenants                                                                         map[string]struct{ EntityID, Key string }
 		IdpRemapSource                                                                           []struct{ Key, Idp, Sp string }
 	}
 
