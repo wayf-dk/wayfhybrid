@@ -605,10 +605,6 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	r.ParseForm()
 
     entityID := r.Header.Get("X-Token")
-    tenant := config.SpBackendTenants[entityID]
-    if tenant.EntityID != "" {
-        entityID = tenant.EntityID
-    }
 	spMd, err := Md.Internal.MDQ(entityID)
 	if err != nil {
 		return
@@ -653,35 +649,27 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-        var tokenString string
-        if tenant.Key != "" {
-		    tokenString, err = jwt.NewWithClaims(jwt.SigningMethodHS256, attrs).SignedString([]byte(tenant.Key))
-            if err != nil {
-                return err
-            }
-		} else {
-            md, err := Md.Hub.MDQ(config.HubEntityID)
-            if err != nil {
-                return err
-            }
+        md, err := Md.Hub.MDQ(config.HubEntityID)
+        if err != nil {
+            return err
+        }
 
-            cert := md.Query1(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) // actual signing key is always first
-        	var keyname string
-            keyname, _, err = gosaml.PublicKeyInfo(cert)
-            if err != nil {
-                return err
-            }
-            var privatekey []byte
-            privatekey, err = ioutil.ReadFile(config.CertPath + keyname + ".key")
-            if err != nil {
-                return err
-            }
+        cert := md.Query1(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) // actual signing key is always first
+        var keyname string
+        keyname, _, err = gosaml.PublicKeyInfo(cert)
+        if err != nil {
+            return err
+        }
+        var privatekey []byte
+        privatekey, err = ioutil.ReadFile(config.CertPath + keyname + ".key")
+        if err != nil {
+            return err
+        }
 
-		    tokenString, err = jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString(privatekey)
-            if err != nil {
-                return err
-            }
-		}
+        tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString(privatekey)
+        if err != nil {
+            return err
+        }
 
 		var app []byte
 		err = authnRequestCookie.Decode("app", relayState, &app)
