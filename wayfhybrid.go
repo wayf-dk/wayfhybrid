@@ -2216,9 +2216,11 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
             return err
         }
 
-        attributeStatement := goxml.NewXpFromString("<saml:AttributeStatement>")
+        attributeStatement := goxml.NewXpFromString(`<saml:AttributeStatement xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:AttributeStatement>`)
         for attribute, values := range userInfo {
+            attribute = basic2uri[attribute].uri
             newAttribute := attributeStatement.QueryDashP(nil, "saml:Attribute[0]/@Name", attribute, nil)
+            attributeStatement.QueryDashP(newAttribute, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
             for _, value := range values {
                 attributeStatement.QueryDashP(newAttribute, "saml:AttributeValue[0]", value, nil)
             }
