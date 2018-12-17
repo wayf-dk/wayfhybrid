@@ -2216,7 +2216,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
             return err
         }
 
-        attributeStatement := goxml.NewXpFromString("saml:AttributeStatement")
+        attributeStatement := goxml.NewXpFromString("<saml:AttributeStatement>")
         for attribute, values := range userInfo {
             newAttribute := attributeStatement.QueryDashP(nil, "saml:Attribute[0]/@Name", attribute, nil)
             for _, value := range values {
