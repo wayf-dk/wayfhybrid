@@ -2207,19 +2207,24 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
-    	copyAttributes(response, newresponse, spMd)
 
-		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
-		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
-		// The response at this time contains a full attribute set
-		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
-		if nameidformat == gosaml.Persistent {
-			newresponse.QueryDashP(nameid, "@Format", gosaml.Persistent, nil)
-			eptid := newresponse.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]/saml:AttributeValue`)
-			newresponse.QueryDashP(nameid, ".", eptid, nil)
-		} else { // if nameidformat == gosaml.Transient
-			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
-		}
+        sp := spMd.Query1(nil, "@entityID")
+        eptid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.10"]/saml:AttributeValue`)
+
+        userInfo, err := getUserInfo(sp, eptid);
+        if err != nil {
+            return err
+        }
+
+        attributeStatement := goxml.NewXpFromString("saml:AttributeStatement")
+        for attribute, values := range userInfo {
+            newAttribute := attributeStatement.QueryDashP(nil, "saml:Attribute[0]/@Name", attribute, nil)
+            for _, value := range values {
+                attributeStatement.QueryDashP(newAttribute, "saml:AttributeValue[0]", value, nil)
+            }
+        }
+
+    	copyAttributes(attributeStatement, newresponse, spMd)
 
 		elementsToSign := config.ElementsToSign
 		if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
@@ -2249,4 +2254,25 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState}
 	postForm.Execute(w, data)
 	return
+}
+
+func getUserInfo(sp, eptid string) (userInfo map[string][]string, err error) {
+    url := "https://attributes.wayf.dk/getuserinfo?" + url.Values{"sp": {sp}, "eptid": {eptid}}.Encode()
+
+    client := &http.Client{Timeout: 5 * time.Second}
+    resp, err := client.Get(url)
+    if err != nil {
+        return
+    }
+    defer resp.Body.Close()
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        return
+    }
+
+    err = json.Unmarshal(body, &userInfo)
+    if err != nil {
+        return
+    }
+    return
 }
