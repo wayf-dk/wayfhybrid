@@ -1209,7 +1209,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 	for _, stmt := range response.Query(assertion, ".//saml1:Subject") {
         response.QueryDashP(stmt, "saml1:NameIdentifier", nameIdentifier, nil)
         response.QueryDashP(stmt, "saml1:NameIdentifier/@Format", nameIdFormat, nil)
-        response.QueryDashP(stmt, "saml1:SubjectConfirmation/@saml1:ConfirmationMethod", "urn:oasis:names:tc:SAML:1.0:cm:bearer", nil)
+        response.QueryDashP(stmt, "saml1:SubjectConfirmation/saml1:ConfirmationMethod", "urn:oasis:names:tc:SAML:1.0:cm:bearer", nil)
 	}
 
 	authContext := sourceResponse.Query1(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef")
