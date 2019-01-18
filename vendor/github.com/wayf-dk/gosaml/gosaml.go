@@ -1207,7 +1207,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 	//response.QueryDashP(authstatement, "@SessionIndex", "missing", nil)
 	response.QueryDashP(authstatement, "saml1:Subject/saml1:NameIdentifier", nameIdentifier, nil)
 	response.QueryDashP(authstatement, "saml1:Subject/saml1:NameIdentifier/@Format", nameIdFormat, nil)
-	response.QueryDashP(authstatement, "saml1:Subject/saml1:saml1:SubjectConfirmation/@saml1:ConfirmationMethod", "urn:oasis:names:tc:SAML:1.0:cm:bearer", nil)
+	response.QueryDashP(authstatement, "saml1:Subject/saml1:SubjectConfirmation/@saml1:ConfirmationMethod", "urn:oasis:names:tc:SAML:1.0:cm:bearer", nil)
 
 	authContext := sourceResponse.Query1(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef")
     response.QueryDashP(authstatement, "./@AuthenticationMethod", authContext, nil)
