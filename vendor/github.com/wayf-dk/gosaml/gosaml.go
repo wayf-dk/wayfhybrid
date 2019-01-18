@@ -1142,6 +1142,8 @@ func wsfedRequest2samlRequest(r *http.Request, issuerMdSet, destinationMdSet Md)
             samlrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", wreply, nil)
 		}
 
+        samlrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", issuerMd.Query1(nil, "/md:EntityDescriptor/md:NameIDFormat"), nil)
+
         DumpFileIfTracing(r, samlrequest)
 		msg = base64.StdEncoding.EncodeToString(Deflate(samlrequest.Dump()))
 	}
@@ -1163,22 +1165,8 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 				<saml1:AudienceRestrictionCondition><saml1:Audience></saml1:Audience></saml1:AudienceRestrictionCondition>
 			</saml1:Conditions>
 			<saml1:AttributeStatement>
-				<saml1:Subject>
-					<saml1:SubjectConfirmation>
-						<saml1:ConfirmationMethod>
-							urn:oasis:names:tc:saml1:1.0:cm:bearer
-						</saml1:ConfirmationMethod>
-					</saml1:SubjectConfirmation>
-				</saml1:Subject>
 			</saml1:AttributeStatement>
 			<saml1:AuthenticationStatement>
-				<saml1:Subject>
-					<saml1:SubjectConfirmation>
-						<saml1:ConfirmationMethod>
-							urn:oasis:names:tc:SAML:1.0:cm:bearer
-						</saml1:ConfirmationMethod>
-					</saml1:SubjectConfirmation>
-				</saml1:Subject>
 			</saml1:AuthenticationStatement>
 		</saml1:Assertion>
 	</t:RequestedSecurityToken>
@@ -1219,6 +1207,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 	//response.QueryDashP(authstatement, "@SessionIndex", "missing", nil)
 	response.QueryDashP(authstatement, "saml1:Subject/saml1:NameIdentifier", nameIdentifier, nil)
 	response.QueryDashP(authstatement, "saml1:Subject/saml1:NameIdentifier/@Format", nameIdFormat, nil)
+	response.QueryDashP(authstatement, "saml1:Subject/saml1:saml1:SubjectConfirmation/@saml1:ConfirmationMethod", "urn:oasis:names:tc:SAML:1.0:cm:bearer", nil)
 
 	authContext := sourceResponse.Query1(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef")
     response.QueryDashP(authstatement, "./@AuthenticationMethod", authContext, nil)
