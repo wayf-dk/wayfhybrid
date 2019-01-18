@@ -1142,8 +1142,7 @@ func wsfedRequest2samlRequest(r *http.Request, issuerMdSet, destinationMdSet Md)
             samlrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", wreply, nil)
 		}
 
-        //samlrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", issuerMd.Query1(nil, "/md:EntityDescriptor/md:NameIDFormat"), nil)
-        samlrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress", nil)
+        samlrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", issuerMd.Query1(nil, "/md:EntityDescriptor/md:SPSSODescriptor/md:NameIDFormat"), nil)
 
         DumpFileIfTracing(r, samlrequest)
 		msg = base64.StdEncoding.EncodeToString(Deflate(samlrequest.Dump()))
