@@ -871,7 +871,7 @@ func IdAndTiming() (issueInstant, id, assertionId, assertionNotOnOrAfter, sessio
 	if now.IsZero() {
 		now = time.Now()
 	}
-	issueInstant = now.Add(-5 * time.Minute).Format(XsDateTime)
+	issueInstant = now.Add(-3 * time.Minute).Format(XsDateTime)
 	assertionNotOnOrAfter = now.Add(4 * time.Hour).Format(XsDateTime)
 	sessionNotOnOrAfter = now.Add(4 * time.Hour).Format(XsDateTime)
 	id = TestId
