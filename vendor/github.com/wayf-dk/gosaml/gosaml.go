@@ -802,7 +802,7 @@ func VerifySign(xp *goxml.Xp, certificates []string, signature types.Node) (err 
 
 // VerifyTiming verify the presence and value of timestamps
 func VerifyTiming(xp *goxml.Xp) (verifiedXp *goxml.Xp, err error) {
-	const timeskew = 300
+	const timeskew = 90
 
 	type timing struct {
 		required     bool
@@ -871,8 +871,8 @@ func IdAndTiming() (issueInstant, id, assertionId, assertionNotOnOrAfter, sessio
 	if now.IsZero() {
 		now = time.Now()
 	}
-	issueInstant = now.Add(-3 * time.Minute).Format(XsDateTime)
-	assertionNotOnOrAfter = now.Add(4 * time.Hour).Format(XsDateTime)
+	issueInstant = now.Format(XsDateTime)
+	assertionNotOnOrAfter = now.Add(4 * time.Minute).Format(XsDateTime)
 	sessionNotOnOrAfter = now.Add(4 * time.Hour).Format(XsDateTime)
 	id = TestId
 	if id == "" {
