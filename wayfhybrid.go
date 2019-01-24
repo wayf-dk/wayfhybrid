@@ -904,7 +904,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := debify.ReplaceAllString(idpMd.Query1(nil, "@entityID"), "$1$2")
 
-	base64encodedIn := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
+	base64encodedIn := idpMd.QueryBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes[normalize-space(.)='1' or normalize-space(.)='true']")
 
 	switch idp {
 	case "https://nemlogin.wayf.dk":
@@ -1096,7 +1096,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard.SPLogo = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
 	ard.SPEntityID = spMd.Query1(nil, "@entityID")
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
-	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.='1']) > 0`)
+	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[normalize-space(.)='1' or normalize-space(.)='true']) > 0`)
 	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
 	ard.Key = idHash(ard.SPEntityID)
 	io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
@@ -1423,9 +1423,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
-	wars := idpMd.Query1(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) + idpMd.Query1(nil, `./md:Extensions/wayf:wayf/wayf:redirect.sign`)
-	switch wars {
-	case "true", "1":
+	if idpMd.QueryBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned[.='1' or .='true]`) {
 		privatekey, err = gosaml.GetPrivateKey(spMd)
 		if err != nil {
 			return
@@ -1604,7 +1602,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		elementsToSign := config.ElementsToSign
-		if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+		if spMd.QueryBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response[normalize-space(.)='1' or normalize-space(.)='true']") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
@@ -1734,7 +1732,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		elementsToSign := config.ElementsToSign
-		if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+		if spMd.QueryBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response[normalize-space(.)='1' or normalize-space(.)='true']") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
@@ -2025,7 +2023,7 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 
 // copyAttributes copies the attributes
 func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
-	base64encodedOut := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes") == "1"
+	base64encodedOut := spMd.QueryBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes[normalize-space(.)='1' or normalize-space(.)='true']")
 
 	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
 	attrcache := map[string]types.Element{}
@@ -2229,7 +2227,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
     	copyAttributes(attributeStatement, newresponse, spMd)
 
 		elementsToSign := config.ElementsToSign
-		if spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") == "1" {
+		if spMd.QueryBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response[normalize-space(.)='1' or normalize-space(.)='true']") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
