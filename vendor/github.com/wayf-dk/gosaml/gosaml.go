@@ -1179,7 +1179,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 `
 	response = goxml.NewXpFromString(template)
 
-	issueInstant, _, assertionId, assertionNotOnOrAfter, _ := IdAndTiming()
+	issueInstant, _, assertionId, assertionNotOnOrAfter, sessionNotOnOrAfter := IdAndTiming()
 	assertionIssueInstant := issueInstant
 
 	spEntityID := spMd.Query1(nil, `/md:EntityDescriptor/@entityID`)
@@ -1196,7 +1196,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 
 	conditions := response.Query(assertion, "saml1:Conditions")[0]
 	response.QueryDashP(conditions, "@NotBefore", assertionIssueInstant, nil)
-	response.QueryDashP(conditions, "@NotOnOrAfter", assertionNotOnOrAfter, nil)
+	response.QueryDashP(conditions, "@NotOnOrAfter", sessionNotOnOrAfter, nil)
 	response.QueryDashP(conditions, "saml1:AudienceRestrictionCondition/saml1:Audience", spEntityID, nil)
 
     nameIdentifierElement := sourceResponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
