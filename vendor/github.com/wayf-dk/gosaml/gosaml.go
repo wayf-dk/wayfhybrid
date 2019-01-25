@@ -1199,9 +1199,9 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 	response.QueryDashP(conditions, "@NotOnOrAfter", sessionNotOnOrAfter, nil)
 	response.QueryDashP(conditions, "saml1:AudienceRestrictionCondition/saml1:Audience", spEntityID, nil)
 
-    nameIdentifierElement := sourceResponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
-    nameIdentifier := sourceResponse.Query1(nameIdentifierElement, ".")
-    nameIdFormat := sourceResponse.Query1(nameIdentifierElement, "./@Format")
+    //nameIdentifierElement := sourceResponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
+    //nameIdentifier := sourceResponse.Query1(nameIdentifierElement, ".")
+    //nameIdFormat := sourceResponse.Query1(nameIdentifierElement, "./@Format")
 
     authStmt := response.Query(assertion, "saml1:AuthenticationStatement")[0]
     response.QueryDashP(authStmt, "@AuthenticationInstant", assertionIssueInstant, nil)
