@@ -1179,7 +1179,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 `
 	response = goxml.NewXpFromString(template)
 
-	issueInstant, _, assertionId, assertionNotOnOrAfter, sessionNotOnOrAfter := IdAndTiming()
+	issueInstant, _, assertionId, _, sessionNotOnOrAfter := IdAndTiming()
 	assertionIssueInstant := issueInstant
 
 	spEntityID := spMd.Query1(nil, `/md:EntityDescriptor/@entityID`)
