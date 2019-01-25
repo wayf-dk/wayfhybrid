@@ -1186,7 +1186,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 	idpEntityID := idpMd.Query1(nil, `/md:EntityDescriptor/@entityID`)
 
 	response.QueryDashP(nil, "./t:Lifetime/wsu:Created", issueInstant, nil)
-	response.QueryDashP(nil, "./t:Lifetime/wsu:Expires", assertionNotOnOrAfter, nil)
+	response.QueryDashP(nil, "./t:Lifetime/wsu:Expires", sessionNotOnOrAfter, nil)
 	response.QueryDashP(nil, "./wsp:AppliesTo/wsa:EndpointReference/wsa:Address", spEntityID, nil)
 
 	assertion := response.Query(nil, "t:RequestedSecurityToken/saml1:Assertion")[0]
