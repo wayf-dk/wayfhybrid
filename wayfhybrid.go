@@ -1423,7 +1423,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
-	if idpMd.QueryBool(nil, `boolean(./md:IDPSSODescriptor/@WantAuthnRequestsSigned[.='1' or .='true])`) {
+	if idpMd.QueryBool(nil, `boolean(./md:IDPSSODescriptor/@WantAuthnRequestsSigned[.='1' or .='true'])`) {
 		privatekey, err = gosaml.GetPrivateKey(spMd)
 		if err != nil {
 			return
