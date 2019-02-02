@@ -253,41 +253,58 @@ func ExampleNemLoginAttributeHandler() {
 
 	gosaml.AttributeCanonicalDump(os.Stdout, nemloginResponse)
 	// Output:
-	// cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     Anton Banton Cantonsen
-	// displayName urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     Anton Banton Cantonsen
-	// eduPersonAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     member
-	// eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     3
-	// eduPersonPrimaryAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     member
-	// eduPersonPrincipalName urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     PID:5666-1234-2-529868547821@sikker-adgang.dk
-	// eduPersonScopedAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     member@sikker-adgang.dk
-	// eduPersonTargetedID urn:oid:1.3.6.1.4.1.5923.1.1.1.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     WAYF-DK-da0dc65f1297726d1dbf0019d729e047148f81c4
-	// gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     Anton Banton
-	// mail urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     someone@example.com
-	// organizationName urn:oid:2.5.4.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     Ingen organisatorisk tilknytning
-	//     NemLogin
-	// schacDateOfBirth urn:oid:1.3.6.1.4.1.25178.1.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     18580824
-	// schacHomeOrganization urn:oid:1.3.6.1.4.1.25178.1.2.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     sikker-adgang.dk
-	// schacHomeOrganizationType urn:oid:1.3.6.1.4.1.25178.1.2.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     urn:mace:terena.org:schac:homeOrganizationType:int:other
-	// schacPersonalUniqueID urn:oid:1.3.6.1.4.1.25178.1.2.15 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     urn:mace:terena.org:schac:personalUniqueID:dk:CPR:2408588234
-	// schacYearOfBirth urn:oid:1.3.6.1.4.1.25178.1.0.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     1858
-	// sn urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     Cantonsen
+    // cn urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Anton Banton Cantonsen
+    // dk:gov:saml:attribute:AssuranceLevel urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     3
+    // dk:gov:saml:attribute:CprNumberIdentifier urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     2408588234
+    // dk:gov:saml:attribute:PidNumberIdentifier urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     9208-2002-2-941238474441
+    // dk:nemlogin:saml:attribute:IdPSessionIndex urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     8D-54-F1-F9-AD-67-D8-65-6D-5A-58-AD-9F-F2-E7-92-5E-72-82-62
+    // eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     3
+    // eduPersonPrimaryAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     member
+    // eduPersonPrimaryAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     member
+    // eduPersonPrincipalName urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     PID:5666-1234-2-529868547821@sikker-adgang.dk
+    // eduPersonPrincipalName urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     PID:5666-1234-2-529868547821@sikker-adgang.dk
+    // gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Anton Banton
+    // gn urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Anton Banton
+    // http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     someone@example.com
+    // http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     CN=Anton Banon Cantonsen + SERIALNUMBER=PID:5666-1234-2-529868547821, O=Ingen organisatorisk tilknytning, C=DK
+    // mail urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     someone@example.com
+    // organizationName urn:oid:2.5.4.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Ingen organisatorisk tilknytning
+    //     NemLogin
+    // schacPersonalUniqueID urn:oid:1.3.6.1.4.1.25178.1.2.15 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     urn:mace:terena.org:schac:personalUniqueID:dk:CPR:2408588234
+    // sn urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Cantonsen
+    // sn urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Cantonsen
+    // urn:oid:0.9.2342.19200300.100.1.1 urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     PID:5666-1234-2-529868547821
+    //     PID:5666-1234-2-529868547821
+    // urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     someone@example.com
+    // urn:oid:1.3.6.1.4.1.1466.115.121.1.8 urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     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
+    // urn:oid:2.5.29.29 urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     CN=TRUST2408 OCES CA II, O=TRUST2408, C=DK
+    // urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     Anton Banton Cantonsen
+    // urn:oid:2.5.4.5 urn:oasis:names:tc:SAML:2.0:attrname-format:basic
+    //     539B4CDA
 }
 
 func ExampleSamlError() {
@@ -349,7 +366,7 @@ func ExampleHandleAttributeNameFormat() {
 	response := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	requestedAttr := goxml.NewXpFromFile("testdata/requestedattr.xml")
 	prepareTables(requestedAttr)
-	handleAttributeNameFormat(response, spMd)
+	handleAttributeNameFormat(response, spMd, unspecified)
 	// Output:
 	//
 }
