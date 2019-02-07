@@ -161,6 +161,11 @@
                             NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
                             >
                 <saml:AttributeValue xsi:type="xs:string">urn:mace:terena.org:tcs:escience-user</saml:AttributeValue>
+                <saml:AttributeValue xsi:type="xs:string">this.is.an.allowed.prefix.with.a.postfix</saml:AttributeValue>
+                <saml:AttributeValue xsi:type="xs:string">this.is.a.prefix.with.an.allowed.postfix</saml:AttributeValue>
+                <saml:AttributeValue xsi:type="xs:string">this.is.an.allowed.infix.with.a.postfix</saml:AttributeValue>
+                <saml:AttributeValue xsi:type="xs:string">this.is.an.allowed.regexp.with.a.postfix</saml:AttributeValue>
+                <saml:AttributeValue xsi:type="xs:string">this is not an allowed value</saml:AttributeValue>
             </saml:Attribute>
         </saml:AttributeStatement>
     </saml:Assertion>

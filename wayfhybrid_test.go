@@ -183,6 +183,61 @@ func ExampleCheckCprCentury() {
 	// 1937
 }
 
+func ExampleCopyAttributes() {
+	idpMd := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
+	hubMd := goxml.NewXpFromFile("testdata/hub_md.xml")
+	spMd := goxml.NewXpFromFile("testdata/sp_md.xml")
+	prepareTables(hubMd)
+	sourceResponse := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
+	WayfACSServiceHandler(idpMd, hubMd, spMd, nil, sourceResponse.CpXp(), false)
+	newresponse := gosaml.NewResponse(idpMd, spMd, sourceResponse, sourceResponse)
+	copyAttributes(sourceResponse, newresponse, spMd)
+	gosaml.AttributeCanonicalDump(os.Stdout, newresponse)
+	// Output:
+    // urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     madpe@dtu.dk
+    // urn:oid:1.3.6.1.4.1.25178.1.0.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     1858
+    // urn:oid:1.3.6.1.4.1.25178.1.2.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     urn:mace:terena.org:schac:homeOrganizationType:eu:higherEducationalInstitution
+    // urn:oid:1.3.6.1.4.1.25178.1.2.15 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     urn:mace:terena.org:schac:personalUniqueID:dk:CPR:2408588834
+    // urn:oid:1.3.6.1.4.1.25178.1.2.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     18580824
+    // urn:oid:1.3.6.1.4.1.25178.1.2.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     dtu.dk
+    // urn:oid:1.3.6.1.4.1.5923.1.1.1.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     WAYF-DK-9c03f6bdabf9e280d9dfdedb42ebaf161c30ed51
+    // urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     2
+    // urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     staff
+    // urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     madpe@dtu.dk
+    // urn:oid:1.3.6.1.4.1.5923.1.1.1.7 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     this.is.a.prefix.with.an.allowed.postfix
+    //     this.is.an.allowed.infix.with.a.postfix
+    //     this.is.an.allowed.prefix.with.a.postfix
+    //     this.is.an.allowed.regexp.with.a.postfix
+    //     urn:mace:terena.org:tcs:escience-user
+    // urn:oid:1.3.6.1.4.1.5923.1.1.1.9 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     member@dtu.dk
+    //     staff@dtu.dk
+    //     staff@just.testing.dtu.dk
+    // urn:oid:2.16.840.1.113730.3.1.241 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Mads Freek Petersen
+    // urn:oid:2.16.840.1.113730.3.1.39 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     da-DK
+    // urn:oid:2.5.4.10 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Danmarks Tekniske Universitet
+    // urn:oid:2.5.4.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Mads Freek Petersen
+    // urn:oid:2.5.4.4 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Petersen
+    // urn:oid:2.5.4.42 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
+    //     Mads Freek
+}
+
 func ExampleWayfAttributeHandler() {
 	idpMd := goxml.NewXpFromFile("testdata/idp_md_dtu.xml")
 	hubMd := goxml.NewXpFromFile("testdata/hub_md.xml")
@@ -209,7 +264,12 @@ func ExampleWayfAttributeHandler() {
 	// eduPersonAssurance urn:oid:1.3.6.1.4.1.5923.1.1.1.11 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     2
 	// eduPersonEntitlement urn:oid:1.3.6.1.4.1.5923.1.1.1.7 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
-	//     urn:mace:terena.org:tcs:escience-user
+    //     this is not an allowed value
+    //     this.is.a.prefix.with.an.allowed.postfix
+    //     this.is.an.allowed.infix.with.a.postfix
+    //     this.is.an.allowed.prefix.with.a.postfix
+    //     this.is.an.allowed.regexp.with.a.postfix
+    //     urn:mace:terena.org:tcs:escience-user
 	// eduPersonPrimaryAffiliation urn:oid:1.3.6.1.4.1.5923.1.1.1.5 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
 	//     staff
 	// eduPersonPrincipalName urn:oid:1.3.6.1.4.1.5923.1.1.1.6 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
@@ -358,7 +418,7 @@ func ExampleSetAttribute() {
 	setAttribute("organizationName", "WAYF", response, sourceAttributes)
 	printHashedDom(response)
 	// Output:
-	// iGxIpD9n687nhQOIovOUBmy1fuM=
+	// QCfnjgGL+fB96uZy93PgNybsmqM=
 }
 
 func ExampleHandleAttributeNameFormat() {

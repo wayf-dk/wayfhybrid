@@ -2044,6 +2044,7 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
     }
     assertion := assertionList[0]
 	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
+
 	for _, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
 		if attribute == nil {
@@ -2052,23 +2053,53 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 
         newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
         response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
-		allowedValues := spMd.QueryMulti(requestedAttribute, `saml:AttributeValue`)
-		allowedValuesMap := make(map[string]bool)
-		for _, value := range allowedValues {
-			allowedValuesMap[value] = true
+		allowedValues := spMd.Query(requestedAttribute, `saml:AttributeValue`)
+        regexps := []*regexp.Regexp{}
+		for _, attr := range allowedValues {
+		    tp := ""
+		    tpAttribute, _ := attr.(types.Element).GetAttribute("type")
+		    if tpAttribute != nil {
+		        tp = tpAttribute.Value()
+		    }
+		    val := attr.NodeValue()
+		    var reg string
+		    switch tp {
+		        case "prefix":
+		            reg = "^" + regexp.QuoteMeta(val)
+		        case "postfix":
+		            reg = regexp.QuoteMeta(val) + "$"
+		        case "wildcard":
+                    reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
+                case "regexp":
+                    reg = val
+                default:
+                    reg = "^" + regexp.QuoteMeta(val) + "$"
+		    }
+    		regexps = append(regexps, regexp.MustCompile(reg))
 		}
-
 		for _, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
-			if base64encodedOut {
-				v := base64.StdEncoding.EncodeToString([]byte(value))
-				value = string(v)
-			}
-			if len(allowedValues) == 0 || allowedValuesMap[value] {
+			if len(allowedValues) == 0 || matchRegexpArray(value, regexps) {
+                if base64encodedOut {
+                    v := base64.StdEncoding.EncodeToString([]byte(value))
+                    value = string(v)
+                }
 				response.QueryDashP(newAttribute, saml+":AttributeValue[0]", value, nil)
 			}
 		}
 	}
+	q.Q(response.PP())
+
 	return
+}
+
+func matchRegexpArray(item string, array []*regexp.Regexp) bool {
+	for _, i := range array {
+		if i.MatchString(item) {
+		    q.Q(item)
+			return true
+		}
+	}
+	return false
 }
 
 // checkScope checks for scope. Takes an xp, metadata. requireppn refers to as bolean if it is required. Returns eppn, securitydomain and list of epsas.
