@@ -621,10 +621,10 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 
 		attrs := jwt.MapClaims{}
 
-		names := response.QueryMulti(nil, "//saml:Attribute/@Name")
+		names := response.QueryMulti(nil, "saml:Assertion/saml:AttributeStatement/saml:Attribute/@Name")
 		for _, name := range names {
 			basic := basic2uri[name].basic
-			attrs[basic] = response.QueryMulti(nil, "//saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
+			attrs[basic] = response.QueryMulti(nil, "saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
 		}
 
 		type claim struct {
