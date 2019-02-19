@@ -1607,18 +1607,16 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
-	    nameFormat := spMd.Query1(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute[1]/@NameFormat")
 		signingType := gosaml.SAMLSign
 		if sRequest.WsFed {
 			newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
-    		copyAttributes(response, newresponse, spMd)
+			copyAttributes(response, newresponse, spMd)
 
 			signingType = gosaml.WSFedSign
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
-			nameFormat = claims
 		}
 
-		handleAttributeNameFormat(newresponse, spMd, nameFormat)
+		handleAttributeNameFormat(newresponse, spMd)
 
 		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, signingType)
@@ -1725,7 +1723,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		// Krib always receives attributes with nameformat=urn. Before sending to the real SP we need to look into
 		// the metadata for SP to determine the actual nameformat - as WAYF supports both for Md.Internal SPs.
 		response.QueryDashP(nil, "./saml:Assertion/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@Recipient", destination, nil)
-		handleAttributeNameFormat(response, spMd, "")
+		handleAttributeNameFormat(response, spMd)
 
 		if sigAlg := gosaml.DebugSetting(r, "sigAlg"); sigAlg != "" {
 			signingMethod = sigAlg
@@ -1995,7 +1993,7 @@ func idHash(data string) string {
 }
 
 // handleAttributeNameFormat handles attribute name format
-func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
+func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
 	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml1:Assertion/saml1:AttributeStatement)")
 	if len(attributestatements) > 0 {
@@ -2005,7 +2003,7 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp, nameFormat string) {
 			uriname := basic2uri[name].uri // maps to it self if already in uri format
 			responseattribute := response.Query(attributestatement, "(saml:Attribute[@Name="+strconv.Quote(uriname)+"] | saml1:Attribute[@Name="+strconv.Quote(uriname)+"])")
 			if len(responseattribute) > 0 {
-				switch nameFormat {
+				switch mdsp.Query1(attr, "@NameFormat") {
 				case basic:
 					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)
 					response.QueryDashP(responseattribute[0], "@Name", name, nil)
