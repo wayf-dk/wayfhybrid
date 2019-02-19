@@ -44,7 +44,7 @@ const (
 	sloInfoTTL      = 8 * 3600
 	basic           = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
 	claims          = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
-	unspecified = "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified"
+	unspecified     = "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified"
 )
 
 type (
@@ -434,7 +434,7 @@ func prepareTables(attrs *goxml.Xp) {
 		uri := attrs.Query1(attr, "@Name")
 		attributeName := attrs.Query1(attr, "@AttributeName")
 		if attributeName == "" {
-		    attributeName = friendlyName
+			attributeName = friendlyName
 		}
 		attributeNameMap := attrName{uri: uri, basic: friendlyName, AttributeName: attributeName}
 		basic2uri[friendlyName] = attributeNameMap
@@ -603,7 +603,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-    entityID := r.Header.Get("X-Token")
+	entityID := r.Header.Get("X-Token")
 	spMd, err := Md.Internal.MDQ(entityID)
 	if err != nil {
 		return
@@ -648,27 +648,27 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-        md, err := Md.Hub.MDQ(config.HubEntityID)
-        if err != nil {
-            return err
-        }
+		md, err := Md.Hub.MDQ(config.HubEntityID)
+		if err != nil {
+			return err
+		}
 
-        cert := md.Query1(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) // actual signing key is always first
-        var keyname string
-        keyname, _, err = gosaml.PublicKeyInfo(cert)
-        if err != nil {
-            return err
-        }
-        var privatekey []byte
-        privatekey, err = ioutil.ReadFile(config.CertPath + keyname + ".key")
-        if err != nil {
-            return err
-        }
+		cert := md.Query1(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) // actual signing key is always first
+		var keyname string
+		keyname, _, err = gosaml.PublicKeyInfo(cert)
+		if err != nil {
+			return err
+		}
+		var privatekey []byte
+		privatekey, err = ioutil.ReadFile(config.CertPath + keyname + ".key")
+		if err != nil {
+			return err
+		}
 
-        tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString(privatekey)
-        if err != nil {
-            return err
-        }
+		tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString(privatekey)
+		if err != nil {
+			return err
+		}
 
 		var app []byte
 		err = authnRequestCookie.Decode("app", relayState, &app)
@@ -778,10 +778,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		external := "0"
 		messages := "none"
 		response, issuerMd, destinationMd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
-//		if err == lMDQ.MetaDataNotFoundError {
-//			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
-//			external = "1"
-//		}
+		//		if err == lMDQ.MetaDataNotFoundError {
+		//			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
+		//			external = "1"
+		//		}
 		if err != nil {
 			return err
 		}
@@ -2026,7 +2026,7 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
 	attrcache := map[string]types.Element{}
 	for _, attr := range sourceAttributes {
-	    name := sourceResponse.Query1(attr, "@Name") // always uri, but cache in all 3 formats
+		name := sourceResponse.Query1(attr, "@Name") // always uri, but cache in all 3 formats
 		attrcache[name] = attr.(types.Element)
 		attrcache[basic2uri[name].basic] = attr.(types.Element)
 		attrcache[basic2uri[name].AttributeName] = attr.(types.Element)
@@ -2034,13 +2034,13 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
 
-    saml := "saml"
-    assertionList := response.Query(nil, "./saml:Assertion")
-    if len(assertionList) == 0 {
-        saml = "saml1"
-        assertionList = response.Query(nil, "./t:RequestedSecurityToken/saml1:Assertion")
-    }
-    assertion := assertionList[0]
+	saml := "saml"
+	assertionList := response.Query(nil, "./saml:Assertion")
+	if len(assertionList) == 0 {
+		saml = "saml1"
+		assertionList = response.Query(nil, "./t:RequestedSecurityToken/saml1:Assertion")
+	}
+	assertion := assertionList[0]
 	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
 
 	for _, requestedAttribute := range requestedAttributes {
@@ -2049,51 +2049,48 @@ func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 			continue
 		}
 
-        newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
-        response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
+		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
+		response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
 		allowedValues := spMd.Query(requestedAttribute, `saml:AttributeValue`)
-        regexps := []*regexp.Regexp{}
+		regexps := []*regexp.Regexp{}
 		for _, attr := range allowedValues {
-		    tp := ""
-		    tpAttribute, _ := attr.(types.Element).GetAttribute("type")
-		    if tpAttribute != nil {
-		        tp = tpAttribute.Value()
-		    }
-		    val := attr.NodeValue()
-		    var reg string
-		    switch tp {
-		        case "prefix":
-		            reg = "^" + regexp.QuoteMeta(val)
-		        case "postfix":
-		            reg = regexp.QuoteMeta(val) + "$"
-		        case "wildcard":
-                    reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
-                case "regexp":
-                    reg = val
-                default:
-                    reg = "^" + regexp.QuoteMeta(val) + "$"
-		    }
-    		regexps = append(regexps, regexp.MustCompile(reg))
+			tp := ""
+			tpAttribute, _ := attr.(types.Element).GetAttribute("type")
+			if tpAttribute != nil {
+				tp = tpAttribute.Value()
+			}
+			val := attr.NodeValue()
+			var reg string
+			switch tp {
+			case "prefix":
+				reg = "^" + regexp.QuoteMeta(val)
+			case "postfix":
+				reg = regexp.QuoteMeta(val) + "$"
+			case "wildcard":
+				reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
+			case "regexp":
+				reg = val
+			default:
+				reg = "^" + regexp.QuoteMeta(val) + "$"
+			}
+			regexps = append(regexps, regexp.MustCompile(reg))
 		}
 		for _, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
 			if len(allowedValues) == 0 || matchRegexpArray(value, regexps) {
-                if base64encodedOut {
-                    v := base64.StdEncoding.EncodeToString([]byte(value))
-                    value = string(v)
-                }
+				if base64encodedOut {
+					v := base64.StdEncoding.EncodeToString([]byte(value))
+					value = string(v)
+				}
 				response.QueryDashP(newAttribute, saml+":AttributeValue[0]", value, nil)
 			}
 		}
 	}
-	q.Q(response.PP())
-
 	return
 }
 
 func matchRegexpArray(item string, array []*regexp.Regexp) bool {
 	for _, i := range array {
 		if i.MatchString(item) {
-		    q.Q(item)
 			return true
 		}
 	}
@@ -2235,25 +2232,25 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
 
-        sp := spMd.Query1(nil, "@entityID")
-        eptid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.10"]/saml:AttributeValue`)
+		sp := spMd.Query1(nil, "@entityID")
+		eptid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.10"]/saml:AttributeValue`)
 
-        userInfo, err := getUserInfo(sp, eptid);
-        if err != nil {
-            return err
-        }
+		userInfo, err := getUserInfo(sp, eptid)
+		if err != nil {
+			return err
+		}
 
-        attributeStatement := goxml.NewXpFromString(`<saml:AttributeStatement xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:AttributeStatement>`)
-        for attribute, values := range userInfo {
-            attribute = basic2uri[attribute].uri
-            newAttribute := attributeStatement.QueryDashP(nil, "saml:Attribute[0]/@Name", attribute, nil)
-            attributeStatement.QueryDashP(newAttribute, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
-            for _, value := range values {
-                attributeStatement.QueryDashP(newAttribute, "saml:AttributeValue[0]", value, nil)
-            }
-        }
+		attributeStatement := goxml.NewXpFromString(`<saml:AttributeStatement xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:AttributeStatement>`)
+		for attribute, values := range userInfo {
+			attribute = basic2uri[attribute].uri
+			newAttribute := attributeStatement.QueryDashP(nil, "saml:Attribute[0]/@Name", attribute, nil)
+			attributeStatement.QueryDashP(newAttribute, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
+			for _, value := range values {
+				attributeStatement.QueryDashP(newAttribute, "saml:AttributeValue[0]", value, nil)
+			}
+		}
 
-    	copyAttributes(attributeStatement, newresponse, spMd)
+		copyAttributes(attributeStatement, newresponse, spMd)
 
 		elementsToSign := config.ElementsToSign
 		if spMd.QueryBool(nil, "boolean(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response[normalize-space(.)='1' or normalize-space(.)='true'])") {
@@ -2286,22 +2283,22 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func getUserInfo(sp, eptid string) (userInfo map[string][]string, err error) {
-    url := "https://attributes.wayf.dk/getuserinfo?" + url.Values{"sp": {sp}, "eptid": {eptid}}.Encode()
+	url := "https://attributes.wayf.dk/getuserinfo?" + url.Values{"sp": {sp}, "eptid": {eptid}}.Encode()
 
-    client := &http.Client{Timeout: 5 * time.Second}
-    resp, err := client.Get(url)
-    if err != nil {
-        return
-    }
-    defer resp.Body.Close()
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return
-    }
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
 
-    err = json.Unmarshal(body, &userInfo)
-    if err != nil {
-        return
-    }
-    return
+	err = json.Unmarshal(body, &userInfo)
+	if err != nil {
+		return
+	}
+	return
 }
