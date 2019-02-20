@@ -302,7 +302,7 @@ func Main() {
 	httpMux.Handle(config.Krib, appHandler(KribService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
-	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
+	httpMux.Handle(config.Public, appHandler(http.FileServer(http.Dir(config.Discopublicpath)).(appHandler)))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
 
