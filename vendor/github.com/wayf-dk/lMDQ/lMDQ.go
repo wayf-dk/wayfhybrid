@@ -59,7 +59,7 @@ type (
 )
 
 var (
-	cacheduration         = time.Minute * 60
+	cacheduration = time.Minute * 60
 	// MetaDataNotFoundError refers to error
 	MetaDataNotFoundError = errors.New("Metadata not found")
 )
@@ -77,7 +77,7 @@ func (mdq *MDQ) Open() (err error) {
 	defer mdq.Lock.Unlock()
 	mdq.Cache = make(map[string]*MdXp)
 	if mdq.db != nil {
-	    mdq.db.Close()
+		mdq.db.Close()
 	}
 	mdq.db, err = sql.Open("sqlite3", mdq.Path)
 	if err != nil {
