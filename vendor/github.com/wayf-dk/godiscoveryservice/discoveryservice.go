@@ -139,22 +139,21 @@ func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
 		//		var query = "select e.md md from entity_HYBRID_INTERNAL e, lookup_HYBRID_INTERNAL l where l.hash = ? and l.entity_id_fk = e.id"
 		var query = "select e.md md from entity_HYBRID_EXTERNAL_SP e, lookup_HYBRID_EXTERNAL_SP l where l.hash = ? and l.entity_id_fk = e.id"
 		err = spDB.QueryRow(query, ent).Scan(&md)
-		if err != nil {
-			return err
+		if err == nil {
+            res.Sp.EntityID = entityID
+            md = gosaml.Inflate([]byte(md))
+            spMetaData = goxml.NewXp(md)
+            res.Sp.Logo = spMetaData.Query1(nil, "md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo")
+            res.Sp.DisplayNames = map[string]string{}
+            for _, l := range []string{"en", "da"} {
+                res.Sp.DisplayNames[l] = spMetaData.Query1(nil, "md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang='"+l+"']")
+            }
+            if res.Feds[0] == "" {
+                res.Feds = spMetaData.QueryMulti(nil, "md:Extensions/wayf:wayf/wayf:feds")
+            }
+            res.DiscoResponse = spMetaData.QueryMulti(nil, "md:SPSSODescriptor/md:Extensions/idpdisc:DiscoveryResponse[@Binding='urn:oasis:names:tc:SAML:profiles:SSO:idp-discovery-protocol']/@Location")
+            res.DiscoACS = spMetaData.QueryMulti(nil, "md:SPSSODescriptor/md:AssertionConsumerService[@Binding='urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']/@Location")
 		}
-		res.Sp.EntityID = entityID
-		md = gosaml.Inflate([]byte(md))
-		spMetaData = goxml.NewXp(md)
-		res.Sp.Logo = spMetaData.Query1(nil, "md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo")
-		res.Sp.DisplayNames = map[string]string{}
-		for _, l := range []string{"en", "da"} {
-			res.Sp.DisplayNames[l] = spMetaData.Query1(nil, "md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang='"+l+"']")
-		}
-		if res.Feds[0] == "" {
-			res.Feds = spMetaData.QueryMulti(nil, "md:Extensions/wayf:wayf/wayf:feds")
-		}
-		res.DiscoResponse = spMetaData.QueryMulti(nil, "md:SPSSODescriptor/md:Extensions/idpdisc:DiscoveryResponse[@Binding='urn:oasis:names:tc:SAML:profiles:SSO:idp-discovery-protocol']/@Location")
-		res.DiscoACS = spMetaData.QueryMulti(nil, "md:SPSSODescriptor/md:AssertionConsumerService[@Binding='urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST']/@Location")
 	}
 
 	fedsquery := ""
