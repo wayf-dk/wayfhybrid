@@ -603,7 +603,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-	entityID := r.Header.Get("X-Issuer")
+	entityID := r.Header.Get("X-Token")
 	spMd, err := Md.Internal.MDQ(entityID)
 	if err != nil {
 		return
@@ -691,7 +691,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-ACS"), "", true, false, strings.Split(r.Form.Get("idplist"), ","))
+	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-Acs"), "", true, false, strings.Split(r.Form.Get("idplist"), ","))
 	return err
 }
 
