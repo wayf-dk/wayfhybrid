@@ -638,7 +638,6 @@ findbinding:
 				// repeat schemacheck
 				_, err = xp.SchemaValidate(Config.SamlSchema)
 				if err != nil {
-                    log.Println(xp.PP())
 					err = goxml.Wrap(err)
 					err = goxml.PublicError(err.(goxml.Werror), "cause:encryption error") // hide the real problem from attacker
 					return nil, err
