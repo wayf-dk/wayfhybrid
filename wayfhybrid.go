@@ -1570,7 +1570,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
-		copyAttributes(response, newresponse, spMd)
+		CopyAttributes(response, newresponse, spMd)
 
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
@@ -1610,7 +1610,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		signingType := gosaml.SAMLSign
 		if sRequest.WsFed {
 			newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
-			copyAttributes(response, newresponse, spMd)
+			CopyAttributes(response, newresponse, spMd)
 
 			signingType = gosaml.WSFedSign
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
@@ -1996,11 +1996,13 @@ func idHash(data string) string {
 func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
 	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml1:Assertion/saml1:AttributeStatement)")
+	q.Q(requestedattributes, attributestatements)
 	if len(attributestatements) > 0 {
 		attributestatement := attributestatements[0]
 		for _, attr := range requestedattributes {
 			name := mdsp.Query1(attr, "@Name")
 			uriname := basic2uri[name].uri // maps to it self if already in uri format
+			log.Println("@Name", uriname)
 			responseattribute := response.Query(attributestatement, "(saml:Attribute[@Name="+strconv.Quote(uriname)+"] | saml1:Attribute[@Name="+strconv.Quote(uriname)+"])")
 			if len(responseattribute) > 0 {
 				switch mdsp.Query1(attr, "@NameFormat") {
@@ -2019,8 +2021,8 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 	}
 }
 
-// copyAttributes copies the attributes
-func copyAttributes(sourceResponse, response, spMd *goxml.Xp) {
+// CopyAttributes copies the attributes
+func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 	base64encodedOut := spMd.QueryBool(nil, "boolean(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes[normalize-space(.)='1' or normalize-space(.)='true'])")
 
 	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
@@ -2250,7 +2252,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		copyAttributes(attributeStatement, newresponse, spMd)
+		CopyAttributes(attributeStatement, newresponse, spMd)
 
 		elementsToSign := config.ElementsToSign
 		if spMd.QueryBool(nil, "boolean(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response[normalize-space(.)='1' or normalize-space(.)='true'])") {
