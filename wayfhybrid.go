@@ -2000,7 +2000,6 @@ func idHash(data string) string {
 func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
 	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml1:Assertion/saml1:AttributeStatement)")
-	q.Q(requestedattributes, attributestatements)
 	if len(attributestatements) > 0 {
 		attributestatement := attributestatements[0]
 		for _, attr := range requestedattributes {
