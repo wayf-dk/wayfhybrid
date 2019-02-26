@@ -1030,7 +1030,6 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, idPList []string) (
 		if nameIDPolicy := originalRequest.Query1(nil, "./samlp:NameIDPolicy/@Format"); nameIDPolicy != "" {
 			nameIDFormats = append([]string{nameIDPolicy}, nameIDFormats...) // prioritize what the SP asked for
 		}
-       	request.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", originalRequest.Query1(nil, "./saml:Issuer"), nil)
 	}
 
 	for _, nameIDFormat = range nameIDFormats {

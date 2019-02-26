@@ -1401,6 +1401,10 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
 	}
 
+    if spMd.QueryBool(nil, `boolean(./md:Extensions/wayf:wayf/wayf:wantRequesterID[normalize-space(.)='1' or normalize-space(.)='true'])`) {
+   	    newrequest.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", originalRequest.Query1(nil, "./saml:Issuer"), nil)
+   	}
+
 	// Save the request in a session for when the response comes back
 	id := newrequest.Query1(nil, "./@ID")
 
