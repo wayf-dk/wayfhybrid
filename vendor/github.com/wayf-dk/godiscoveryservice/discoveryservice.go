@@ -243,8 +243,8 @@ func DSBackend(w http.ResponseWriter, r *http.Request) (err error) {
 
 		}
 
-		ftsquery := dotdashpling.ReplaceAllLiteralString(query, "0")
-		ftsquery = notword.ReplaceAllLiteralString(ftsquery, " ")
+//		ftsquery := dotdashpling.ReplaceAllLiteralString(query, "0")
+//		ftsquery = notword.ReplaceAllLiteralString(ftsquery, " ")
 		ftsquery = whitespace.ReplaceAllLiteralString(ftsquery, "* ")
 
 		// Find number of relevant IdPs
