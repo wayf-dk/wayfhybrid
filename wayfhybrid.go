@@ -2002,7 +2002,6 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 		for _, attr := range requestedattributes {
 			name := mdsp.Query1(attr, "@Name")
 			uriname := basic2uri[name].uri // maps to it self if already in uri format
-			log.Println("@Name", uriname)
 			responseattribute := response.Query(attributestatement, "(saml:Attribute[@Name="+strconv.Quote(uriname)+"] | saml1:Attribute[@Name="+strconv.Quote(uriname)+"])")
 			if len(responseattribute) > 0 {
 				switch mdsp.Query1(attr, "@NameFormat") {
