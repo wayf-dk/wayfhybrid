@@ -191,7 +191,7 @@ func ExampleCopyAttributes() {
 	sourceResponse := goxml.NewXpFromFile("testdata/sourceresponse_dtu.saml")
 	WayfACSServiceHandler(idpMd, hubMd, spMd, nil, sourceResponse.CpXp(), false)
 	newresponse := gosaml.NewResponse(idpMd, spMd, sourceResponse, sourceResponse)
-	copyAttributes(sourceResponse, newresponse, spMd)
+	CopyAttributes(sourceResponse, newresponse, spMd)
 	gosaml.AttributeCanonicalDump(os.Stdout, newresponse)
 	// Output:
 	// urn:oid:0.9.2342.19200300.100.1.3 urn:oasis:names:tc:SAML:2.0:attrname-format:uri
