@@ -1401,7 +1401,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
 	}
 
-    if spMd.QueryBool(nil, `boolean(./md:Extensions/wayf:wayf/wayf:wantRequesterID[normalize-space(.)='1' or normalize-space(.)='true'])`) {
+    if idpMd.QueryBool(nil, `boolean(./md:Extensions/wayf:wayf/wayf:wantRequesterID[normalize-space(.)='1' or normalize-space(.)='true'])`) {
    	    newrequest.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
    	}
 
