@@ -665,7 +665,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHSM256, attrs).SignedString(privatekey)
+		tokenString, err := jwt.NewWithClaims(SigningMethodHSM256, attrs).SignedString(privatekey)
 		if err != nil {
 			return err
 		}
@@ -2305,4 +2305,40 @@ func getUserInfo(sp, eptid string) (userInfo map[string][]string, err error) {
 		return
 	}
 	return
+}
+
+
+// Implements the WAYF specific HSM RSA signingMethod
+// Expects "PEM" private key format ie. when for HSM it starts with hsm:
+type SigningMethodHSM struct {
+	Name, Algo string
+}
+
+// Specific instances for RS256 and company
+var (
+	SigningMethodHSM256 *SigningMethodHSM
+)
+
+func init() {
+	SigningMethodHSM256 = &SigningMethodHSM{"RS256", "sha256"}
+	jwt.RegisterSigningMethod(SigningMethodHSM256.Alg(), func() jwt.SigningMethod {
+		return SigningMethodHSM256
+	})
+}
+
+func (m *SigningMethodHSM) Alg() string {
+	return m.Name
+}
+
+func (m *SigningMethodHSM) Sign(signingString string, key interface{}) (string, error) {
+	digest := goxml.Hash(goxml.Algos[m.Algo].Algo, signingString)
+	if sigBytes, err := goxml.Sign([]byte(digest), key.([]byte), []byte(""), m.Algo); err == nil {
+		return jwt.EncodeSegment(sigBytes), nil
+	} else {
+		return "", err
+	}
+}
+
+func (m *SigningMethodHSM) Verify(signingString, signature string, key interface{}) error {
+    return nil
 }
