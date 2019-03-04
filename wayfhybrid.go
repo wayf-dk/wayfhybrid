@@ -2055,6 +2055,7 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 
 		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
 		response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
+		response.QueryDashP(newAttribute, "@FriendlyName", sourceResponse.Query1(attribute, "@FriendlyName"), nil)
 		allowedValues := spMd.Query(requestedAttribute, `saml:AttributeValue`)
 		regexps := []*regexp.Regexp{}
 		for _, attr := range allowedValues {
