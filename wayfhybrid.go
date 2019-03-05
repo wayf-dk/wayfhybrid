@@ -149,8 +149,8 @@ type (
 
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
-		Fo                   int
-		DtS, Brk, WsFed      bool
+		Fo, Ii, Di           int
+	    WsFed                bool
 	}
 )
 
@@ -610,11 +610,11 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
-		response, _, _, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Hub, Md.Internal, r.Header.Get("X-Acs"))
+		response, _, _, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, r.Header.Get("X-Acs"))
 		if err != nil {
 			return err
 		}
-		_, _, _, err = getOriginalRequest(w, r, response, nil, nil, "JWT-")
+		_, _, _, _, err = getOriginalRequest(w, r, response, nil, nil, "JWT-")
 		if err != nil {
 			return err
 		}
@@ -691,7 +691,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-ACS"), "", true, false, strings.Split(r.Form.Get("idplist"), ","))
+	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-ACS"), "", 0, 0, strings.Split(r.Form.Get("idplist"), ","))
 	return err
 }
 
@@ -777,7 +777,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
 		messages := "none"
-		response, issuerMd, destinationMd, relayState, err := gosaml.DecodeSAMLMsg(r, Md.Hub, Md.Internal, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
+		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
 		//		if err == lMDQ.MetaDataNotFoundError {
 		//			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
 		//			external = "1"
@@ -1259,7 +1259,7 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 // SSOService handles single sign on requests
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spMd, _, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.Hub)
+	request, spMd, _, relayState, issuerIndex, destinationIndex, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Internal}, gosaml.MdSets{Md.Hub})
 	if err != nil {
 		return
 	}
@@ -1298,7 +1298,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp2, relayState, "SSO-", "", config.Domain, true, false, nil)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp2, relayState, "SSO-", "", config.Domain, issuerIndex, destinationIndex, nil)
 		return err
 	}
 	return
@@ -1310,26 +1310,10 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	// remember to add the Scoping element to inform the IdP of requesterID - if stated in metadata for the IdP
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
-	var directToSp bool
 
-	request, spMd, birkIdpMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.Internal, Md.ExternalIdP)
+	request, spMd, birkIdpMd, relayState, issuerIndex, destinationIndex, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Internal, Md.ExternalIdP})
 	if err != nil {
-		var err2 error
-		e, ok := err.(goxml.Werror)
-		if ok && (e.Cause == gosaml.ACSError || e.Cause == lMDQ.MetaDataNotFoundError) {
-			// or is it coming directly from a SP
-			request, spMd, birkIdpMd, relayState, err2 = gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
-			if err2 != nil {
-				// we need the original error for a SP that use an invalid ACS, but is in the external feed
-				return goxml.Wrap(err)
-			}
-		} else {
-			return err
-		}
-		// If we get here we need to tag the request as a direct BIRK to SP - otherwise we will end up sending the response to KRIB
-
-	} else {
-		directToSp = true
+    	return err
 	}
 
 	var hubMd, idpMd *goxml.Xp
@@ -1344,7 +1328,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, directToSp, true, nil)
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, issuerIndex, destinationIndex, nil)
 	if err != nil {
 		return
 	}
@@ -1391,7 +1375,7 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, directToSP, birk bool, idPList []string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, issuerIndex, destinationIndex int, idPList []string) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList)
 	if err != nil {
@@ -1419,8 +1403,8 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		De:    destination,
 		Fo:    gosaml.NameIDMap[request.Query1(nil, "./samlp:NameIDPolicy/@Format")],
 		Acs:   request.Query1(nil, "./@AssertionConsumerServiceIndex"),
-		DtS:   directToSP,
-		Brk:   birk,
+		Ii:    issuerIndex,
+		Di:    destinationIndex,
 		WsFed: r.Form.Get("wa") == "wsignin1.0",
 	}
 	bytes, err := json.Marshal(&sRequest)
@@ -1450,7 +1434,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	}
 
 	legacyLog("", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
-	if birk {
+	if destinationIndex == 1 {
 		var jsonlog = map[string]string{
 			"action": "receive",
 			"type":   "samlp:AuthnRequest",
@@ -1492,7 +1476,7 @@ func eIdasExtras(request *goxml.Xp) {
 	return
 }
 
-func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, md1, md2 gosaml.Md, prefix string) (spMd, request *goxml.Xp, sRequest samlRequest, err error) {
+func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, issuerMdSets, destinationMdSets gosaml.MdSets, prefix string) (spMd, idpMd, request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFileIfTracing(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
 	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
@@ -1507,14 +1491,15 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	}
 
 	if sRequest.Id == "" { // This is a non-hub request - no original actual original request - just checking if response/@InResponseTo == request/@ID
-		return nil, nil, sRequest, nil
+		return nil, nil, nil, sRequest, nil
 	}
 
-	if sRequest.DtS {
-		spMd, err = md1.MDQ(sRequest.Is)
-	} else {
-		spMd, err = md2.MDQ(sRequest.Is)
+    spMd, err = issuerMdSets[sRequest.Ii].MDQ(sRequest.Is)
+	if err != nil {
+		return
 	}
+
+	idpMd, err = destinationMdSets[sRequest.Di].MDQ(sRequest.De)
 	if err != nil {
 		return
 	}
@@ -1535,35 +1520,21 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 // ACSService handles all the stuff related to receiving response and attribute handling
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, hubMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.Internal, Md.Hub, "https://"+r.Host+r.URL.Path)
+	response, _, hubMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Internal}, gosaml.MdSets{Md.Hub}, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
-	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP, "SSO-")
+	spMd, issuerMd, request, sRequest, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP}, "SSO-")
 	if err != nil {
 		return
 	}
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
 
-	birkMd, err := Md.ExternalIdP.MDQ(sRequest.De)
-	if err != nil {
-		return
-	}
-
-	issuerMd, err := Md.Hub.MDQ(config.HubEntityID)
-	if err != nil {
-		return
-	}
-
-	if sRequest.Brk {
-		issuerMd = birkMd
-	}
-
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		ard, err = aCSServiceHandler(birkMd, hubRequestedAttributes, spMd, request, response, sRequest.Brk)
+		ard, err = aCSServiceHandler(issuerMd, hubRequestedAttributes, spMd, request, response, sRequest.Di == 1)
 		if err != nil {
 			return goxml.Wrap(err)
 		}
@@ -1679,12 +1650,12 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
 
-	response, birkMd, kribMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://"+r.Host+r.URL.Path)
+	response, birkMd, kribMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.ExternalIdP}, gosaml.MdSets{Md.ExternalSP}, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
 
-	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.Internal, "SSO-")
+	spMd, _, request, sRequest, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.Internal}, nil, "SSO-")
 	if err != nil {
 		return
 	}
@@ -1799,7 +1770,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	defer r.Body.Close()
 	r.ParseForm()
 	if _, ok := r.Form["SAMLRequest"]; ok {
-		request, issuer, destination, relayState, err := gosaml.ReceiveLogoutMessage(r, issuerMdSet, destinationMdSet, role)
+		request, issuer, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
 		if err != nil {
 			return err
 		}
@@ -1850,7 +1821,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			return err
 		}
 	} else if _, ok := r.Form["SAMLResponse"]; ok {
-		response, issuer, destination, relayState, err := gosaml.ReceiveLogoutMessage(r, issuerMdSet, destinationMdSet, role)
+		response, issuer, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
 		if err != nil {
 			return err
 		}
@@ -2181,7 +2152,7 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 
-	request, spMd, idpMd, relayState, err := gosaml.ReceiveAuthnRequest(r, Md.ExternalSP, Md.ExternalIdP)
+	request, spMd, idpMd, relayState, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.ExternalSP}, gosaml.MdSets{Md.ExternalIdP})
 	if err != nil {
 		return err
 	}
@@ -2209,7 +2180,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 31536000})
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK-", "", "", false, false, nil)
+		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK-", "", "", 0, 0, nil)
 		return err
 	}
 	return
@@ -2217,21 +2188,16 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, spMd, relayState, err := gosaml.ReceiveSAMLResponse(r, Md.ExternalIdP, Md.ExternalSP, "https://"+r.Host+r.URL.Path)
+	response, _, spMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r,gosaml.MdSets{Md.ExternalIdP}, gosaml.MdSets{Md.ExternalSP}, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
-	spMd, request, sRequest, err := getOriginalRequest(w, r, response, Md.Internal, Md.ExternalSP, "ID-WAYF-DK-")
+	spMd, issuerMd, request, _, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.ExternalSP}, gosaml.MdSets{Md.ExternalIdP}, "ID-WAYF-DK-")
 	if err != nil {
 		return
 	}
 
 	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
-
-	issuerMd, err := Md.ExternalIdP.MDQ(sRequest.De)
-	if err != nil {
-		return
-	}
 
 	var newresponse *goxml.Xp
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
