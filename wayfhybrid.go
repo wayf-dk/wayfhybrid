@@ -298,7 +298,8 @@ func Main() {
 	httpMux.Handle(config.Acs, appHandler(ACSService))
 	httpMux.Handle(config.Nemlogin_Acs, appHandler(ACSService))
 	httpMux.Handle(config.Eidas_Acs, appHandler(ACSService))
-	httpMux.Handle(config.Birk, appHandler(BirkService))
+	//httpMux.Handle(config.Birk, appHandler(BirkService))
+	httpMux.Handle(config.Birk, appHandler(SSOService))
 	httpMux.Handle(config.Krib, appHandler(KribService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
@@ -1259,7 +1260,7 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 // SSOService handles single sign on requests
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spMd, _, relayState, issuerIndex, destinationIndex, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Internal}, gosaml.MdSets{Md.Hub})
+	request, spMd, hubIdpMd, relayState, spIndex, hubIdpIndex, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP})
 	if err != nil {
 		return
 	}
@@ -1269,38 +1270,36 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		vvpmss = tmp.Value
 	}
 
-	idpLists := [][]string{
-		spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
-		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
-		{r.URL.Query().Get("idpentityid")},
-		strings.Split(r.URL.Query().Get("idplist"), ","),
-		strings.Split(vvpmss, ",")}
+    idp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
 
-	if idp2 := wayf(w, r, request, spMd, idpLists); idp2 != "" {
-		idp2Md, err := Md.ExternalIdP.MDQ(idp2)
-		if err != nil {
-			return err
-		}
+    if hubIdpIndex == 0 { // Request to hub
+        idpLists := [][]string{
+            spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
+            request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
+            {r.URL.Query().Get("idpentityid")},
+            strings.Split(r.URL.Query().Get("idplist"), ","),
+            strings.Split(vvpmss, ",")}
 
-		sp2 := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
-		sp2Md, _ := Md.ExternalSP.MDQ(sp2)
+        idp = wayf(w, r, request, spMd, idpLists)
+        hubIdpMd, _ = Md.ExternalIdP.MDQ(idp) // birk md
+    }
 
-		// check for common feds before remapping!
-		if err = checkForCommonFederations(spMd, idp2Md); err != nil {
-			return err
-		}
+    // check for common feds before remapping!
+    if err = checkForCommonFederations(spMd, hubIdpMd); err != nil {
+        return err
+    }
 
-		altIdp := debify.ReplaceAllString(idp2, "$1$2")
-		if idp2 != altIdp { // an internal IdP
-			sp2Md, idp2Md, err = remapper(idp2)
-			if err != nil {
-				return err
-			}
-		}
+    HubSPMd, _ := Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID") )
+    internalIdP := debify.ReplaceAllString(idp, "$1$2")
+    idpMd, err := Md.Internal.MDQ(internalIdP)
+    if err == nil { // an internal IdP
+        HubSPMd, idpMd, err = remapper(idp)
+        if err != nil {
+            return err
+        }
+    }
 
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp2, relayState, "SSO-", "", config.Domain, issuerIndex, destinationIndex, nil)
-		return err
-	}
+    err = sendRequestToIdP(w, r, request, HubSPMd, idpMd, idp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
 	return
 }
 
@@ -1311,14 +1310,14 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 	// check ad-hoc feds overlap
 	defer r.Body.Close()
 
-	request, spMd, birkIdpMd, relayState, issuerIndex, destinationIndex, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Internal, Md.ExternalIdP})
+	request, spMd, hubIdpMd, relayState, spIndex, hubIdpIndex, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP})
 	if err != nil {
     	return err
 	}
 
 	var hubMd, idpMd *goxml.Xp
 
-	birkIdp := birkIdpMd.Query1(nil, "@entityID")
+	birkIdp := hubIdpMd.Query1(nil, "@entityID")
 	hubMd, idpMd, err = remapper(birkIdp)
 	if err != nil {
 		return
@@ -1328,7 +1327,7 @@ func BirkService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, issuerIndex, destinationIndex, nil)
+	err = sendRequestToIdP(w, r, request, hubMd, idpMd, birkIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
 	if err != nil {
 		return
 	}
@@ -1524,7 +1523,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
-	spMd, issuerMd, request, sRequest, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP}, "SSO-")
+	spMd, hubIdpMd, request, sRequest, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP}, "SSO-")
 	if err != nil {
 		return
 	}
@@ -1534,7 +1533,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		ard, err = aCSServiceHandler(issuerMd, hubRequestedAttributes, spMd, request, response, sRequest.Di == 1)
+		ard, err = aCSServiceHandler(hubIdpMd, hubRequestedAttributes, spMd, request, response, sRequest.Di == 1)
 		if err != nil {
 			return goxml.Wrap(err)
 		}
@@ -1544,7 +1543,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			response.QueryDashP(nil, eppnPath, response.Query1(nil, eppnPath)+"1", nil)
 		}
 
-		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
+		newresponse = gosaml.NewResponse(hubIdpMd, spMd, request, response)
 		CopyAttributes(response, newresponse, spMd)
 
 		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
@@ -1584,7 +1583,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
 		signingType := gosaml.SAMLSign
 		if sRequest.WsFed {
-			newresponse = gosaml.NewWsFedResponse(issuerMd, spMd, newresponse)
+			newresponse = gosaml.NewWsFedResponse(hubIdpMd, spMd, newresponse)
 			CopyAttributes(response, newresponse, spMd)
 
 			signingType = gosaml.WSFedSign
@@ -1594,7 +1593,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		handleAttributeNameFormat(newresponse, spMd)
 
 		for _, q := range elementsToSign {
-			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, signingType)
+			err = gosaml.SignResponse(newresponse, q, hubIdpMd, signingMethod, signingType)
 			if err != nil {
 				return err
 			}
@@ -1616,9 +1615,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.Encrypt(assertion, publicKey, ea)
 		}
 	} else {
-		newresponse = gosaml.NewErrorResponse(issuerMd, spMd, request, response)
+		newresponse = gosaml.NewErrorResponse(hubIdpMd, spMd, request, response)
 
-		err = gosaml.SignResponse(newresponse, "/samlp:Response", issuerMd, signingMethod, gosaml.SAMLSign)
+		err = gosaml.SignResponse(newresponse, "/samlp:Response", hubIdpMd, signingMethod, gosaml.SAMLSign)
 		if err != nil {
 			return
 		}
