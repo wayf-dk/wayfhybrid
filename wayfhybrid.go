@@ -1671,7 +1671,7 @@ func KribService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	spMd, _, request, sRequest, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.Internal}, nil, "SSO-")
+	spMd, _, request, sRequest, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP}, "SSO-")
 	if err != nil {
 		return
 	}
