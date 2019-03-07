@@ -1303,6 +1303,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
     internalIdP := debify.ReplaceAllString(idp, "$1$2")
     idpMd, err := Md.Internal.MDQ(internalIdP)
     if err == nil { // an internal IdP
+        idp = internalIdP // use debirkifyed internally
         HubSPMd, idpMd, err = remapper(idp)
         if err != nil {
             return err
