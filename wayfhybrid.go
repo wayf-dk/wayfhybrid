@@ -149,7 +149,7 @@ type (
 
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
-		Fo, Ii, Di           int
+		Fo, SPi, Hubi        int
 	    WsFed                bool
 	}
 )
@@ -1272,7 +1272,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    idp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
+    hubIdp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
+    idp := hubIdp
 
     if hubIdpIndex == 0 { // Request to hub
         vvpmss := ""
@@ -1310,7 +1311,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
         }
     }
 
-    err = sendRequestToIdP(w, r, request, HubSPMd, idpMd, idp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
+    err = sendRequestToIdP(w, r, request, HubSPMd, idpMd, hubIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
 	return
 }
 
@@ -1385,7 +1386,7 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, destination, relayState, prefix, altAcs, domain string, issuerIndex, destinationIndex int, idPList []string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, hubIdp, relayState, prefix, altAcs, domain string, spIndex, hubIdpIndex int, idPList []string) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList)
 	if err != nil {
@@ -1410,11 +1411,11 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Nid:   id,
 		Id:    request.Query1(nil, "./@ID"),
 		Is:    request.Query1(nil, "./saml:Issuer"),
-		De:    destination,
+		De:    hubIdp,
 		Fo:    gosaml.NameIDMap[request.Query1(nil, "./samlp:NameIDPolicy/@Format")],
 		Acs:   request.Query1(nil, "./@AssertionConsumerServiceIndex"),
-		Ii:    issuerIndex,
-		Di:    destinationIndex,
+		SPi:   spIndex,
+		Hubi:  hubIdpIndex,
 		WsFed: r.Form.Get("wa") == "wsignin1.0",
 	}
 	bytes, err := json.Marshal(&sRequest)
@@ -1444,12 +1445,12 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	}
 
 	legacyLog("", "SAML2.0 - IdP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
-	if destinationIndex == 1 {
+	if hubIdpIndex == 1 {
 		var jsonlog = map[string]string{
 			"action": "receive",
 			"type":   "samlp:AuthnRequest",
 			"src":    request.Query1(nil, "./saml:Issuer"),
-			"us":     destination,
+			"us":     hubIdp,
 			"ip":     r.RemoteAddr,
 			"ts":     strconv.FormatInt(time.Now().Unix(), 10),
 			"host":   hostName,
@@ -1504,12 +1505,12 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 		return nil, nil, nil, sRequest, nil
 	}
 
-    spMd, err = issuerMdSets[sRequest.Ii].MDQ(sRequest.Is)
+    spMd, err = issuerMdSets[sRequest.SPi].MDQ(sRequest.Is)
 	if err != nil {
 		return
 	}
 
-	idpMd, err = destinationMdSets[sRequest.Di].MDQ(sRequest.De)
+	idpMd, err = destinationMdSets[sRequest.Hubi].MDQ(sRequest.De)
 	if err != nil {
 		return
 	}
@@ -1544,7 +1545,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		ard, err = aCSServiceHandler(hubIdpMd, hubRequestedAttributes, spMd, request, response, sRequest.Di == 1)
+		ard, err = aCSServiceHandler(hubIdpMd, hubRequestedAttributes, spMd, request, response, sRequest.Hubi == 1)
 		if err != nil {
 			return goxml.Wrap(err)
 		}
