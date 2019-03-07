@@ -1288,6 +1288,9 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
             strings.Split(vvpmss, ",")}
 
         idp = wayf(w, r, request, spMd, idpLists)
+        if idp == "" {
+            return
+        }
         hubIdpMd, _ = Md.ExternalIdP.MDQ(idp) // birk md
     }
 
