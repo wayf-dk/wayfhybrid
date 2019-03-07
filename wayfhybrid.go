@@ -718,7 +718,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		hubMd, err := Md.Hub.MDQ(config.HubEntityID)
+		idpMd, err := Md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
 			return err
 		}
@@ -728,7 +728,14 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			scoping = strings.Split(r.Form.Get("scopedidp"), ",")
 		}
 
-		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, hubMd, scoping)
+		if r.Form.Get("scoping") == "birk" {
+			idpMd, err = Md.ExternalIdP.MDQ(r.Form.Get("scopedidp"))
+            if err != nil {
+                return err
+            }
+		}
+
+		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, scoping)
 
 		options := []struct{ name, path, value string }{
 			{"isPassive", "./@IsPassive", "true"},
