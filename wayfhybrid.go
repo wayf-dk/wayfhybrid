@@ -785,7 +785,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
 		messages := "none"
-		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
+		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, gosaml.MdSets{Md.Hub, Md.ExternalIdP}, gosaml.MdSets{Md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
 		//		if err == lMDQ.MetaDataNotFoundError {
 		//			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
 		//			external = "1"
