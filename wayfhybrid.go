@@ -1309,6 +1309,11 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
         if err != nil {
             return err
         }
+    } else {
+        idpMd, err = Md.ExternalSP.MDQ(idp)
+        if err != nil {
+            return
+        }
     }
 
     err = sendRequestToIdP(w, r, request, HubSPMd, idpMd, hubIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
