@@ -1272,14 +1272,14 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	vvpmss := ""
-	if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
-		vvpmss = tmp.Value
-	}
-
     idp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
 
     if hubIdpIndex == 0 { // Request to hub
+        vvpmss := ""
+        if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
+            vvpmss = tmp.Value
+        }
+
         idpLists := [][]string{
             spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
             request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
