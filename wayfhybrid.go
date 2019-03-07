@@ -877,9 +877,11 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 
 // attributeValues returns all the attribute values
 func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrValue) {
+    seen := map[string]bool
 	requestedAttributes := hubMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute`) // [@isRequired='true' or @isRequired='1']`)
 	for _, requestedAttribute := range requestedAttributes {
 		name := destinationMd.Query1(requestedAttribute, "@Name")
+		seen[name] = true
 		friendlyName := destinationMd.Query1(requestedAttribute, "@FriendlyName")
 
 		must := hubMd.Query1(nil, `.//md:RequestedAttribute[@FriendlyName=`+strconv.Quote(friendlyName)+`]/@must`) == "true"
@@ -888,6 +890,14 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+` or @Name=`+strconv.Quote(friendlyName)+`]/saml:AttributeValue`)
 		values = append(values, attrValue{Name: friendlyName, Must: must, Values: attrValues})
 	}
+
+    for _, name := range response.QueryMulti(nil, ".//saml:Attribute/@Name") {
+        if seen[name] {
+            continue
+        }
+  		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/saml:AttributeValue`)
+		values = append(values, attrValue{Name: name, Must: false, Values: attrValues})
+    }
 	return
 }
 
