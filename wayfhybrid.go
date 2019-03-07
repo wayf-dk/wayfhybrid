@@ -1310,7 +1310,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
             return err
         }
     } else {
-        idpMd, err = Md.ExternalSP.MDQ(idp)
+        idpMd, err = Md.ExternalIdP.MDQ(idp)
         if err != nil {
             return
         }
