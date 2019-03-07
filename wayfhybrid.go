@@ -1531,7 +1531,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 // ACSService handles all the stuff related to receiving response and attribute handling
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, hubMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Internal}, gosaml.MdSets{Md.Hub}, "https://"+r.Host+r.URL.Path)
+	response, idpMd, hubSpMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Internal}, gosaml.MdSets{Md.Hub}, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -1545,7 +1545,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		ard, err = aCSServiceHandler(hubIdpMd, hubRequestedAttributes, spMd, request, response, sRequest.Hubi == 1)
+		ard, err = aCSServiceHandler(idpMd, hubRequestedAttributes, spMd, request, response, sRequest.Hubi == 1)
 		if err != nil {
 			return goxml.Wrap(err)
 		}
@@ -1610,7 +1610,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 		}
-		if _, err = SLOInfoHandler(w, r, response, hubMd, newresponse, spMd, gosaml.SPRole, "SLO"); err != nil {
+		if _, err = SLOInfoHandler(w, r, response, hubSpMd, newresponse, spMd, gosaml.SPRole, "SLO"); err != nil {
 			return
 		}
 
