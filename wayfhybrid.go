@@ -908,10 +908,6 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	default:
 	}
 
-	if err = checkForCommonFederations(idpMd, spMd); err != nil {
-		return
-	}
-
 	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
 	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	//response.QueryDashP(destinationAttributes, "@xmlns:xs", "http://www.w3.org/2001/XMLSchema", nil)
@@ -1117,10 +1113,6 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 }
 
 func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
-	if err = checkForCommonFederations(idpMd, spMd); err != nil {
-		return
-	}
-
     // we ignore the qualifiers and use the idp and sp entityIDs
     eptid := response.Query1(nil, "./saml:Assertion/saml:Subject/saml:NameID[@Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent']")
     if eptid == "" {
@@ -1516,6 +1508,10 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	spMd, hubIdpMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIdP, "SSO-")
 	if err != nil {
+		return
+	}
+
+	if err = checkForCommonFederations(idpMd, spMd); err != nil {
 		return
 	}
 
