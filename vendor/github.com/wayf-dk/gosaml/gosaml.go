@@ -1031,12 +1031,10 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, idPList []string) (
 	nameIDFormats := NameIDList
 
 	if originalRequest != nil { // already checked for supported nameidformat
-		switch originalRequest.Query1(nil, "./@ForceAuthn") {
-		case "1", "true":
+		if originalRequest.QueryXMLBool(nil, "./@ForceAuthn") {
 			request.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 		}
-		switch originalRequest.Query1(nil, "./@IsPassive") {
-		case "1", "true":
+		if originalRequest.QueryXMLBool(nil, "./@IsPassive") {
 			request.QueryDashP(nil, "./@IsPassive", "true", nil)
 		}
 		//requesterID := originalRequest.Query1(nil, "./saml:Issuer")
