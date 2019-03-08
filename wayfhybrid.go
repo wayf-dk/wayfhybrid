@@ -239,6 +239,11 @@ func Main() {
 	Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table}
 	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
 
+	intExtSP =  gosaml.MdSets{Md.Internal, Md.ExternalSP}
+	intExtIdP = gosaml.MdSets{Md.Internal, Md.ExternalIdP}
+	hubExtIdP = gosaml.MdSets{Md.Hub, Md.ExternalIdP}
+	hubExtSP  = gosaml.MdSets{Md.Hub, Md.ExternalSP}
+
 	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
 	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
@@ -277,8 +282,6 @@ func Main() {
 
 	httpMux := http.NewServeMux()
 
-	//http.HandleFunc("/status", statushandler)
-	//http.Handle(config["hybrid_public_prefix"], http.FileServer(http.Dir(config["hybrid_public"])))
 	for _, pattern := range config.NotFoundRoutes {
 		httpMux.Handle(pattern, http.NotFoundHandler())
 	}
@@ -781,7 +784,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
 		messages := "none"
-		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, gosaml.MdSets{Md.Hub, Md.ExternalIdP}, gosaml.MdSets{Md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
+		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, hubExtIdP, gosaml.MdSets{Md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
 		//		if err == lMDQ.MetaDataNotFoundError {
 		//			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
 		//			external = "1"
@@ -1296,7 +1299,7 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 // SSOService handles single sign on requests
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spMd, hubIdpMd, relayState, spIndex, hubIdpIndex, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP})
+	request, spMd, hubIdpMd, relayState, spIndex, hubIdpIndex, err := gosaml.ReceiveAuthnRequest(r, intExtSP, hubExtIdP)
 	if err != nil {
 		return
 	}
@@ -1535,11 +1538,11 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 // ACSService handles all the stuff related to receiving response and attribute handling
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, idpMd, hubSpMd, relayState, _, hubSpIndex, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Internal, Md.ExternalIdP}, gosaml.MdSets{Md.Hub, Md.ExternalSP}, "https://"+r.Host+r.URL.Path)
+	response, idpMd, hubSpMd, relayState, _, hubSpIndex, err := gosaml.ReceiveSAMLResponse(r, intExtIdP, hubExtSP, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
-	spMd, hubIdpMd, request, sRequest, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.Internal, Md.ExternalSP}, gosaml.MdSets{Md.Hub, Md.ExternalIdP}, "SSO-")
+	spMd, hubIdpMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIdP, "SSO-")
 	if err != nil {
 		return
 	}
