@@ -1537,21 +1537,18 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		newresponse = gosaml.NewResponse(hubIdpMd, spMd, request, response)
 		CopyAttributes(response, newresponse, spMd)
 
-		nameid := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
+		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
+		nameid := gosaml.Id()
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
 		// The response at this time contains a full attribute set
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
-		if nameidformat == gosaml.Persistent {
-			newresponse.QueryDashP(nameid, "@Format", gosaml.Persistent, nil)
-			eptid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]/saml:AttributeValue`)
-			newresponse.QueryDashP(nameid, ".", eptid, nil)
-		} else if nameidformat == gosaml.Email {
-			newresponse.QueryDashP(nameid, "@Format", gosaml.Email, nil)
-			eppn := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonPrincipalName"]/saml:AttributeValue`)
-			newresponse.QueryDashP(nameid, ".", eppn, nil)
-		} else { // if nameidformat == gosaml.Transient
-			newresponse.QueryDashP(nameid, ".", gosaml.Id(), nil)
+		nameidformatMap := map[string]string{gosaml.Persistent: "eduPersonTargetedID", gosaml.Email: "eduPersonPrincipalName"}
+		if friendlyname, ok := nameidformatMap[nameidformat]; ok {
+            nameid = response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="`+friendlyname+`"]/saml:AttributeValue`)
 		}
+
+		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
+		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
 
 		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
 		if spMd.QueryBool(nil, "count(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds[.='eduGAIN']) > 0") {
