@@ -897,7 +897,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := debify.ReplaceAllString(idpMd.Query1(nil, "@entityID"), "$1$2")
 
-	base64encodedIn := idpMd.QueryBool(nil, "boolean(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes[normalize-space(.)='1' or normalize-space(.)='true'])")
+	base64encodedIn := idpMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes")
 
 	switch idp {
 	case "https://nemlogin.wayf.dk":
@@ -1085,7 +1085,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard.SPLogo = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
 	ard.SPEntityID = spMd.Query1(nil, "@entityID")
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
-	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryBool(nil, `boolean(./md:Extensions/wayf:wayf/wayf:consent.disable[normalize-space(.)='1' or normalize-space(.)='true'])`)
+	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryXMLBool(nil, `./md:Extensions/wayf:wayf/wayf:consent.disable`)
 	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
 	ard.Key = idHash(ard.SPEntityID)
 	io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
@@ -1367,7 +1367,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
 	}
 
-    if idpMd.QueryBool(nil, `boolean(./md:Extensions/wayf:wayf/wayf:wantRequesterID[normalize-space(.)='1' or normalize-space(.)='true'])`) {
+    if idpMd.QueryXMLBool(nil, `./md:Extensions/wayf:wayf/wayf:wantRequesterID`) {
    	    newrequest.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
    	}
 
@@ -1564,7 +1564,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		elementsToSign := config.ElementsToSign
-		if spMd.QueryBool(nil, "boolean(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response[normalize-space(.)='1' or normalize-space(.)='true'])") {
+		if spMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
@@ -1619,6 +1619,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return goxml.Wrap(err)
 	}
+
 	gosaml.DumpFileIfTracing(r, newresponse)
 
 	var samlResponse string
@@ -1885,7 +1886,7 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 
 // CopyAttributes copies the attributes
 func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
-	base64encodedOut := spMd.QueryBool(nil, "boolean(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes[normalize-space(.)='1' or normalize-space(.)='true'])")
+	base64encodedOut := spMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes")
 
 	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
 	attrcache := map[string]types.Element{}
@@ -2113,7 +2114,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		CopyAttributes(attributeStatement, newresponse, spMd)
 
 		elementsToSign := config.ElementsToSign
-		if spMd.QueryBool(nil, "boolean(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response[normalize-space(.)='1' or normalize-space(.)='true'])") {
+		if spMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
