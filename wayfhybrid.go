@@ -182,8 +182,8 @@ var (
 
 	Md                 MdSets
 	basic2uri          map[string]attrName
-	aCSServiceHandler  func(*goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, *goxml.Xp, bool) (AttributeReleaseData, error)
-	kribServiceHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (string, error)
+
+	intExtSP, intExtIdP, hubExtIdP, hubExtSP gosaml.MdSets
 )
 
 func Main() {
@@ -253,14 +253,6 @@ func Main() {
 			panic(err)
 		}
 	}
-
-	/*
-	   wayfsp2, _ := Md.Internal.MDQ("https://wayfsp2.wayf.dk")
-	   wayfsp2.QueryDashP(nil, "/md:SPSSODescriptor/md:AssertionConsumerService/@Location", "http://localhost:32361", nil)
-	   kribwayfsp2, _ := Md.ExternalSP.MDQ("https://wayfsp2.wayf.dk")
-	   kribwayfsp2.QueryDashP(nil, "/md:SPSSODescriptor/md:AssertionConsumerService/@Location", "https://krib.wayf.dk/76ae4bd1a482918378e0617993684344c2cd95bd/localhost:32361", nil)
-	   q.Q(kribwayfsp2.PP()) //
-	*/
 
 	godiscoveryservice.Config = godiscoveryservice.Conf{
 		DiscoMetaData: config.Discometadata,
@@ -339,26 +331,6 @@ func Main() {
 			log.Printf("main(): %s\n", err)
 		}
 	}()
-
-	/*
-	   	pprofMux := http.NewServeMux()
-	       pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
-	       pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	       pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	       pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	       pprofMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-	       pprofMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-	       pprofMux.Handle("/debug/pprof/block", pprof.Handler("block"))
-	       pprofMux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-
-	   	go func() {
-	   		log.Println("listening on 0.0.0.0:9000")
-	   		err = http.ListenAndServe(":9000", pprofMux)
-	   		if err != nil {
-	   			log.Printf("main(): %s\n", err)
-	   		}
-	   	}()
-	*/
 
 	<-finish
 }
