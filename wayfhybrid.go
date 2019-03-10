@@ -9,6 +9,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"html/template"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/securecookie"
 	toml "github.com/pelletier/go-toml"
@@ -19,11 +25,7 @@ import (
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lMDQ"
 	"github.com/y0ssar1an/q"
-	"html/template"
-	"io"
-	"io/ioutil"
-	"log"
-	"net/http"
+
 	//"net/http/pprof"
 	"net/url"
 	"os"
@@ -150,7 +152,7 @@ type (
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
 		Fo, SPi, Hubi        int
-	    WsFed                bool
+		WsFed                bool
 	}
 )
 
@@ -180,8 +182,8 @@ var (
 
 	hubRequestedAttributes *goxml.Xp
 
-	Md                 MdSets
-	basic2uri          map[string]attrName
+	Md        MdSets
+	basic2uri map[string]attrName
 
 	intExtSP, intExtIdP, hubExtIdP, hubExtSP gosaml.MdSets
 )
@@ -239,10 +241,10 @@ func Main() {
 	Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table}
 	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
 
-	intExtSP =  gosaml.MdSets{Md.Internal, Md.ExternalSP}
+	intExtSP = gosaml.MdSets{Md.Internal, Md.ExternalSP}
 	intExtIdP = gosaml.MdSets{Md.Internal, Md.ExternalIdP}
 	hubExtIdP = gosaml.MdSets{Md.Hub, Md.ExternalIdP}
-	hubExtSP  = gosaml.MdSets{Md.Hub, Md.ExternalSP}
+	hubExtSP = gosaml.MdSets{Md.Hub, Md.ExternalSP}
 
 	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
 	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
@@ -294,7 +296,7 @@ func Main() {
 	httpMux.Handle(config.Krib, appHandler(ACSService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
-    httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
+	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
 
@@ -701,9 +703,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		if r.Form.Get("scoping") == "birk" {
 			idpMd, err = Md.ExternalIdP.MDQ(r.Form.Get("scopedidp"))
-            if err != nil {
-                return err
-            }
+			if err != nil {
+				return err
+			}
 		}
 
 		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, scoping)
@@ -848,7 +850,7 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 
 // attributeValues returns all the attribute values
 func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrValue) {
-    seen := map[string]bool{}
+	seen := map[string]bool{}
 	requestedAttributes := hubMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute`) // [@isRequired='true' or @isRequired='1']`)
 	for _, requestedAttribute := range requestedAttributes {
 		name := destinationMd.Query1(requestedAttribute, "@Name")
@@ -862,17 +864,17 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 		values = append(values, attrValue{Name: friendlyName, Must: must, Values: attrValues})
 	}
 
-    for _, name := range response.QueryMulti(nil, ".//saml:Attribute/@Name") {
-        if seen[name] {
-            continue
-        }
-  		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/saml:AttributeValue`)
-  		friendlyName := response.Query1(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/@FriendlyName`)
-  		if friendlyName != "" {
-  		    name = friendlyName
-  		}
+	for _, name := range response.QueryMulti(nil, ".//saml:Attribute/@Name") {
+		if seen[name] {
+			continue
+		}
+		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/saml:AttributeValue`)
+		friendlyName := response.Query1(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/@FriendlyName`)
+		if friendlyName != "" {
+			name = friendlyName
+		}
 		values = append(values, attrValue{Name: name, Must: false, Values: attrValues})
-    }
+	}
 	return
 }
 
@@ -1113,28 +1115,28 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 }
 
 func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
-    // we ignore the qualifiers and use the idp and sp entityIDs
-    eptid := response.Query1(nil, "./saml:Assertion/saml:Subject/saml:NameID[@Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent']")
-    if eptid == "" {
-        eptid = response.Query1(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.10' or @Name='eduPersonTargetedID']/saml:AttributeValue/saml:NameID")
-    }
+	// we ignore the qualifiers and use the idp and sp entityIDs
+	eptid := response.Query1(nil, "./saml:Assertion/saml:Subject/saml:NameID[@Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent']")
+	if eptid == "" {
+		eptid = response.Query1(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.10' or @Name='eduPersonTargetedID']/saml:AttributeValue/saml:NameID")
+	}
 
-    if eptid != "" { // convert to WAYF format eptid - legacy ...
-        idp := idpMd.Query1(nil, "@entityID")
-        sp := spMd.Query1(nil, "@entityID")
-        if tmp := spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
-            sp = tmp
-        }
+	if eptid != "" { // convert to WAYF format eptid - legacy ...
+		idp := idpMd.Query1(nil, "@entityID")
+		sp := spMd.Query1(nil, "@entityID")
+		if tmp := spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
+			sp = tmp
+		}
 
-        uidhashbase := "uidhashbase" + config.EptidSalt
-        uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
-        uidhashbase += strconv.Itoa(len(sp)) + ":" + sp
-        uidhashbase += strconv.Itoa(len(eptid)) + ":" + eptid
-        uidhashbase += config.EptidSalt
+		uidhashbase := "uidhashbase" + config.EptidSalt
+		uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
+		uidhashbase += strconv.Itoa(len(sp)) + ":" + sp
+		uidhashbase += strconv.Itoa(len(eptid)) + ":" + eptid
+		uidhashbase += config.EptidSalt
 
-        hash := sha1.Sum([]byte(uidhashbase))
-        eptid = "WAYF-DK-" + hex.EncodeToString(append(hash[:]))
-        response.QueryDashP(nil,  `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonTargetedID"]/saml:AttributeValue`, eptid, nil)
+		hash := sha1.Sum([]byte(uidhashbase))
+		eptid = "WAYF-DK-" + hex.EncodeToString(append(hash[:]))
+		response.QueryDashP(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonTargetedID"]/saml:AttributeValue`, eptid, nil)
 	}
 	ard = AttributeReleaseData{BypassConfirmation: true}
 	return
@@ -1345,9 +1347,9 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
 	}
 
-    if idpMd.QueryXMLBool(nil, `./md:Extensions/wayf:wayf/wayf:wantRequesterID`) {
-   	    newrequest.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
-   	}
+	if idpMd.QueryXMLBool(nil, `./md:Extensions/wayf:wayf/wayf:wantRequesterID`) {
+		newrequest.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
+	}
 
 	// Save the request in a session for when the response comes back
 	id := newrequest.Query1(nil, "./@ID")
@@ -1454,7 +1456,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 		return nil, nil, nil, sRequest, nil
 	}
 
-    spMd, err = issuerMdSets[sRequest.SPi].MDQ(sRequest.Is)
+	spMd, err = issuerMdSets[sRequest.SPi].MDQ(sRequest.Is)
 	if err != nil {
 		return
 	}
@@ -1498,10 +1500,10 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-	    if hubSpIndex == 0 { // to the hub itself
-		    ard, err = WayfACSServiceHandler(idpMd, hubRequestedAttributes, spMd, request, response, sRequest.Hubi == 1)
+		if hubSpIndex == 0 { // to the hub itself
+			ard, err = WayfACSServiceHandler(idpMd, hubRequestedAttributes, spMd, request, response, sRequest.Hubi == 1)
 		} else { // krib
-		    ard, err = WayfKribHandler(idpMd, spMd, request, response)
+			ard, err = WayfKribHandler(idpMd, spMd, request, response)
 		}
 		if err != nil {
 			return goxml.Wrap(err)
@@ -1522,7 +1524,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
 		nameidformatMap := map[string]string{gosaml.Persistent: "eduPersonTargetedID", gosaml.Email: "eduPersonPrincipalName"}
 		if friendlyname, ok := nameidformatMap[nameidformat]; ok {
-            nameid = response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="`+friendlyname+`"]/saml:AttributeValue`)
+			nameid = response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="`+friendlyname+`"]/saml:AttributeValue`)
 		}
 
 		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
@@ -2056,7 +2058,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, spMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r,gosaml.MdSets{Md.ExternalIdP}, gosaml.MdSets{Md.ExternalSP}, "https://"+r.Host+r.URL.Path)
+	response, _, spMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.ExternalIdP}, gosaml.MdSets{Md.ExternalSP}, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -2142,7 +2144,6 @@ func getUserInfo(sp, eptid string) (userInfo map[string][]string, err error) {
 	return
 }
 
-
 // Implements the WAYF specific HSM RSA signingMethod
 // Expects "PEM" private key format ie. when for HSM it starts with hsm:
 type SigningMethodHSM struct {
@@ -2175,5 +2176,5 @@ func (m *SigningMethodHSM) Sign(signingString string, key interface{}) (string, 
 }
 
 func (m *SigningMethodHSM) Verify(signingString, signature string, key interface{}) error {
-    return nil
+	return nil
 }
