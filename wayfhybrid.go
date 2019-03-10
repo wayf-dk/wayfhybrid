@@ -1268,76 +1268,41 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    hubIdp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
-    idp := hubIdp
+	hubIdp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
+	idp := hubIdp // we need to keep the original 'Destination' around in hubIdp, idp will become a backend idp after discovery
 
-    if hubIdpIndex == 0 { // Request to hub
-        vvpmss := ""
-        if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
-            vvpmss = tmp.Value
-        }
-
-        idpLists := [][]string{
-            spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
-            request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
-            {r.URL.Query().Get("idpentityid")},
-            strings.Split(r.URL.Query().Get("idplist"), ","),
-            strings.Split(vvpmss, ",")}
-
-        idp = wayf(w, r, request, spMd, idpLists)
-        if idp == "" {
-            return
-        }
-        hubIdpMd, _ = Md.ExternalIdP.MDQ(idp) // birk md
-    }
-
-    // check for common feds before remapping!
-    if err = checkForCommonFederations(spMd, hubIdpMd); err != nil {
-        return err
-    }
-
-    HubSPMd, _ := Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID") )
-    internalIdP := debify.ReplaceAllString(idp, "$1$2")
-    idpMd, err := Md.Internal.MDQ(internalIdP)
-    if err == nil { // an internal IdP
-        idp = internalIdP // use debirkifyed internally
-        HubSPMd, idpMd, err = remapper(idp)
-        if err != nil {
-            return err
-        }
-    } else {
-        idpMd, err = Md.ExternalIdP.MDQ(idp)
-        if err != nil {
-            return
-        }
-    }
-
-    err = sendRequestToIdP(w, r, request, HubSPMd, idpMd, hubIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
-	return
-}
-
-// BirkService refers to handling the request at Birk
-func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
-	idp = debify.ReplaceAllString(idp, "$1$2")
-	if rm, ok := remap[idp]; ok {
-		idpMd, err = Md.Internal.MDQ(rm.Idp)
-		if err != nil {
-			return
-		}
-		hubMd, err = Md.Hub.MDQ(rm.Sp)
-		if err != nil {
-			return
-		}
-	} else {
-		idpMd, err = Md.Internal.MDQ(idp)
-		if err != nil {
-			return
+	if hubIdpIndex == 0 { // Request to hub - do Scoping/Discovery
+		vvpmss := ""
+		if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
+			vvpmss = tmp.Value
 		}
 
-		// both IdP and SP comes from original IdP
+		idpLists := [][]string{
+			spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
+			request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
+			{r.URL.Query().Get("idpentityid")},
+			strings.Split(r.URL.Query().Get("idplist"), ","),
+			strings.Split(vvpmss, ",")}
+
+		idp = wayf(w, r, request, spMd, idpLists)
+		if idp == "" {
+			return
+		}
+		hubIdpMd, err = Md.ExternalIdP.MDQ(idp) // now hubIdpMd is no longer the Hub's IdP MD and can be used below for common feds check
+		if err != nil {
+		    return
+		}
+	}
+
+	// check for common feds before remapping!
+	if err = checkForCommonFederations(spMd, hubIdpMd); err != nil {
+		return err
+	}
+
+    var HubSPMd, idpMd *goxml.Xp
+   	idpMd, err = Md.Internal.MDQ(debify.ReplaceAllString(idp, "$1$2")) // lookup using debirkified entityID
+	if err == nil { // found it - an internal IdP
 		mappedIdP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:map2IdP")
-		mappedSP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:map2SP")
-
 		if mappedIdP != "" {
 			idpMd, err = Md.Internal.MDQ(mappedIdP)
 			if err != nil {
@@ -1345,15 +1310,28 @@ func remapper(idp string) (hubMd, idpMd *goxml.Xp, err error) {
 			}
 		}
 
+		mappedSP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:map2SP")
 		if mappedSP == "" {
 			mappedSP = config.HubEntityID
 		}
 
-		hubMd, err = Md.Hub.MDQ(mappedSP)
+		HubSPMd, err = Md.Hub.MDQ(mappedSP)
+		if err != nil {
+			return
+		}
+	} else { // Krib request to ext IdP
+		idpMd, err = Md.ExternalIdP.MDQ(idp)
+		if err != nil {
+			return
+		}
+
+    	HubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
 		if err != nil {
 			return
 		}
 	}
+
+	err = sendRequestToIdP(w, r, request, HubSPMd, idpMd, hubIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
 	return
 }
 
