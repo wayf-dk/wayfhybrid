@@ -455,23 +455,9 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 		return
 	}
 
-	/*
-	       if r.Host == "krib.wayf.dk" {
-	           destination = "{sha1}"+strings.Split(r.URL.Path, "/")[1]
-	       }
-	   q.Q(r.URL.Path, destination)
-	*/
-
     destinationMd, destinationIndex, err = findInMetadataSets(destinationMdSets, location)
 	if err != nil {
 		return
-	}
-
-	if issuer == "https://eidasconnector.test.eid.digst.dk/idp" { // what is this doing here ???
-		destinationMd, err = destinationMdSets[destinationIndex].MDQ("https://saml.eidas.wayf.dk") // always same as as destination
-		if err != nil {
-			return
-		}
 	}
 
 	xp, err = CheckSAMLMessage(r, tmpXp, issuerMd, destinationMd, role, location)
