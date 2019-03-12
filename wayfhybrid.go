@@ -1291,7 +1291,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	// check for common feds before remapping!
-	if err = checkForCommonFederations(spMd, hubIdpMd); err != nil {
+	if err = checkForCommonFederations(spMd, idpMd); err != nil {
 		return err
 	}
 
@@ -1319,8 +1319,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return
 		}
 	} else { // Krib request to ext IdP
-	    idpMd = hubIdpMd
-
     	hubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
 		if err != nil {
 			return
