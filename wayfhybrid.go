@@ -1297,6 +1297,10 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
     var hubSPMd *goxml.Xp
 	if idpIndex == hubIdpIndex { // Hub to Int or Birk
+	    idpMd, _ = Md.Internal.MDQ(idp)
+        if err != nil {
+            return
+        }
 		mappedIdP := idpMd.Query1(nil, xprefix + "map2IdP")
 		if mappedIdP != "" {
 			idpMd, err = Md.Internal.MDQ(mappedIdP)
