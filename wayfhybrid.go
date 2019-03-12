@@ -47,6 +47,7 @@ const (
 	basic           = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
 	claims          = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
 	unspecified     = "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified"
+	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
 )
 
 type (
@@ -880,14 +881,14 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 
 // checkForCommonFederations checks for common federation in sp and idp
 func checkForCommonFederations(idpMd, spMd *goxml.Xp) (err error) {
-	idpFeds := idpMd.QueryMulti(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds")
+	idpFeds := idpMd.QueryMulti(nil, xprefix + "feds")
 	tmp := idpFeds[:0]
 	for _, federation := range idpFeds {
 		fed := allowedInFeds.ReplaceAllLiteralString(strings.TrimSpace(federation), "")
 		tmp = append(tmp, strconv.Quote(fed))
 	}
 	idpFedsQuery := strings.Join(idpFeds, " or .=")
-	commonFeds := spMd.QueryMulti(nil, `/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds[.=`+idpFedsQuery+`]`)
+	commonFeds := spMd.QueryMulti(nil, xprefix + `feds[.=`+idpFedsQuery+`]`)
 	if len(commonFeds) == 0 {
 		err = fmt.Errorf("no common federations")
 		return
@@ -899,7 +900,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := debify.ReplaceAllString(idpMd.Query1(nil, "@entityID"), "$1$2")
 
-	base64encodedIn := idpMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes")
+	base64encodedIn := idpMd.QueryXMLBool(nil, xprefix + "base64attributes")
 
 	switch idp {
 	case "https://nemlogin.wayf.dk":
@@ -961,10 +962,10 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		return
 	}
 
-	val := idpMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:wayf_schacHomeOrganizationType")
+	val := idpMd.Query1(nil, xprefix + "wayf_schacHomeOrganizationType")
 	setAttribute("schacHomeOrganizationType", val, response, destinationAttributes)
 
-	val = idpMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:wayf_schacHomeOrganization")
+	val = idpMd.Query1(nil, xprefix + "wayf_schacHomeOrganization")
 	setAttribute("schacHomeOrganization", val, response, destinationAttributes)
 
 	if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="displayName"]/saml:AttributeValue`) == "" {
@@ -975,13 +976,13 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 	// Use kribified?, use birkified?
 	idpPEID := idp
-	if tmp := idpMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
+	if tmp := idpMd.Query1(nil, xprefix + "persistentEntityID"); tmp != "" {
 		idpPEID = tmp
 	}
 
 	sp := spMd.Query1(nil, "@entityID")
 	spPEID := sp
-	if tmp := spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
+	if tmp := spMd.Query1(nil, xprefix + "persistentEntityID"); tmp != "" {
 		spPEID = tmp
 	}
 	spPEID = deproxy.ReplaceAllString(debify.ReplaceAllString(spPEID, "$1$2"), "$1") // Transition hack - old BIRK new hub interaction
@@ -1124,7 +1125,7 @@ func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeRel
 	if eptid != "" { // convert to WAYF format eptid - legacy ...
 		idp := idpMd.Query1(nil, "@entityID")
 		sp := spMd.Query1(nil, "@entityID")
-		if tmp := spMd.Query1(nil, "./md:Extensions/wayf:wayf/wayf:persistentEntityID"); tmp != "" {
+		if tmp := spMd.Query1(nil, xprefix + "persistentEntityID"); tmp != "" {
 			sp = tmp
 		}
 
@@ -1280,7 +1281,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		idpLists := [][]string{
-			spMd.QueryMulti(nil, "./md:Extensions/wayf:wayf/wayf:IDPList"),
+			spMd.QueryMulti(nil, xprefix + "IDPList"),
 			request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
 			{r.URL.Query().Get("idpentityid")},
 			strings.Split(r.URL.Query().Get("idplist"), ","),
@@ -1290,7 +1291,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		if idp == "" {
 			return
 		}
-		hubIdpMd, err = Md.ExternalIdP.MDQ(idp) // now hubIdpMd is no longer the Hub's IdP MD and can be used below for common feds check
+		idp = debify.ReplaceAllString(idp, "$1$2")
+		idpMd, idpIndex, err = gosaml.FindInMetadataSets(intExtIdP, idp)
 		if err != nil {
 		    return
 		}
@@ -1312,28 +1314,25 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		mappedSP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:map2SP")
+		mappedSP := idpMd.Query1(nil, xprefix + "map2SP")
 		if mappedSP == "" {
 			mappedSP = config.HubEntityID
 		}
 
-		HubSPMd, err = Md.Hub.MDQ(mappedSP)
+		hubSPMd, err = Md.Hub.MDQ(mappedSP)
 		if err != nil {
 			return
 		}
 	} else { // Krib request to ext IdP
-		idpMd, err = Md.ExternalIdP.MDQ(idp)
-		if err != nil {
-			return
-		}
+	    idpMd = hubIdpMd
 
-    	HubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
+    	hubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
 		if err != nil {
 			return
 		}
 	}
 
-	err = sendRequestToIdP(w, r, request, HubSPMd, idpMd, hubIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
+	err = sendRequestToIdP(w, r, request, hubSPMd, idpMd, hubIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
 	return
 }
 
@@ -1347,7 +1346,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
 	}
 
-	if idpMd.QueryXMLBool(nil, `./md:Extensions/wayf:wayf/wayf:wantRequesterID`) {
+	if idpMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) {
 		newrequest.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
 	}
 
@@ -1380,7 +1379,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		}
 	}
 
-	algo := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+	algo := idpMd.Query1(nil, xprefix + "SigningMethod")
 
 	if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 		algo = sigAlg
@@ -1495,7 +1494,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+	signingMethod := spMd.Query1(nil, xprefix + "SigningMethod")
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
@@ -1531,7 +1530,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
 
 		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
-		if spMd.QueryBool(nil, "count(/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:feds[.='eduGAIN']) > 0") {
+		if spMd.QueryBool(nil, "count("+xprefix+"feds[.='eduGAIN']) > 0") {
 			if eptidAttr := newresponse.Query(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]`); eptidAttr != nil {
 				value := newresponse.Query1(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.Rm(eptidAttr[0], "./saml:AttributeValue")
@@ -1544,7 +1543,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		elementsToSign := config.ElementsToSign
-		if spMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") {
+		if spMd.QueryXMLBool(nil, xprefix + "saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
@@ -1574,7 +1573,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
 		}
 
-		if gosaml.DebugSetting(r, "encryptAssertion") == "1" {
+		if spMd.QueryXMLBool(nil, xprefix + "assertion.encryption ") || gosaml.DebugSetting(r, "encryptAssertion") == "1" {
 			gosaml.DumpFileIfTracing(r, newresponse)
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
@@ -1678,7 +1677,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 				return err
 			}
 
-			algo := finalDestination.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+			algo := finalDestination.Query1(nil, xprefix + "SigningMethod")
 
 			if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 				algo = sigAlg
@@ -1721,7 +1720,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			return err
 		}
 
-		algo := destinationMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+		algo := destinationMd.Query1(nil, xprefix + "SigningMethod")
 
 		if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 			algo = sigAlg
@@ -1866,7 +1865,7 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 
 // CopyAttributes copies the attributes
 func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
-	base64encodedOut := spMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:base64attributes")
+	base64encodedOut := spMd.QueryXMLBool(nil, xprefix + "base64attributes")
 
 	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
 	attrcache := map[string]types.Element{}
@@ -2067,7 +2066,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	signingMethod := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:SigningMethod")
+	signingMethod := spMd.Query1(nil, xprefix + "SigningMethod")
 
 	var newresponse *goxml.Xp
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
@@ -2094,7 +2093,7 @@ func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		CopyAttributes(attributeStatement, newresponse, spMd)
 
 		elementsToSign := config.ElementsToSign
-		if spMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:saml20.sign.response") {
+		if spMd.QueryXMLBool(nil, xprefix + "saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
