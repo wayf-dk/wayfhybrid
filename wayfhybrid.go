@@ -1297,7 +1297,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
     var hubSPMd *goxml.Xp
 	if idpIndex == hubIdpIndex { // Hub to Int or Birk
-	    idpMd, _ = Md.Internal.MDQ(idp)
+		idp = debify.ReplaceAllString(idp, "$1$2")
+	    idpMd, err = Md.Internal.MDQ(idp)
         if err != nil {
             return
         }
