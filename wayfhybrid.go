@@ -1080,15 +1080,15 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard.IdPDisplayName["en"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
 	ard.IdPDisplayName["da"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
 	ard.IdPLogo = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
-	ard.IdPEntityID = birkify(idp)
+	ard.IdPEntityID = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
 	ard.SPDisplayName["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
 	ard.SPDisplayName["da"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
 	ard.SPDescription["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`)
 	ard.SPDescription["da"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`)
 	ard.SPLogo = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
 	ard.SPEntityID = spMd.Query1(nil, "@entityID")
-	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(./md:Extensions/wayf:wayf/wayf:consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
-	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryXMLBool(nil, `./md:Extensions/wayf:wayf/wayf:consent.disable`)
+	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(`+xprefix+`consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
+	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryXMLBool(nil, xprefix+`consent.disable`)
 	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
 	ard.Key = idHash(ard.SPEntityID)
 	io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
@@ -1228,21 +1228,11 @@ func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err
 	return
 }
 
-func birkify(idp string) string {
-	if _, err := Md.Internal.MDQ(idp); err == nil {
-		idp = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
-	}
-	return idp
-}
-
 func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLists [][]string) (idp string) {
 	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
 	data := url.Values{}
 
 	for _, idpList := range idpLists {
-		for i, idp := range idpList {
-			idpList[i] = birkify(idp)
-		}
 		switch len(idpList) {
 		case 0:
 			continue
@@ -1273,6 +1263,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	hubIdp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
 	idp := hubIdp // we need to keep the original 'Destination' around in hubIdp, idp will become a backend idp after discovery
+	idpMd := hubIdpMd
+	idpIndex := 1
 
 	if hubIdpIndex == 0 { // Request to hub - do Scoping/Discovery
 		vvpmss := ""
@@ -1303,10 +1295,9 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-    var HubSPMd, idpMd *goxml.Xp
-   	idpMd, err = Md.Internal.MDQ(debify.ReplaceAllString(idp, "$1$2")) // lookup using debirkified entityID
-	if err == nil { // found it - an internal IdP
-		mappedIdP := idpMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:map2IdP")
+    var hubSPMd *goxml.Xp
+	if idpIndex == hubIdpIndex { // Hub to Int or Birk
+		mappedIdP := idpMd.Query1(nil, xprefix + "map2IdP")
 		if mappedIdP != "" {
 			idpMd, err = Md.Internal.MDQ(mappedIdP)
 			if err != nil {
