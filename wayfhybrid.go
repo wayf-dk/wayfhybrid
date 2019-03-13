@@ -3,7 +3,6 @@ package wayfhybrid
 import (
 	"crypto"
 	"crypto/sha1"
-	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -417,59 +416,6 @@ func prepareTables(attrs *goxml.Xp) {
 		basic2uri[attributeName] = attributeNameMap
 	}
 }
-
-func (m mddb) MDQ(key string) (xp *goxml.Xp, err error) {
-	db, err := sql.Open("sqlite3", m.db)
-	if err != nil {
-		return
-	}
-	defer db.Close()
-	//ent := hex.EncodeToString(goxml.Hash(crypto.SHA1, key))
-	hash := sha1.Sum([]byte(key))
-	ent := hex.EncodeToString(append(hash[:]))
-	var md []byte
-	var query = "select e.md md from entity_" + m.table + " e, lookup_" + m.table + " l where l.hash = ? and l.entity_id_fk = e.id"
-	err = db.QueryRow(query, ent).Scan(&md)
-	switch {
-	case err == sql.ErrNoRows:
-		err = goxml.Wrap(err, "err:Metadata not found", "key:"+key, "table:"+m.table)
-		return
-	case err != nil:
-		return
-	default:
-		md = gosaml.Inflate(md)
-		xp = goxml.NewXp(md)
-	}
-	return
-}
-
-func (m mddb) Open(db, table string) (err error) {
-	m.db = db
-	m.table = table
-	return
-}
-
-/* how to get the status ...
-type statusLoggingResponseWriter struct {
-   status int
-   http.ResponseWriter
-}
-
-func (w *statusLoggingResponseWriter) WriteHeader(code int) {
-  w.status = code
-  w.ResponseWriter.WriteHeader(code)
-}
-
-type WrapHTTPHandler struct {
-	m *http.Handler
-}
-
-func (h *WrapHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-        myW := StatusLoggingResponseWriter{-1, w}
-	h.m.ServeHTTP(myW, r)
-	log.Printf("[%s] %s %d\n", r.RemoteAddr, r.URL, w.status)
-}
-*/
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	starttime := time.Now()
