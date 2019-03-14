@@ -524,14 +524,18 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-	entityID := r.Header.Get("X-Issuer")
+    // backward compatible - use either or
+	entityID := r.Header.Get("X-Issuer") + r.Form.Get("issuer")
 	spMd, err := Md.Internal.MDQ(entityID)
 	if err != nil {
 		return
 	}
 
+    acs := r.Header.Get("X-Acs") + f.Form.Get("acs")
+    app := r.Header.Get("X-App") + f.Form.Get("app")
+
 	if _, ok := r.Form["SAMLResponse"]; ok {
-		response, _, _, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, r.Header.Get("X-Acs"))
+		response, _, _, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, acs)
 		if err != nil {
 			return err
 		}
@@ -607,12 +611,12 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	relayState, err := authnRequestCookie.Encode("app", []byte(r.Header.Get("X-App")))
+	relayState, err := authnRequestCookie.Encode("app", []byte(app))
 	if err != nil {
 		return err
 	}
 
-	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", r.Header.Get("X-ACS"), "", 0, 0, strings.Split(r.Form.Get("idplist"), ","))
+	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", acs, "", 0, 0, strings.Split(r.Form.Get("idplist"), ","))
 	return err
 }
 
