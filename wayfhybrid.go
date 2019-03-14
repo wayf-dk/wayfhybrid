@@ -531,8 +531,8 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    acs := r.Header.Get("X-Acs") + f.Form.Get("acs")
-    app := r.Header.Get("X-App") + f.Form.Get("app")
+    acs := r.Header.Get("X-Acs") + r.Form.Get("acs")
+    app := r.Header.Get("X-App") + r.Form.Get("app")
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
 		response, _, _, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, acs)
