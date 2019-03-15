@@ -564,7 +564,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		names := response.QueryMulti(assertion, "saml:AttributeStatement/saml:Attribute/@Name")
 		for _, name := range names {
 			basic := basic2uri[name].basic
-			attrs[basic] = response.QueryMulti(nil, "saml:AttributeStatement/saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
+			attrs[basic] = response.QueryMulti(assertion, "saml:AttributeStatement/saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
 		}
 
         attrs["iss"] = response.Query1(assertion, "./saml:Issuer")
