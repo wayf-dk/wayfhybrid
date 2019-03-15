@@ -13,8 +13,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-
-	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/securecookie"
 	toml "github.com/pelletier/go-toml"
 	"github.com/wayf-dk/go-libxml2/types"
@@ -519,6 +517,22 @@ func samlTime2JwtTime(xmlTime string) int64 {
 	return samlTime.Unix()
 }
 
+/*
+func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
+	defer r.Body.Close()
+	r.ParseForm()
+	request, hubSpMd, IdPMd, relayState, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal})
+	if err != nil {
+		return
+	}
+    // check jwt
+    // jwt2map
+    // map2saml
+    // send
+    return
+}
+
+*/
 // saml2jwt handles saml2jwt request
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
@@ -544,34 +558,20 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		attrs := jwt.MapClaims{}
-
-		names := response.QueryMulti(nil, "saml:Assertion/saml:AttributeStatement/saml:Attribute/@Name")
-		for _, name := range names {
-			basic := basic2uri[name].basic
-			attrs[basic] = response.QueryMulti(nil, "saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
-		}
-
-		type claim struct {
-			name, xpath string
-			conv        func(string) int64
-		}
-
-		claims := []claim{
-			{"iss", "./saml:Issuer", nil},
-			{"aud", "./saml:Conditions/saml:AudienceRestriction/saml:Audience", nil},
-			{"nbf", "./saml:Conditions/@NotBefore", samlTime2JwtTime},
-			{"exp", "./saml:Conditions/@NotOnOrAfter", samlTime2JwtTime},
-			{"iat", "@IssueInstant", samlTime2JwtTime},
-		}
+		attrs := map[string]interface{}{}
 
 		assertion := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
-		for _, c := range claims {
-			attrs[c.name] = response.Query1(assertion, c.xpath)
-			if c.conv != nil {
-				attrs[c.name] = c.conv(attrs[c.name].(string))
-			}
+		names := response.QueryMulti(assertion, "saml:AttributeStatement/saml:Attribute/@Name")
+		for _, name := range names {
+			basic := basic2uri[name].basic
+			attrs[basic] = response.QueryMulti(nil, "saml:AttributeStatement/saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
 		}
+
+        attrs["iss"] = response.Query1(assertion, "./saml:Issuer")
+        attrs["aud"] = response.Query1(assertion, "./saml:Conditions/saml:AudienceRestriction/saml:Audience")
+        attrs["nbf"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
+        attrs["exp"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
+        attrs["iat"] = samlTime2JwtTime(response.Query1(assertion, "@IssueInstant"))
 
 		md, err := Md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
@@ -590,10 +590,22 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		tokenString, err := jwt.NewWithClaims(SigningMethodHSM256, attrs).SignedString(privatekey)
-		if err != nil {
-			return err
-		}
+		header := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." // RS256
+
+        json, err := json.Marshal(attrs)
+        if err != nil {
+            return err
+        }
+
+		payload := strings.TrimRight(base64.URLEncoding.EncodeToString(json), "=")
+
+        digest := goxml.Hash(goxml.Algos["sha256"].Algo, header + payload)
+        signature, err := goxml.Sign([]byte(digest), privatekey, []byte(""), "sha256")
+        if err != nil {
+            return err
+        }
+
+        tokenString := header + payload + "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
 
 		var app []byte
 		err = authnRequestCookie.Decode("app", relayState, &app)
@@ -2087,39 +2099,4 @@ func getUserInfo(sp, eptid string) (userInfo map[string][]string, err error) {
 		return
 	}
 	return
-}
-
-// Implements the WAYF specific HSM RSA signingMethod
-// Expects "PEM" private key format ie. when for HSM it starts with hsm:
-type SigningMethodHSM struct {
-	Name, Algo string
-}
-
-// Specific instances for RS256 and company
-var (
-	SigningMethodHSM256 *SigningMethodHSM
-)
-
-func init() {
-	SigningMethodHSM256 = &SigningMethodHSM{"RS256", "sha256"}
-	jwt.RegisterSigningMethod(SigningMethodHSM256.Alg(), func() jwt.SigningMethod {
-		return SigningMethodHSM256
-	})
-}
-
-func (m *SigningMethodHSM) Alg() string {
-	return m.Name
-}
-
-func (m *SigningMethodHSM) Sign(signingString string, key interface{}) (string, error) {
-	digest := goxml.Hash(goxml.Algos[m.Algo].Algo, signingString)
-	if sigBytes, err := goxml.Sign([]byte(digest), key.([]byte), []byte(""), m.Algo); err == nil {
-		return jwt.EncodeSegment(sigBytes), nil
-	} else {
-		return "", err
-	}
-}
-
-func (m *SigningMethodHSM) Verify(signingString, signature string, key interface{}) error {
-	return nil
 }
