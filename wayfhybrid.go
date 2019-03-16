@@ -79,7 +79,7 @@ type (
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Testsp2, Testsp2_Acs, Testsp2_Slo                        string
 		Eidas_Acs, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                         string
-		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, Saml2jwt, SaltForHashedEppn                string
+		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, Saml2jwt, Jwt2saml, SaltForHashedEppn      string
 		ElementsToSign                                                                           []string
 		NotFoundRoutes                                                                           []string
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
@@ -298,6 +298,7 @@ func Main() {
 	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
+	httpMux.Handle(config.Jwt2saml, appHandler(jwt2saml))
 
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPService))
