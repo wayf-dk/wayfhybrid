@@ -2,6 +2,7 @@ package wayfhybrid
 
 import (
 	"crypto"
+	"crypto/rsa"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
@@ -517,22 +518,66 @@ func samlTime2JwtTime(xmlTime string) int64 {
 	return samlTime.Unix()
 }
 
-/*
 func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	request, hubSpMd, IdPMd, relayState, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal})
+	request, hubSpMd, idpMd, _, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal})
 	if err != nil {
 		return
 	}
-    // check jwt
-    // jwt2map
-    // map2saml
-    // send
+
+    headerPayloadSignature := strings.SplitN(r.Form.Get("jwt"), ".", 3)
+	certificates := idpMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
+    digest := goxml.Hash(goxml.Algos["sha256"].Algo, strings.Join(headerPayloadSignature[:1], "."))
+
+    for _, certificate := range certificates {
+        _, pub, err := gosaml.PublicKeyInfo(certificate)
+        if err != nil {
+            return err
+        }
+        err = rsa.VerifyPKCS1v15(pub, goxml.Algos["sha256"].Algo, digest[:], []byte(headerPayloadSignature[2]))
+        if err == nil {
+            break
+        }
+    }
+
+    if err != nil {
+        return
+    }
+
+    var attrs map[string]interface{}
+    err = json.Unmarshal([]byte(headerPayloadSignature[1]), &attrs)
+    if err != nil {
+        return err
+    }
+
+    response := gosaml.NewResponse(idpMd, hubSpMd, request, nil)
+	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]`, "", nil)
+
+    requestedAttributes := hubRequestedAttributes.Query(nil, `//md:RequestedAttribute[not(@computed)]`)
+	for _, requestedAttribute := range requestedAttributes {
+		friendlyName := hubRequestedAttributes.Query1(requestedAttribute, "@FriendlyName")
+		if len(attrs[friendlyName].([]string)) == 0 {
+			continue
+		}
+		attr := response.QueryDashP(destinationAttributes, `saml:Attribute[@Name=`+strconv.Quote(friendlyName)+`]`, "", nil)
+		response.QueryDashP(attr, `@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
+		for _, value := range attrs[friendlyName].([]string) {
+			response.QueryDashP(attr, "saml:AttributeValue[0]", value, nil)
+		}
+	}
+
+	err = gosaml.SignResponse(response, "/samlp:Response/saml:Assertion", idpMd, "sha256", gosaml.SAMLSign)
+    if err != nil {
+	    return err
+	}
+
+	ard, _ := json.Marshal(AttributeReleaseData{BypassConfirmation: true})
+	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), Ard: template.JS(ard)}
+	postForm.Execute(w, data)
     return
 }
 
-*/
 // saml2jwt handles saml2jwt request
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
@@ -584,19 +629,19 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
+
 		var privatekey []byte
 		privatekey, err = ioutil.ReadFile(config.CertPath + keyname + ".key")
 		if err != nil {
 			return err
 		}
 
-		header := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." // RS256
-
         json, err := json.Marshal(attrs)
         if err != nil {
             return err
         }
 
+		header := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." // RS256
 		payload := strings.TrimRight(base64.URLEncoding.EncodeToString(json), "=")
 
         digest := goxml.Hash(goxml.Algos["sha256"].Algo, header + payload)
