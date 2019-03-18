@@ -163,7 +163,7 @@ var (
 	remap  = map[string]idpsppair{}
 
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
-	debify        = regexp.MustCompile("^(https?://)(?:(?:birk|krib)\\.wayf\\.dk/(?:birk\\.php|[a-f0-9]{40})/)(.+)$")
+	debify        = regexp.MustCompile("^((?:https?://)?)(?:(?:(?:birk|krib)\\.wayf\\.dk/(?:birk\\.php|[a-f0-9]{40})/)|(?:urn:oid:1.3.6.1.4.1.39153:42:))(.+)$")
 	deproxy       = regexp.MustCompile("(.+)-proxy$")
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
 	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
