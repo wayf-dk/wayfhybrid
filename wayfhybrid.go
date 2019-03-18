@@ -567,17 +567,17 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
     requestedAttributes := hubRequestedAttributes.Query(nil, `//md:RequestedAttribute[not(@computed)]`)
 	for _, requestedAttribute := range requestedAttributes {
 		friendlyName := hubRequestedAttributes.Query1(requestedAttribute, "@FriendlyName")
-		if len(attrs[friendlyName].([]string)) == 0 {
+		if _, ok := attrs[friendlyName]; !ok {
 			continue
 		}
 		attr := response.QueryDashP(destinationAttributes, `saml:Attribute[@Name=`+strconv.Quote(friendlyName)+`]`, "", nil)
 		response.QueryDashP(attr, `@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
-		for _, value := range attrs[friendlyName].([]string) {
-			response.QueryDashP(attr, "saml:AttributeValue[0]", value, nil)
+		for _, value := range attrs[friendlyName].([]interface{}) {
+			response.QueryDashP(attr, "saml:AttributeValue[0]", value.(string), nil)
 		}
 	}
 
-	err = gosaml.SignResponse(response, "/samlp:Response/saml:Assertion", idpMd, "sha256", gosaml.SAMLSign)
+	err = gosaml.SignResponse(response, "/samlp:Response/saml:Assertion", hubSpMd, "sha256", gosaml.SAMLSign)
     if err != nil {
 	    return err
 	}
