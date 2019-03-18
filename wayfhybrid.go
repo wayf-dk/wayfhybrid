@@ -2,7 +2,7 @@ package wayfhybrid
 
 import (
 	"crypto"
-	"crypto/rsa"
+	//"crypto/rsa"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
@@ -185,6 +185,8 @@ var (
 	basic2uri map[string]attrName
 
 	intExtSP, intExtIdP, hubExtIdP, hubExtSP gosaml.MdSets
+
+	hubIdpCerts []string
 )
 
 func Main() {
@@ -254,6 +256,13 @@ func Main() {
 			panic(err)
 		}
 	}
+
+    hubMd, err := Md.Hub.MDQ(config.HubEntityID)
+    if err != nil {
+			panic(err)
+    }
+
+    hubIdpCerts = hubMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) //
 
 	godiscoveryservice.Config = godiscoveryservice.Conf{
 		DiscoMetaData: config.Discometadata,
@@ -604,7 +613,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
     app := r.Header.Get("X-App") + r.Form.Get("app")
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
-		response, _, _, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, acs)
+		response, _, _, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, acs, nil)
 		if err != nil {
 			return err
 		}
@@ -778,7 +787,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
 		messages := "none"
-		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, hubExtIdP, gosaml.MdSets{Md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path)
+		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, hubExtIdP, gosaml.MdSets{Md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path, nil)
 		//		if err == lMDQ.MetaDataNotFoundError {
 		//			response, issuerMd, destinationMd, relayState, err = gosaml.DecodeSAMLMsg(r, Md.ExternalIdP, Md.ExternalSP, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "")
 		//			external = "1"
@@ -1275,7 +1284,7 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 // SSOService handles single sign on requests
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spMd, hubIdpMd, relayState, spIndex, hubIdpIndex, err := gosaml.ReceiveAuthnRequest(r, intExtSP, hubExtIdP)
+	request, spMd, hubIdpMd, relayState, spIndex, hubIdpIndex, err := gosaml.ReceiveAuthnRequest(r, intExtSP, hubExtIdP, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
@@ -1494,7 +1503,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 // ACSService handles all the stuff related to receiving response and attribute handling
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, idpMd, hubSpMd, relayState, _, hubSpIndex, err := gosaml.ReceiveSAMLResponse(r, intExtIdP, hubExtSP, "https://"+r.Host+r.URL.Path)
+	response, idpMd, hubSpMd, relayState, _, hubSpIndex, err := gosaml.ReceiveSAMLResponse(r, intExtIdP, hubExtSP, "https://"+r.Host+r.URL.Path, hubIdpCerts)
 	if err != nil {
 		return
 	}
@@ -2034,7 +2043,7 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 
-	request, spMd, idpMd, relayState, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.ExternalSP}, gosaml.MdSets{Md.ExternalIdP})
+	request, spMd, idpMd, relayState, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.ExternalSP}, gosaml.MdSets{Md.ExternalIdP}, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return err
 	}
@@ -2070,7 +2079,7 @@ func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, _, spMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.ExternalIdP}, gosaml.MdSets{Md.ExternalSP}, "https://"+r.Host+r.URL.Path)
+	response, _, spMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.ExternalIdP}, gosaml.MdSets{Md.ExternalSP}, "https://"+r.Host+r.URL.Path, nil)
 	if err != nil {
 		return
 	}
