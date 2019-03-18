@@ -522,21 +522,28 @@ func samlTime2JwtTime(xmlTime string) int64 {
 func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	request, hubSpMd, idpMd, _, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal})
-	if err != nil {
-		return
-	}
-
+    // we need to identify the sender first for getting the key for checking the signature
     headerPayloadSignature := strings.SplitN(r.Form.Get("jwt"), ".", 3)
-	certificates := idpMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
+    payload, _ :=  base64.RawURLEncoding.DecodeString(headerPayloadSignature[1])
+
+    var attrs map[string]interface{}
+    err = json.Unmarshal(payload, &attrs)
+    if err != nil {
+        return err
+    }
+
+    jwtIdpMd, _ := Md.Internal.MDQ(attrs["iss"].(string))
+/*
+	certificates := jwtIdpMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
     digest := goxml.Hash(goxml.Algos["sha256"].Algo, strings.Join(headerPayloadSignature[:1], "."))
+    signature, _ := base64.RawURLEncoding.DecodeString(headerPayloadSignature[2])
 
     for _, certificate := range certificates {
         _, pub, err := gosaml.PublicKeyInfo(certificate)
         if err != nil {
             return err
         }
-        err = rsa.VerifyPKCS1v15(pub, goxml.Algos["sha256"].Algo, digest[:], []byte(headerPayloadSignature[2]))
+        err = rsa.VerifyPKCS1v15(pub, goxml.Algos["sha256"].Algo, digest[:], signature)
         if err == nil {
             break
         }
@@ -545,12 +552,14 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
     if err != nil {
         return
     }
+*/
 
-    var attrs map[string]interface{}
-    err = json.Unmarshal([]byte(headerPayloadSignature[1]), &attrs)
-    if err != nil {
-        return err
-    }
+    location := jwtIdpMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
+
+	request, hubSpMd, idpMd, _, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, location)
+	if err != nil {
+		return
+	}
 
     response := gosaml.NewResponse(idpMd, hubSpMd, request, nil)
 	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]`, "", nil)
