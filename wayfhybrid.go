@@ -1381,7 +1381,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	}
 
 	if idpMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) {
-		newrequest.QueryDashP(nil, "./saml:Scoping/saml:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
+		newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
 	}
 
 	// Save the request in a session for when the response comes back
