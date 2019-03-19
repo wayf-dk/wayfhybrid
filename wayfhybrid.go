@@ -617,10 +617,6 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		_, _, _, _, err = getOriginalRequest(w, r, response, nil, nil, "JWT-")
-		if err != nil {
-			return err
-		}
 
 		attrs := map[string]interface{}{}
 
@@ -694,8 +690,18 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-	err = sendRequestToIdP(w, r, nil, spMd, hubMd, "", relayState, "JWT-", acs, "", 0, 0, strings.Split(r.Form.Get("idplist"), ","))
-	return err
+	request, err := gosaml.NewAuthnRequest(nil, spMd, hubMd, strings.Split(r.Form.Get("idplist"), ","))
+	if err != nil {
+		return
+    }
+
+	u, err := gosaml.SAMLRequest2Url(request, relayState, "", "", "")
+	if err != nil {
+		return
+	}
+
+	http.Redirect(w, r, u.String(), http.StatusFound)
+	return
 }
 
 func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
