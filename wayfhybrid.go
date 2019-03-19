@@ -591,9 +591,8 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 	    return err
 	}
 
-	ard, _ := json.Marshal(AttributeReleaseData{BypassConfirmation: true})
-	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), Ard: template.JS(ard)}
-	postForm.Execute(w, data)
+    w.Header().Set("Content-Type", "application/xml")
+    w.Write([]byte(base64.StdEncoding.EncodeToString(response.Dump())))
     return
 }
 
