@@ -2,11 +2,12 @@ package wayfhybrid
 
 import (
 	"crypto"
-	//"crypto/rsa"
+	"crypto/rsa"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -542,17 +543,24 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
     }
 
     jwtIdpMd, _ := Md.Internal.MDQ(attrs["iss"].(string))
-/*
-	certificates := jwtIdpMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
-    digest := goxml.Hash(goxml.Algos["sha256"].Algo, strings.Join(headerPayloadSignature[:1], "."))
+
+	certificates := jwtIdpMd.QueryMulti(nil, "./md:IDPSSODescriptor"+gosaml.SigningCertQuery)
+
+    if len(certificates) == 0 {
+        return errors.New("No Certs found")
+    }
+
+    digest := goxml.Hash(goxml.Algos["sha256"].Algo, strings.Join(headerPayloadSignature[:2], "."))
     signature, _ := base64.RawURLEncoding.DecodeString(headerPayloadSignature[2])
 
+    var pub *rsa.PublicKey
     for _, certificate := range certificates {
-        _, pub, err := gosaml.PublicKeyInfo(certificate)
+        _, pub, err = gosaml.PublicKeyInfo(certificate)
         if err != nil {
             return err
         }
         err = rsa.VerifyPKCS1v15(pub, goxml.Algos["sha256"].Algo, digest[:], signature)
+        fmt.Println(err)
         if err == nil {
             break
         }
@@ -561,7 +569,6 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
     if err != nil {
         return
     }
-*/
 
     location := jwtIdpMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
 
