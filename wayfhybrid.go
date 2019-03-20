@@ -570,6 +570,8 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
         return
     }
 
+//    iat := attrs["iat"].(int64)
+
     location := jwtIdpMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
 
 	request, hubSpMd, idpMd, _, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, location)
@@ -598,9 +600,9 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 	    return err
 	}
 
-    w.Header().Set("Content-Type", "application/xml")
-    w.Write([]byte(base64.StdEncoding.EncodeToString(response.Dump())))
-    return
+	data := formdata{Acs: "https://" + config.Acs, Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: r.Form.Get("RelayState")}
+	postForm.Execute(w, data)
+	return
 }
 
 // saml2jwt handles saml2jwt request
