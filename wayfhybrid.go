@@ -1560,7 +1560,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newresponse = gosaml.NewResponse(hubIdpMd, spMd, request, response)
-		CopyAttributes(response, newresponse, spMd)
+		ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameid := gosaml.Id()
@@ -1597,7 +1597,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		signingType := gosaml.SAMLSign
 		if sRequest.WsFed {
 			newresponse = gosaml.NewWsFedResponse(hubIdpMd, spMd, newresponse)
-			CopyAttributes(response, newresponse, spMd)
+			ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
 
 			signingType = gosaml.WSFedSign
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
@@ -1910,8 +1910,9 @@ func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
 }
 
 // CopyAttributes copies the attributes
-func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
-	base64encodedOut := spMd.QueryXMLBool(nil, xprefix + "base64attributes")
+func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
+	ardValues = make(map[string][]string)
+	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 
 	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
 	attrcache := map[string]types.Element{}
@@ -1933,15 +1934,19 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 	assertion := assertionList[0]
 	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
 
+	h := sha1.New()
 	for _, requestedAttribute := range requestedAttributes {
 		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
 		if attribute == nil {
 			continue
 		}
 
-		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", sourceResponse.Query1(attribute, "@Name"), nil)
+		name := sourceResponse.Query1(attribute, "@Name")
+		friendlyName := sourceResponse.Query1(attribute, "@FriendlyName")
+		io.WriteString(h, name)
+		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", name, nil)
 		response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
-		response.QueryDashP(newAttribute, "@FriendlyName", sourceResponse.Query1(attribute, "@FriendlyName"), nil)
+		response.QueryDashP(newAttribute, "@FriendlyName", friendlyName, nil)
 		allowedValues := spMd.Query(requestedAttribute, `saml:AttributeValue`)
 		regexps := []*regexp.Regexp{}
 		for _, attr := range allowedValues {
@@ -1966,8 +1971,11 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 			}
 			regexps = append(regexps, regexp.MustCompile(reg))
 		}
+
 		for _, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
 			if len(allowedValues) == 0 || matchRegexpArray(value, regexps) {
+				io.WriteString(h, value)
+				ardValues[friendlyName] = append(ardValues[friendlyName], value)
 				if base64encodedOut {
 					v := base64.StdEncoding.EncodeToString([]byte(value))
 					value = string(v)
@@ -1976,6 +1984,10 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) {
 			}
 		}
 	}
+
+	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`))
+	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`))
+	ardHash = fmt.Sprintf("%x", h.Sum(nil))
 	return
 }
 
