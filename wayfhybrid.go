@@ -1121,23 +1121,13 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		arpmap[attrName] = true
 	}
 
-	h := sha1.New()
-	for _, attrNode := range response.Query(destinationAttributes, `saml:Attribute`) {
-		friendlyName := response.Query1(attrNode, "@FriendlyName")
-		name := response.Query1(attrNode, "@Name")
-		if arpmap[name] || arpmap[friendlyName] {
-			io.WriteString(h, name)
-			for _, attrValue := range response.QueryMulti(attrNode, "saml:AttributeValue") {
-				io.WriteString(h, attrValue)
-				ard.Values[friendlyName] = append(ard.Values[friendlyName], attrValue)
-			}
-		}
-	}
-
 	ard.IdPDisplayName["en"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
 	ard.IdPDisplayName["da"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
 	ard.IdPLogo = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
 	ard.IdPEntityID = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
+	if ard.IdPEntityID == idp {
+		ard.IdPEntityID = "urn:oid:1.3.6.1.4.1.39153:42:" + idp
+	}
 	ard.SPDisplayName["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
 	ard.SPDisplayName["da"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
 	ard.SPDescription["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`)
@@ -1147,10 +1137,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(`+xprefix+`consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
 	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryXMLBool(nil, xprefix+`consent.disable`)
 	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
-	ard.Key = idHash(ard.SPEntityID + ard.IdPEntityID)
-	io.WriteString(h, ard.Key+config.SaltForHashedEppn+eppn+ard.SPDescription["en"]+ard.SPDescription["da"])
 
-	ard.Hash = fmt.Sprintf("%x", h.Sum(nil))
 	ard.ConsentAsAService = config.ConsentAsAService
 
 	if birk {
