@@ -1065,45 +1065,50 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		}
 	}
 
-	epsas := make(map[string]bool)
-	// scopes are checked for legality above
-	for _, epsa := range epsaList {
-		epsas[epsa] = true
-	}
-
 	// primaryaffiliation => affiliation
 	eppa := response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonPrimaryAffiliation"]/saml:AttributeValue`)
 	epas := response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue`)
 	if eppa != "" {
-		epas = append(epas, eppa)
-	}
-	epaset := make(map[string]bool)
-	for _, epa := range epas {
-		epaset[epa] = true
+		epas = append([]string{eppa}, epas...)
 	}
 
-	// 'student', 'faculty', 'staff', 'employee' => member
-	if epaset["student"] || epaset["faculty"] || epaset["staff"] || epaset["employee"] {
-		epaset["member"] = true
+	for _, epa := range epas {
+		switch epa {
+		case "student", "faculty", "staff", "employee":
+			epas = append(epas, "member")
+			break
+		}
 	}
 
 	name := hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]/@Name`)
 	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@Name`, name, nil)
 	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
+
+	seenEpas := make(map[string]bool)
 	i := 1
-	for epa := range epaset {
+	for _, epa := range epas {
+		if seenEpas[epa] {
+			continue
+		}
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i)+`]`, epa, nil)
-		epsas[epa+"@"+securitydomain] = true
 		i += 1
+		seenEpas[epa] = true
+		epsas = append(epsas, epa+"@"+securitydomain)
 	}
 
 	name = hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`)
 	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`, name, nil)
 	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
+
+	seenEpsas := make(map[string]bool)
 	i = 1
-	for epsa := range epsas {
+	for _, epsa := range epsas {
+		if seenEpsas[epsa] {
+			continue
+		}
 		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i)+`]`, epsa, nil)
 		i += 1
+		seenEpsas[epsa] = true
 	}
 
 	// legal affiliations 'student', 'faculty', 'staff', 'affiliate', 'alum', 'employee', 'library-walk-in', 'member'
