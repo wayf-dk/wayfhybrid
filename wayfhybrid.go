@@ -78,7 +78,7 @@ type (
 		Certpath                                                                                 string
 		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Vvpmss            string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
-		Testsp, Testsp_Acs, Testsp_Slo, Testsp2, Testsp2_Acs, Testsp2_Slo                        string
+		Testsp, Testsp_Acs, Testsp_Slo, Testsp2, Testsp2_Acs, Testsp2_Slo, MDQ                   string
 		Eidas_Acs, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                         string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, Saml2jwt, Jwt2saml, SaltForHashedEppn      string
 		ElementsToSign                                                                           []string
@@ -323,6 +323,7 @@ func Main() {
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
 	httpMux.Handle(config.Jwt2saml, appHandler(jwt2saml))
+	httpMux.Handle(config.MDQ, appHandler(MDQWeb))
 
 	httpMux.Handle(config.Testsp_Slo, appHandler(testSPService))
 	httpMux.Handle(config.Testsp_Acs, appHandler(testSPService))
