@@ -1161,6 +1161,10 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
 	// we ignore the qualifiers and use the idp and sp entityIDs
+	_, _, _, _, err = checkScope(response, idpMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
+	if err != nil {
+		return
+	}
 	eptid := response.Query1(nil, "./saml:Assertion/saml:Subject/saml:NameID[@Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent']")
 	if eptid == "" {
 		eptid = response.Query1(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.10' or @Name='eduPersonTargetedID']/saml:AttributeValue/saml:NameID")
