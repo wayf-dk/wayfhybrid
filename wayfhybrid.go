@@ -194,7 +194,6 @@ var (
 	hubIdpCerts []string
 
 	webMdMap map[string]webMd
-
 )
 
 func Main() {
@@ -258,12 +257,13 @@ func Main() {
 	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
 	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
+    webMdMap = make(map[string]webMd)
 	for _, md := range []*lMDQ.MDQ{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
 		err := md.Open()
 		if err != nil {
 			panic(err)
 		}
-		webMdMap[md.Table] = webMd{md: md, }
+		webMdMap[md.Table] = webMd{md: md}
 	}
 
 	for _, md := range []*lMDQ.MDQ{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
