@@ -129,7 +129,7 @@ type (
 	}
 
 	MdSets struct {
-		Hub, Internal, ExternalIdP, ExternalSP gosaml.Md
+		Hub, Internal, ExternalIdP, ExternalSP *lMDQ.MDQ
 	}
 
 	wayfHybridSession struct{}
@@ -153,6 +153,10 @@ type (
 		Nid, Id, Is, De, Acs string
 		Fo, SPi, Hubi        int
 		WsFed                bool
+	}
+
+	webMd struct {
+	    md, revmd *lMDQ.MDQ
 	}
 )
 
@@ -188,6 +192,9 @@ var (
 	intExtSP, intExtIdP, hubExtIdP, hubExtSP gosaml.MdSets
 
 	hubIdpCerts []string
+
+	webMdMap map[string]webMd
+
 )
 
 func Main() {
@@ -238,10 +245,10 @@ func Main() {
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
 
-	Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table}
-	Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table}
-	Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table}
-	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table}
+	Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table, Rev: config.Hub.Table}
+	Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table, Rev: config.Internal.Table}
+	Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table, Rev: config.ExternalSP.Table}
+	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table, Rev: config.ExternalIdP.Table}
 
 	intExtSP = gosaml.MdSets{Md.Internal, Md.ExternalSP}
 	intExtIdP = gosaml.MdSets{Md.Internal, Md.ExternalIdP}
@@ -251,19 +258,26 @@ func Main() {
 	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
 	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
-	for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
-		err := md.(*lMDQ.MDQ).Open()
+	for _, md := range []*lMDQ.MDQ{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
+		err := md.Open()
 		if err != nil {
 			panic(err)
 		}
+		webMdMap[md.Table] = webMd{md: md, }
 	}
 
-    hubMd, err := Md.Hub.MDQ(config.HubEntityID)
-    if err != nil {
-			panic(err)
-    }
+	for _, md := range []*lMDQ.MDQ{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
+	    m := webMdMap[md.Table]
+	    m.revmd = webMdMap[md.Rev].md
+	    webMdMap[md.Table] = m
+	}
 
-    hubIdpCerts = hubMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) //
+	hubMd, err := Md.Hub.MDQ(config.HubEntityID)
+	if err != nil {
+		panic(err)
+	}
+
+	hubIdpCerts = hubMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) //
 
 	godiscoveryservice.Config = godiscoveryservice.Conf{
 		DiscoMetaData: config.Discometadata,
