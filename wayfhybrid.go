@@ -10,11 +10,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"html/template"
-	"io"
-	"io/ioutil"
-	"log"
-	"net/http"
 	"github.com/gorilla/securecookie"
 	toml "github.com/pelletier/go-toml"
 	"github.com/wayf-dk/go-libxml2/types"
@@ -24,6 +19,11 @@ import (
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lMDQ"
 	"github.com/y0ssar1an/q"
+	"html/template"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
 
 	//"net/http/pprof"
 	"net/url"
@@ -542,57 +542,57 @@ func samlTime2JwtTime(xmlTime string) int64 {
 func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-    // we need to identify the sender first for getting the key for checking the signature
-    headerPayloadSignature := strings.SplitN(r.Form.Get("jwt"), ".", 3)
-    payload, _ :=  base64.RawURLEncoding.DecodeString(headerPayloadSignature[1])
+	// we need to identify the sender first for getting the key for checking the signature
+	headerPayloadSignature := strings.SplitN(r.Form.Get("jwt"), ".", 3)
+	payload, _ := base64.RawURLEncoding.DecodeString(headerPayloadSignature[1])
 
-    var attrs map[string]interface{}
-    err = json.Unmarshal(payload, &attrs)
-    if err != nil {
-        return err
-    }
+	var attrs map[string]interface{}
+	err = json.Unmarshal(payload, &attrs)
+	if err != nil {
+		return err
+	}
 
-    jwtIdpMd, _ := Md.Internal.MDQ(attrs["iss"].(string))
+	jwtIdpMd, _ := Md.Internal.MDQ(attrs["iss"].(string))
 
 	certificates := jwtIdpMd.QueryMulti(nil, "./md:IDPSSODescriptor"+gosaml.SigningCertQuery)
 
-    if len(certificates) == 0 {
-        return errors.New("No Certs found")
-    }
+	if len(certificates) == 0 {
+		return errors.New("No Certs found")
+	}
 
-    digest := goxml.Hash(goxml.Algos["sha256"].Algo, strings.Join(headerPayloadSignature[:2], "."))
-    signature, _ := base64.RawURLEncoding.DecodeString(headerPayloadSignature[2])
+	digest := goxml.Hash(goxml.Algos["sha256"].Algo, strings.Join(headerPayloadSignature[:2], "."))
+	signature, _ := base64.RawURLEncoding.DecodeString(headerPayloadSignature[2])
 
-    var pub *rsa.PublicKey
-    for _, certificate := range certificates {
-        _, pub, err = gosaml.PublicKeyInfo(certificate)
-        if err != nil {
-            return err
-        }
-        err = rsa.VerifyPKCS1v15(pub, goxml.Algos["sha256"].Algo, digest[:], signature)
-        fmt.Println(err)
-        if err == nil {
-            break
-        }
-    }
+	var pub *rsa.PublicKey
+	for _, certificate := range certificates {
+		_, pub, err = gosaml.PublicKeyInfo(certificate)
+		if err != nil {
+			return err
+		}
+		err = rsa.VerifyPKCS1v15(pub, goxml.Algos["sha256"].Algo, digest[:], signature)
+		fmt.Println(err)
+		if err == nil {
+			break
+		}
+	}
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
-//    iat := attrs["iat"].(int64)
+	//    iat := attrs["iat"].(int64)
 
-    location := jwtIdpMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
+	location := jwtIdpMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
 
 	request, hubSpMd, idpMd, _, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, location)
 	if err != nil {
 		return
 	}
 
-    response := gosaml.NewResponse(idpMd, hubSpMd, request, nil)
+	response := gosaml.NewResponse(idpMd, hubSpMd, request, nil)
 	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]`, "", nil)
 
-    requestedAttributes := hubRequestedAttributes.Query(nil, `//md:RequestedAttribute[not(@computed)]`)
+	requestedAttributes := hubRequestedAttributes.Query(nil, `//md:RequestedAttribute[not(@computed)]`)
 	for _, requestedAttribute := range requestedAttributes {
 		friendlyName := hubRequestedAttributes.Query1(requestedAttribute, "@FriendlyName")
 		if _, ok := attrs[friendlyName]; !ok {
@@ -606,8 +606,8 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	err = gosaml.SignResponse(response, "/samlp:Response/saml:Assertion", hubSpMd, "sha256", gosaml.SAMLSign)
-    if err != nil {
-	    return err
+	if err != nil {
+		return err
 	}
 
 	data := formdata{Acs: "https://" + config.Acs, Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: r.Form.Get("RelayState")}
@@ -620,15 +620,15 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-    // backward compatible - use either or
+	// backward compatible - use either or
 	entityID := r.Header.Get("X-Issuer") + r.Form.Get("issuer")
 	spMd, err := Md.Internal.MDQ(entityID)
 	if err != nil {
 		return
 	}
 
-    acs := r.Header.Get("X-Acs") + r.Form.Get("acs")
-    app := r.Header.Get("X-App") + r.Form.Get("app")
+	acs := r.Header.Get("X-Acs") + r.Form.Get("acs")
+	app := r.Header.Get("X-App") + r.Form.Get("app")
 
 	if _, ok := r.Form["SAMLResponse"]; ok {
 		response, _, _, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.Hub}, gosaml.MdSets{Md.Internal}, acs, nil)
@@ -645,11 +645,11 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			attrs[basic] = response.QueryMulti(assertion, "saml:AttributeStatement/saml:Attribute[@Name="+strconv.Quote(name)+"]/saml:AttributeValue")
 		}
 
-        attrs["iss"] = response.Query1(assertion, "./saml:Issuer")
-        attrs["aud"] = response.Query1(assertion, "./saml:Conditions/saml:AudienceRestriction/saml:Audience")
-        attrs["nbf"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
-        attrs["exp"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
-        attrs["iat"] = samlTime2JwtTime(response.Query1(assertion, "@IssueInstant"))
+		attrs["iss"] = response.Query1(assertion, "./saml:Issuer")
+		attrs["aud"] = response.Query1(assertion, "./saml:Conditions/saml:AudienceRestriction/saml:Audience")
+		attrs["nbf"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
+		attrs["exp"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
+		attrs["iat"] = samlTime2JwtTime(response.Query1(assertion, "@IssueInstant"))
 
 		md, err := Md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
@@ -669,21 +669,21 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-        json, err := json.Marshal(attrs)
-        if err != nil {
-            return err
-        }
+		json, err := json.Marshal(attrs)
+		if err != nil {
+			return err
+		}
 
 		header := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." // RS256
 		payload := strings.TrimRight(base64.URLEncoding.EncodeToString(json), "=")
 
-        digest := goxml.Hash(goxml.Algos["sha256"].Algo, header + payload)
-        signature, err := goxml.Sign([]byte(digest), privatekey, []byte(""), "sha256")
-        if err != nil {
-            return err
-        }
+		digest := goxml.Hash(goxml.Algos["sha256"].Algo, header+payload)
+		signature, err := goxml.Sign([]byte(digest), privatekey, []byte(""), "sha256")
+		if err != nil {
+			return err
+		}
 
-        tokenString := header + payload + "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
+		tokenString := header + payload + "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
 
 		var app []byte
 		err = authnRequestCookie.Decode("app", relayState, &app)
@@ -694,7 +694,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		w.Header().Set("X-Accel-Redirect", string(app))
 		w.Header().Set("Authorization", "Bearer "+tokenString)
 		w.Header().Set("Content-Type", "application/json")
-        w.Write([]byte(tokenString))
+		w.Write([]byte(tokenString))
 		return err
 	}
 
@@ -711,7 +711,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	request, err := gosaml.NewAuthnRequest(nil, spMd, hubMd, strings.Split(r.Form.Get("idplist"), ","))
 	if err != nil {
 		return
-    }
+	}
 
 	u, err := gosaml.SAMLRequest2Url(request, relayState, "", "", "")
 	if err != nil {
@@ -909,6 +909,7 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 		name := destinationMd.Query1(requestedAttribute, "@Name")
 		seen[name] = true
 		friendlyName := destinationMd.Query1(requestedAttribute, "@FriendlyName")
+		seen[friendlyName] = true
 
 		must := hubMd.Query1(nil, `.//md:RequestedAttribute[@FriendlyName=`+strconv.Quote(friendlyName)+`]/@must`) == "true"
 
@@ -933,14 +934,14 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 
 // checkForCommonFederations checks for common federation in sp and idp
 func checkForCommonFederations(idpMd, spMd *goxml.Xp) (err error) {
-	idpFeds := idpMd.QueryMulti(nil, xprefix + "feds")
+	idpFeds := idpMd.QueryMulti(nil, xprefix+"feds")
 	tmp := idpFeds[:0]
 	for _, federation := range idpFeds {
 		fed := allowedInFeds.ReplaceAllLiteralString(strings.TrimSpace(federation), "")
 		tmp = append(tmp, strconv.Quote(fed))
 	}
 	idpFedsQuery := strings.Join(idpFeds, " or .=")
-	commonFeds := spMd.QueryMulti(nil, xprefix + `feds[.=`+idpFedsQuery+`]`)
+	commonFeds := spMd.QueryMulti(nil, xprefix+`feds[.=`+idpFedsQuery+`]`)
 	if len(commonFeds) == 0 {
 		err = fmt.Errorf("no common federations")
 		return
@@ -949,10 +950,10 @@ func checkForCommonFederations(idpMd, spMd *goxml.Xp) (err error) {
 }
 
 func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk bool) (ard AttributeReleaseData, err error) {
-	ard = AttributeReleaseData{Values: make(map[string][]string), IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
+	ard = AttributeReleaseData{IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := debify.ReplaceAllString(idpMd.Query1(nil, "@entityID"), "$1$2")
 
-	base64encodedIn := idpMd.QueryXMLBool(nil, xprefix + "base64attributes")
+	base64encodedIn := idpMd.QueryXMLBool(nil, xprefix+"base64attributes")
 
 	switch idp {
 	case "https://nemlogin.wayf.dk":
@@ -1009,15 +1010,15 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 	// check that the security domain of eppn is one of the domains in the shib:scope list
 	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
-	eppn, eppnForEptid, securitydomain, epsaList, err := checkScope(response, idpMd, destinationAttributes, true)
+	eppn, eppnForEptid, securitydomain, epsas, err := checkScope(response, idpMd, destinationAttributes, true)
 	if err != nil {
 		return
 	}
 
-	val := idpMd.Query1(nil, xprefix + "wayf_schacHomeOrganizationType")
+	val := idpMd.Query1(nil, xprefix+"wayf_schacHomeOrganizationType")
 	setAttribute("schacHomeOrganizationType", val, response, destinationAttributes)
 
-	val = idpMd.Query1(nil, xprefix + "wayf_schacHomeOrganization")
+	val = idpMd.Query1(nil, xprefix+"wayf_schacHomeOrganization")
 	setAttribute("schacHomeOrganization", val, response, destinationAttributes)
 
 	if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="displayName"]/saml:AttributeValue`) == "" {
@@ -1028,13 +1029,13 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 	// Use kribified?, use birkified?
 	idpPEID := idp
-	if tmp := idpMd.Query1(nil, xprefix + "persistentEntityID"); tmp != "" {
+	if tmp := idpMd.Query1(nil, xprefix+"persistentEntityID"); tmp != "" {
 		idpPEID = tmp
 	}
 
 	sp := spMd.Query1(nil, "@entityID")
 	spPEID := sp
-	if tmp := spMd.Query1(nil, xprefix + "persistentEntityID"); tmp != "" {
+	if tmp := spMd.Query1(nil, xprefix+"persistentEntityID"); tmp != "" {
 		spPEID = tmp
 	}
 	spPEID = deproxy.ReplaceAllString(debify.ReplaceAllString(spPEID, "$1$2"), "$1") // Transition hack - old BIRK new hub interaction
@@ -1173,7 +1174,7 @@ func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeRel
 	if eptid != "" { // convert to WAYF format eptid - legacy ...
 		idp := idpMd.Query1(nil, "@entityID")
 		sp := spMd.Query1(nil, "@entityID")
-		if tmp := spMd.Query1(nil, xprefix + "persistentEntityID"); tmp != "" {
+		if tmp := spMd.Query1(nil, xprefix+"persistentEntityID"); tmp != "" {
 			sp = tmp
 		}
 
@@ -1310,7 +1311,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	hubIdp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
-	idp := hubIdp // we need to keep the original 'Destination' around in hubIdp, idp will become a backend idp after discovery
+	idp := hubIdp                               // we need to keep the original 'Destination' around in hubIdp, idp will become a backend idp after discovery
 	idpMd := hubIdpMd
 	idpIndex := 1
 
@@ -1321,7 +1322,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		idpLists := [][]string{
-			spMd.QueryMulti(nil, xprefix + "IDPList"),
+			spMd.QueryMulti(nil, xprefix+"IDPList"),
 			request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
 			{r.URL.Query().Get("idpentityid")},
 			strings.Split(r.URL.Query().Get("idplist"), ","),
@@ -1334,7 +1335,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		idp = debify.ReplaceAllString(idp, "$1$2")
 		idpMd, idpIndex, err = gosaml.FindInMetadataSets(intExtIdP, idp)
 		if err != nil {
-		    return
+			return
 		}
 	}
 
@@ -1343,14 +1344,14 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
-    var hubSPMd *goxml.Xp
+	var hubSPMd *goxml.Xp
 	if idpIndex == hubIdpIndex { // Hub to Int or Birk
 		idp = debify.ReplaceAllString(idp, "$1$2")
-	    idpMd, err = Md.Internal.MDQ(idp)
-        if err != nil {
-            return
-        }
-		mappedIdP := idpMd.Query1(nil, xprefix + "map2IdP")
+		idpMd, err = Md.Internal.MDQ(idp)
+		if err != nil {
+			return
+		}
+		mappedIdP := idpMd.Query1(nil, xprefix+"map2IdP")
 		if mappedIdP != "" {
 			idpMd, err = Md.Internal.MDQ(mappedIdP)
 			if err != nil {
@@ -1358,7 +1359,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		mappedSP := idpMd.Query1(nil, xprefix + "map2SP")
+		mappedSP := idpMd.Query1(nil, xprefix+"map2SP")
 		if mappedSP == "" {
 			mappedSP = config.HubEntityID
 		}
@@ -1368,7 +1369,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return
 		}
 	} else { // Krib request to ext IdP
-    	hubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
+		hubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
 		if err != nil {
 			return
 		}
@@ -1421,7 +1422,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		}
 	}
 
-	algo := idpMd.Query1(nil, xprefix + "SigningMethod")
+	algo := idpMd.Query1(nil, xprefix+"SigningMethod")
 
 	if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 		algo = sigAlg
@@ -1536,7 +1537,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	signingMethod := spMd.Query1(nil, xprefix + "SigningMethod")
+	signingMethod := spMd.Query1(nil, xprefix+"SigningMethod")
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
@@ -1585,7 +1586,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		elementsToSign := config.ElementsToSign
-		if spMd.QueryXMLBool(nil, xprefix + "saml20.sign.response") {
+		if spMd.QueryXMLBool(nil, xprefix+"saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
@@ -1615,7 +1616,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
 		}
 
-		if spMd.QueryXMLBool(nil, xprefix + "assertion.encryption ") || gosaml.DebugSetting(r, "encryptAssertion") == "1" {
+		if spMd.QueryXMLBool(nil, xprefix+"assertion.encryption ") || gosaml.DebugSetting(r, "encryptAssertion") == "1" {
 			gosaml.DumpFileIfTracing(r, newresponse)
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
@@ -1719,7 +1720,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 				return err
 			}
 
-			algo := finalDestination.Query1(nil, xprefix + "SigningMethod")
+			algo := finalDestination.Query1(nil, xprefix+"SigningMethod")
 
 			if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 				algo = sigAlg
@@ -1762,7 +1763,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			return err
 		}
 
-		algo := destinationMd.Query1(nil, xprefix + "SigningMethod")
+		algo := destinationMd.Query1(nil, xprefix+"SigningMethod")
 
 		if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 			algo = sigAlg
@@ -2049,22 +2050,21 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 	}
 
 	subSecurityDomain := "." + securityDomain
-	for _, eppsa := range epsas {
-		eppsaparts := scoped.FindStringSubmatch(eppsa)
-		if len(eppsaparts) != 3 {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", eppsa)
+	for _, epsa := range epsas {
+		epsaparts := scoped.FindStringSubmatch(epsa)
+		if len(epsaparts) != 3 {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
-		domain := eppsaparts[1] + eppsaparts[2]
+		domain := epsaparts[1] + epsaparts[2]
 		if requireEppn {
 			if domain != securityDomain && !strings.HasSuffix(domain, subSecurityDomain) {
-				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security sub domain", eppsa, securityDomain)
+				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security sub domain", epsa, securityDomain)
 				return
-
 			}
 		} else {
 			if domain != securityDomain {
-				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security domain", eppsa, securityDomain)
+				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security domain", epsa, securityDomain)
 				return
 			}
 		}
