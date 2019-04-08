@@ -319,10 +319,6 @@ func Main() {
 	httpMux.Handle(config.Testsp2_Acs, appHandler(testSPService))
 	httpMux.Handle(config.Testsp2+"/", appHandler(testSPService)) // need a root "/" for routing
 
-	//id.wayf.dk tests ...
-	httpMux.Handle("id.wayf.dk/SSO", appHandler(IdWayfDkSSOService))
-	httpMux.Handle("id.wayf.dk/ACS", appHandler(IdWayfDkACSService))
-
 	finish := make(chan bool)
 
 	go func() {
@@ -2054,127 +2050,58 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 	return
 }
 
-func IdWayfDkSSOService(w http.ResponseWriter, r *http.Request) (err error) {
-	defer r.Body.Close()
-
-	request, spMd, idpMd, relayState, _, _, err := gosaml.ReceiveAuthnRequest(r, gosaml.MdSets{Md.ExternalSP}, gosaml.MdSets{Md.ExternalIdP}, "https://"+r.Host+r.URL.Path)
-	if err != nil {
-		return err
+func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
+	path := strings.Split(r.URL.RawPath, "/")
+	md, ok := webMdMap[path[1]]
+	if !ok {
+	    return err
 	}
-
-	authIdP := ""
-	if tmp, _ := r.Cookie("IdP"); tmp != nil {
-		authIdP = tmp.Value
-	}
-
-	idpLists := [][]string{
-		{authIdP},
-		{r.URL.Query().Get("idpentityid")},
-	}
-
-	if idp2 := wayf(w, r, request, spMd, idpLists); idp2 != "" {
-		idp2Md, err := Md.ExternalIdP.MDQ(idp2)
+    var xml []byte
+    var en1, en2 string
+    var xp1, xp2 *goxml.Xp
+	switch len(path) {
+	case 2:
+		en1, err = url.PathUnescape(path[2])
+		_, xml, err = md.md.WebMDQ(en1)
 		if err != nil {
-			return err
+		    return
 		}
-
-		idp := idpMd.Query1(nil, "@entityID")
-		sp2Md, err := Md.ExternalSP.MDQ("https://id.wayf.dk")
+	case 3:
+		en1, _ = url.PathUnescape(path[2])
+		en2, _ = url.PathUnescape(path[3])
+		xp1, _, err = md.revmd.WebMDQ(en1)
 		if err != nil {
-			return err
+		    return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "IdP", Value: idp2, Path: "/", Secure: true, HttpOnly: true, MaxAge: 31536000})
-
-		err = sendRequestToIdP(w, r, request, sp2Md, idp2Md, idp, relayState, "ID-WAYF-DK-", "", "", 0, 0, nil)
-		return err
-	}
-	return
-}
-
-func IdWayfDkACSService(w http.ResponseWriter, r *http.Request) (err error) {
-	defer r.Body.Close()
-	response, _, spMd, relayState, _, _, err := gosaml.ReceiveSAMLResponse(r, gosaml.MdSets{Md.ExternalIdP}, gosaml.MdSets{Md.ExternalSP}, "https://"+r.Host+r.URL.Path, nil)
-	if err != nil {
-		return
-	}
-	spMd, issuerMd, request, _, err := getOriginalRequest(w, r, response, gosaml.MdSets{Md.ExternalSP}, gosaml.MdSets{Md.ExternalIdP}, "ID-WAYF-DK-")
-	if err != nil {
-		return
-	}
-
-	signingMethod := spMd.Query1(nil, xprefix + "SigningMethod")
-
-	var newresponse *goxml.Xp
-	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		newresponse = gosaml.NewResponse(issuerMd, spMd, request, response)
-
-		sp := spMd.Query1(nil, "@entityID")
-		eptid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.10"]/saml:AttributeValue`)
-
-		userInfo, err := getUserInfo(sp, eptid)
+		xp2, xml, err = md.md.WebMDQ(en2)
 		if err != nil {
-			return err
+		    return err
 		}
-
-		attributeStatement := goxml.NewXpFromString(`<saml:AttributeStatement xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:AttributeStatement>`)
-		for attribute, values := range userInfo {
-			attribute = basic2uri[attribute].uri
-			newAttribute := attributeStatement.QueryDashP(nil, "saml:Attribute[0]/@Name", attribute, nil)
-			attributeStatement.QueryDashP(newAttribute, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
-			for _, value := range values {
-				attributeStatement.QueryDashP(newAttribute, "saml:AttributeValue[0]", value, nil)
-			}
+		if !intersectionNotEmpty(xp1.QueryMulti(nil, xprefix+"feds"), xp2.QueryMulti(nil, xprefix+"feds")) {
+		     return fmt.Errorf("no common federations")
 		}
-
-		CopyAttributes(attributeStatement, newresponse, spMd)
-
-		elementsToSign := config.ElementsToSign
-		if spMd.QueryXMLBool(nil, xprefix + "saml20.sign.response") {
-			elementsToSign = []string{"/samlp:Response"}
-		}
-
-		for _, q := range elementsToSign {
-			err = gosaml.SignResponse(newresponse, q, issuerMd, signingMethod, gosaml.SAMLSign)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		newresponse = gosaml.NewErrorResponse(issuerMd, spMd, request, response)
-
-		err = gosaml.SignResponse(newresponse, "/samlp:Response", issuerMd, signingMethod, gosaml.SAMLSign)
-		if err != nil {
-			return
-		}
+	default:
+		return fmt.Errorf("invalid MDQ path")
 	}
 
-	// when consent as a service is ready - we will post to that
-	// acs := newresponse.Query1(nil, "@Destination")
+    w.Header().Set("Content-Type:", "application/samlmetadata+xml")
+    //w.Header().Set("Content-Encoding", "deflate")
+    //w.Header().Set("ETag", "abcdefg")
+    //w.Header().Set("Content-Length", len(xml))
+    xml = gosaml.Inflate(xml)
+    w.Write(xml)
+    return
+    }
 
-	gosaml.DumpFileIfTracing(r, newresponse)
-
-	data := formdata{Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: base64.StdEncoding.EncodeToString(newresponse.Dump()), RelayState: relayState}
-	postForm.Execute(w, data)
-	return
-}
-
-func getUserInfo(sp, eptid string) (userInfo map[string][]string, err error) {
-	url := "https://attributes.wayf.dk/getuserinfo?" + url.Values{"sp": {sp}, "eptid": {eptid}}.Encode()
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-
-	err = json.Unmarshal(body, &userInfo)
-	if err != nil {
-		return
-	}
-	return
+func intersectionNotEmpty(s1, s2 []string) (res bool) {
+    hash := make(map[string]bool)
+    for _, e := range s1 {
+        hash[e] = true
+    }
+    for _, e := range s2 {
+        if hash[e] {
+            return true
+        }
+    }
+    return
 }
