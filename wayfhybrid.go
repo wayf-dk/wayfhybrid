@@ -244,10 +244,10 @@ func Main() {
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
 	prepareTables(hubRequestedAttributes)
 
-	Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table, Rev: config.Hub.Table}
-	Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table, Rev: config.Internal.Table}
-	Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table, Rev: config.ExternalSP.Table}
-	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table, Rev: config.ExternalIdP.Table}
+	Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table, Rev: config.Hub.Table, Short: "hub"}
+	Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table, Rev: config.Internal.Table, Short: "int"}
+	Md.ExternalIdP = &lMDQ.MDQ{Path: config.ExternalIdP.Path, Table: config.ExternalIdP.Table, Rev: config.ExternalSP.Table, Short: "idp"}
+	Md.ExternalSP = &lMDQ.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table, Rev: config.ExternalIdP.Table, Short: "sp"}
 
 	intExtSP = gosaml.MdSets{Md.Internal, Md.ExternalSP}
 	intExtIdP = gosaml.MdSets{Md.Internal, Md.ExternalIdP}
