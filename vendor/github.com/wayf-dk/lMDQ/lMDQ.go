@@ -29,6 +29,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -44,12 +45,12 @@ type (
 	}
 	// MDQ refers to metadata query
 	MDQ struct {
-		db         *sql.DB
-		stmt       *sql.Stmt
-		Path       string
-		Cache      map[string]*MdXp
-		Lock       sync.Mutex
-		Table, Rev string
+		db                *sql.DB
+		stmt              *sql.Stmt
+		Path              string
+		Cache             map[string]*MdXp
+		Lock              sync.Mutex
+		Table, Rev, Short string
 	}
 	// MdXp refers to check validity
 	MdXp struct {
@@ -63,6 +64,7 @@ var (
 	cacheduration = time.Minute * 60
 	// MetaDataNotFoundError refers to error
 	MetaDataNotFoundError = errors.New("Metadata not found")
+	hexChars              = regexp.MustCompile("^[a-fA-F0-9]+$")
 )
 
 // Valid refers to check the validity of metadata
@@ -114,6 +116,8 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 	k := key
 	if strings.HasPrefix(key, "{sha1}") {
 		key = key[6:]
+	} else if hexChars.MatchString(key) {
+
 	} else {
 		hash := sha1.Sum([]byte(key))
 		key = hex.EncodeToString(append(hash[:]))
