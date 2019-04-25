@@ -156,7 +156,7 @@ type (
 	}
 
 	webMd struct {
-	    md, revmd *lMDQ.MDQ
+		md, revmd *lMDQ.MDQ
 	}
 )
 
@@ -257,19 +257,21 @@ func Main() {
 	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
 	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
 
-    webMdMap = make(map[string]webMd)
+	webMdMap = make(map[string]webMd)
 	for _, md := range []*lMDQ.MDQ{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
 		err := md.Open()
 		if err != nil {
 			panic(err)
 		}
 		webMdMap[md.Table] = webMd{md: md}
+		webMdMap[md.Short] = webMd{md: md}
 	}
 
 	for _, md := range []*lMDQ.MDQ{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
-	    m := webMdMap[md.Table]
-	    m.revmd = webMdMap[md.Rev].md
-	    webMdMap[md.Table] = m
+		m := webMdMap[md.Table]
+		m.revmd = webMdMap[md.Rev].md
+		webMdMap[md.Table] = m
+		webMdMap[md.Short] = m
 	}
 
 	hubMd, err := Md.Hub.MDQ(config.HubEntityID)
@@ -2074,57 +2076,63 @@ func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, e
 }
 
 func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
-	path := strings.Split(r.URL.RawPath, "/")
-	md, ok := webMdMap[path[1]]
-	if !ok {
-	    return err
+	var rawPath string
+	if rawPath = r.URL.RawPath; rawPath == "" {
+		rawPath = r.URL.Path
 	}
-    var xml []byte
-    var en1, en2 string
-    var xp1, xp2 *goxml.Xp
+	path := strings.Split(rawPath, "/")
+	path = path[2:] // need a way to do this automatically
+	fmt.Printf("%q %q %q\n", r.URL, r.URL.RawPath, path)
+	md, ok := webMdMap[path[0]]
+	if !ok {
+		return fmt.Errorf("Metadata set not found")
+	}
+	var xml []byte
+	var en1, en2 string
+	var xp1, xp2 *goxml.Xp
 	switch len(path) {
 	case 2:
-		en1, err = url.PathUnescape(path[2])
+		en1, err = url.PathUnescape(path[1])
 		_, xml, err = md.md.WebMDQ(en1)
 		if err != nil {
-		    return
+			return
 		}
 	case 3:
-		en1, _ = url.PathUnescape(path[2])
-		en2, _ = url.PathUnescape(path[3])
-		xp1, _, err = md.revmd.WebMDQ(en1)
+		en1, _ = url.PathUnescape(path[1])
+		en2, _ = url.PathUnescape(path[2])
+		xp1, _, err = md.md.WebMDQ(en1)
 		if err != nil {
-		    return
+			return
 		}
-		xp2, xml, err = md.md.WebMDQ(en2)
+		xp2, xml, err = md.revmd.WebMDQ(en2)
 		if err != nil {
-		    return err
+			return err
 		}
 		if !intersectionNotEmpty(xp1.QueryMulti(nil, xprefix+"feds"), xp2.QueryMulti(nil, xprefix+"feds")) {
-		     return fmt.Errorf("no common federations")
+			return fmt.Errorf("no common federations")
 		}
 	default:
 		return fmt.Errorf("invalid MDQ path")
 	}
 
-    w.Header().Set("Content-Type:", "application/samlmetadata+xml")
-    //w.Header().Set("Content-Encoding", "deflate")
-    //w.Header().Set("ETag", "abcdefg")
-    //w.Header().Set("Content-Length", len(xml))
-    xml = gosaml.Inflate(xml)
-    w.Write(xml)
-    return
-    }
+	w.Header().Set("Content-Type", "application/samlmetadata+xml")
+	//w.Header().Set("Content-Encoding", "deflate")
+	//w.Header().Set("ETag", "abcdefg")
+	xml = gosaml.Inflate(xml)
+	w.Header().Set("Content-Length", strconv.Itoa(len(xml)))
+	w.Write(xml)
+	return
+}
 
 func intersectionNotEmpty(s1, s2 []string) (res bool) {
-    hash := make(map[string]bool)
-    for _, e := range s1 {
-        hash[e] = true
-    }
-    for _, e := range s2 {
-        if hash[e] {
-            return true
-        }
-    }
-    return
+	hash := make(map[string]bool)
+	for _, e := range s1 {
+		hash[e] = true
+	}
+	for _, e := range s2 {
+		if hash[e] {
+			return true
+		}
+	}
+	return
 }
