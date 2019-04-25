@@ -349,15 +349,14 @@ func inArray(item string, array []string) bool {
 }
 
 func FindInMetadataSets(metadataSets MdSets, key string) (md *goxml.Xp, index int, err error) {
-    for index, _ = range metadataSets {
-        md, err = metadataSets[index].MDQ(key)
-        if err == nil { // if we don't get md not found the last error is as good as the first
-            return
-        }
+	for index, _ = range metadataSets {
+		md, err = metadataSets[index].MDQ(key)
+		if err == nil { // if we don't get md not found the last error is as good as the first
+			return
+		}
 	}
 	return
 }
-
 
 // ReceiveSAMLResponse handles the SAML minutiae when receiving a SAMLResponse
 // Currently the only supported binding is POST
@@ -440,9 +439,9 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 		return
 	}
 
-    issuerMd, issuerIndex, err = FindInMetadataSets(issuerMdSets, issuer)
+	issuerMd, issuerIndex, err = FindInMetadataSets(issuerMdSets, issuer)
 	if err != nil {
-	    return
+		return
 	}
 
 	destination := tmpXp.Query1(nil, "./@Destination")
@@ -456,7 +455,7 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 		return
 	}
 
-    destinationMd, destinationIndex, err = FindInMetadataSets(destinationMdSets, location)
+	destinationMd, destinationIndex, err = FindInMetadataSets(destinationMdSets, location)
 	if err != nil {
 		return
 	}
@@ -540,7 +539,6 @@ findbinding:
 
 	certificates := issuerMd.QueryMulti(nil, `./`+Roles[(role+1)%2]+SigningCertQuery) // the issuer's role
 	certificates = append(certificates, xtraCerts...)
-
 
 	if len(certificates) == 0 {
 		err = errors.New("no certificates found in metadata")
@@ -1097,8 +1095,8 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 
 	nameid := response.Query(assertion, "saml:Subject/saml:NameID")[0]
 	response.QueryDashP(nameid, "@SPNameQualifier", spEntityID, nil)
-    response.QueryDashP(nameid, "@Format", Transient, nil)
-    response.QueryDashP(nameid, ".", Id(), nil)
+	response.QueryDashP(nameid, "@Format", Transient, nil)
+	response.QueryDashP(nameid, ".", Id(), nil)
 
 	subjectconfirmationdata := response.Query(assertion, "saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData")[0]
 	response.QueryDashP(subjectconfirmationdata, "@NotOnOrAfter", assertionNotOnOrAfter, nil)
@@ -1115,16 +1113,16 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 	response.QueryDashP(authstatement, "@SessionIndex", Id(), nil)
 	response.QueryDashP(authstatement, "@SessionNotOnOrAfter", sessionNotOnOrAfter, nil)
 	//response.QueryDashP(authstatement, "@SessionIndex", "missing", nil)
-    response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", "urn:oasis:names:tc:SAML:2.0:ac:classes:Password", nil)
+	response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", "urn:oasis:names:tc:SAML:2.0:ac:classes:Password", nil)
 
-    if sourceResponse != nil {
-        for _, aa := range sourceResponse.QueryMulti(nil, "//saml:AuthnContext/saml:AuthenticatingAuthority") {
-            response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa, nil)
-        }
-        response.QueryDashP(nameid, "@Format", sourceResponse.Query1(nil, "//saml:NameID/@Format"), nil)
-        response.QueryDashP(nameid, ".", sourceResponse.Query1(nil, "//saml:NameID"), nil)
-        response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", sourceResponse.Query1(nil, "./saml:Issuer"), nil)
-        response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(nil, "//saml:AuthnContextClassRef"), nil)
+	if sourceResponse != nil {
+		for _, aa := range sourceResponse.QueryMulti(nil, "//saml:AuthnContext/saml:AuthenticatingAuthority") {
+			response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa, nil)
+		}
+		response.QueryDashP(nameid, "@Format", sourceResponse.Query1(nil, "//saml:NameID/@Format"), nil)
+		response.QueryDashP(nameid, ".", sourceResponse.Query1(nil, "//saml:NameID"), nil)
+		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", sourceResponse.Query1(nil, "./saml:Issuer"), nil)
+		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(nil, "//saml:AuthnContextClassRef"), nil)
 	}
 	return
 }
@@ -1136,16 +1134,16 @@ func wsfedRequest2samlRequest(r *http.Request, issuerMdSets, destinationMdSets M
 		issuer := r.Form.Get("wtrealm")
 		location := "https://" + r.Host + r.URL.Path
 
-        destinationMd, _, err := FindInMetadataSets(destinationMdSets, location)
-        if err != nil {
-            return
-        }
+		destinationMd, _, err := FindInMetadataSets(destinationMdSets, location)
+		if err != nil {
+			return
+		}
 
-        issuerMd, _, err := FindInMetadataSets(issuerMdSets, issuer)
+		issuerMd, _, err := FindInMetadataSets(issuerMdSets, issuer)
 
-        if err != nil {
-            return
-        }
+		if err != nil {
+			return
+		}
 
 		samlrequest, _ := NewAuthnRequest(nil, issuerMd, destinationMd, nil)
 		if wreply := r.Form.Get("wreply"); wreply != "" {
