@@ -1,9 +1,10 @@
 package main
 
 import (
-    "crypto"
+	"bytes"
+	"crypto"
 	"crypto/rand"
- 	"crypto/rsa"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
@@ -49,37 +50,13 @@ type (
 		Cache map[string]*goxml.Xp
 		Lock  sync.Mutex
 	}
+
+	XField {
+	    Key, XPath string
+	}
 )
 
 const (
-	HRAXML = `<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" entityID="https://wayf.wayf.dk">
-  <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:1.1:protocol urn:oasis:names:tc:SAML:2.0:protocol">
-    <md:AttributeConsumingService index="0">
-      <md:RequestedAttribute FriendlyName="sn" singular="true" must="true" Name="urn:oid:2.5.4.4" AttributeName="surname"/>
-      <md:RequestedAttribute FriendlyName="gn" singular="true" must="true" Name="urn:oid:2.5.4.42"  AttributeName="givenname"/>
-      <md:RequestedAttribute FriendlyName="cn" singular="true" must="true" Name="urn:oid:2.5.4.3"/>
-      <md:RequestedAttribute FriendlyName="eduPersonPrincipalName" singular="true" must="true" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.6" isRequired="true"/>
-      <md:RequestedAttribute FriendlyName="mail" Name="urn:oid:0.9.2342.19200300.100.1.3" AttributeName="emailaddress"/>
-      <md:RequestedAttribute FriendlyName="eduPersonPrimaryAffiliation" singular="true" must="true" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.5"/>
-      <md:RequestedAttribute FriendlyName="organizationName" singular="true" must="true" Name="urn:oid:2.5.4.10"/>
-      <md:RequestedAttribute FriendlyName="eduPersonAssurance" singular="true" must="true" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.11"/>
-      <md:RequestedAttribute FriendlyName="schacPersonalUniqueID" Name="urn:oid:1.3.6.1.4.1.25178.1.2.15"/>
-      <md:RequestedAttribute FriendlyName="schacCountryOfCitizenship" singular="true" Name="urn:oid:1.3.6.1.4.1.25178.1.2.5" />
-      <md:RequestedAttribute FriendlyName="eduPersonScopedAffiliation" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.9" />
-      <md:RequestedAttribute FriendlyName="preferredLanguage" Name="urn:oid:2.16.840.1.113730.3.1.39" />
-      <md:RequestedAttribute FriendlyName="eduPersonEntitlement" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.7" />
-      <md:RequestedAttribute FriendlyName="norEduPersonLIN" Name="urn:oid:1.3.6.1.4.1.2428.90.1.4" />
-      <md:RequestedAttribute FriendlyName="schacHomeOrganization" computed="true" Name="urn:oid:1.3.6.1.4.1.25178.1.2.9" />
-      <md:RequestedAttribute FriendlyName="eduPersonTargetedID" computed="true" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.10" />
-      <md:RequestedAttribute FriendlyName="schacDateOfBirth" Name="urn:oid:1.3.6.1.4.1.25178.1.2.3" />
-      <md:RequestedAttribute FriendlyName="schacYearOfBirth" Name="urn:oid:1.3.6.1.4.1.25178.1.0.2.3" />
-      <md:RequestedAttribute FriendlyName="schacHomeOrganizationType" computed="true" Name="urn:oid:1.3.6.1.4.1.25178.1.2.10" />
-      <md:RequestedAttribute FriendlyName="eduPersonAffiliation" Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.1" />
-      <md:RequestedAttribute FriendlyName="displayName" Name="urn:oid:2.16.840.1.113730.3.1.241" />
-    </md:AttributeConsumingService>
-  </md:SPSSODescriptor>
-</md:EntityDescriptor>
-`
 	postformTemplate = `<html>
 <body onload="document.forms[0].submit()">
 <form action="{{.Acs}}" method="POST">
@@ -91,7 +68,8 @@ const (
 </body>
 </html>
 `
-	mdCert = `MIIDBTCCAe2gAwIBAgIBBzANBgkqhkiG9w0BAQsFADA8MQswCQYDVQQGEwJESzEN MAsGA1UEChMEV0FZRjEeMBwGA1UEAxMVbWV0YWRhdGEuMjAxNi5zaWduaW5nMB4X DTE1MDEwMTAwMDAwMFoXDTI1MTIzMTAwMDAwMFowPDELMAkGA1UEBhMCREsxDTAL BgNVBAoTBFdBWUYxHjAcBgNVBAMTFW1ldGFkYXRhLjIwMTYuc2lnbmluZzCCASIw DQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJ8csKphZWfERIcorQzodVnR9vUS LzxXI0DGL98afvJvEfsbqy5WHhS1Sl1CnYoKSl6NtO7UC6wix3gxa0OasB6vsUe0 LDsXndLhyKziZIsu0D/sHvaz6jucs6Q7gvuyUztohtzSEu2iIyCzUQMSwwAJwtY3 AVNssxJaG+CF6bwU8ARQxUqlpB8Ufx2knFLnL8NJcZcXKz+ZpnNZtEWu5cIRPSiI pWkc4efwk78pqFdLr14fPBo9jgfzunq71TjnP0G2wYD15dq9ShWGKNm6sT6xs29i BNjI/MZzD7Srp6GWdMjEVcbWSlA7YBc0FpdwWZpDUDwj6D2l/8FRSNjqyTUCAwEA AaMSMBAwDgYDVR0PAQH/BAQDAgIEMA0GCSqGSIb3DQEBCwUAA4IBAQAXkE3WqIly NAeHXjDvJPDy8JBWeHOt7CpLJ8mDvD3Ev7uTiM2I5Mh/arMAH6T2aMxiCrk4k1qF ibX0wIlWDfCCvCUfDELaCcpSjHFmumbt0cI1SBhYh6Kt0kWYsEdyzpGm0gPl+YID Rg6VNKINJeOBM6r/avh3aRzmh2pGz1M1DAucEXz6L0caCkxU3RXFRzvvakW01qKO 2hc6WhxfqMUmSIxi+SAPlLN3L2kS0ItTJ3RSxVPA2zF7yVgoI0yrLBhR2AQgWCS2 eW2q8fSxpyb0sDCGVV/AAsunKYSO8i2Hjvu13lcRx/JxLwdlm8+NNNGX52qwz0Lo i1lLXSO09bfw`
+	discoveryURLTemplate = `https://wayf.wayf.dk/ds/?returnIDParam=idpentityid&entityID={{.EntityID}}&return={{.ACS}}`
+	mdCert               = `MIIDBTCCAe2gAwIBAgIBBzANBgkqhkiG9w0BAQsFADA8MQswCQYDVQQGEwJESzEN MAsGA1UEChMEV0FZRjEeMBwGA1UEAxMVbWV0YWRhdGEuMjAxNi5zaWduaW5nMB4X DTE1MDEwMTAwMDAwMFoXDTI1MTIzMTAwMDAwMFowPDELMAkGA1UEBhMCREsxDTAL BgNVBAoTBFdBWUYxHjAcBgNVBAMTFW1ldGFkYXRhLjIwMTYuc2lnbmluZzCCASIw DQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJ8csKphZWfERIcorQzodVnR9vUS LzxXI0DGL98afvJvEfsbqy5WHhS1Sl1CnYoKSl6NtO7UC6wix3gxa0OasB6vsUe0 LDsXndLhyKziZIsu0D/sHvaz6jucs6Q7gvuyUztohtzSEu2iIyCzUQMSwwAJwtY3 AVNssxJaG+CF6bwU8ARQxUqlpB8Ufx2knFLnL8NJcZcXKz+ZpnNZtEWu5cIRPSiI pWkc4efwk78pqFdLr14fPBo9jgfzunq71TjnP0G2wYD15dq9ShWGKNm6sT6xs29i BNjI/MZzD7Srp6GWdMjEVcbWSlA7YBc0FpdwWZpDUDwj6D2l/8FRSNjqyTUCAwEA AaMSMBAwDgYDVR0PAQH/BAQDAgIEMA0GCSqGSIb3DQEBCwUAA4IBAQAXkE3WqIly NAeHXjDvJPDy8JBWeHOt7CpLJ8mDvD3Ev7uTiM2I5Mh/arMAH6T2aMxiCrk4k1qF ibX0wIlWDfCCvCUfDELaCcpSjHFmumbt0cI1SBhYh6Kt0kWYsEdyzpGm0gPl+YID Rg6VNKINJeOBM6r/avh3aRzmh2pGz1M1DAucEXz6L0caCkxU3RXFRzvvakW01qKO 2hc6WhxfqMUmSIxi+SAPlLN3L2kS0ItTJ3RSxVPA2zF7yVgoI0yrLBhR2AQgWCS2 eW2q8fSxpyb0sDCGVV/AAsunKYSO8i2Hjvu13lcRx/JxLwdlm8+NNNGX52qwz0Lo i1lLXSO09bfw`
 
 	MdSetHub         = "https://wayf.wayf.dk/MDQ/hub/"
 	MdSetInternal    = "https://wayf.wayf.dk/MDQ/int/"
@@ -104,9 +82,8 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	postForm *template.Template
+	postForm, discoveryURL *template.Template
 
-	hubRequestedAttributes                         *goxml.Xp
 	mdHub, mdInternal, mdExternalIdP, mdExternalSP *MDQ
 	mdqCache                                       = MdqCache{Cache: map[string]*goxml.Xp{}}
 	whitespace                                     = regexp.MustCompile("\\s")
@@ -114,7 +91,7 @@ var (
 
 func main() {
 	postForm = template.Must(template.New("PostForm").Parse(postformTemplate))
-	hubRequestedAttributes = goxml.NewXpFromString(HRAXML)
+	discoveryURL = template.Must(template.New("discoveryURL").Parse(discoveryURLTemplate))
 
 	mdHub = &MDQ{Mdq: MdSetHub}
 	mdInternal = &MDQ{Mdq: MdSetInternal}
@@ -274,10 +251,9 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 		return errors.New("No Certs found")
 	}
 
-
 	validated := false
 	for _, certificate := range certificates {
-	    validated = validated || verify(certificate, strings.Join(headerPayloadSignature[:2], "."), headerPayloadSignature[2])
+		validated = validated || verify(certificate, strings.Join(headerPayloadSignature[:2], "."), headerPayloadSignature[2])
 	}
 
 	if !validated {
@@ -294,15 +270,15 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 	response := gosaml.NewResponse(idpMd, hubSpMd, request, sourceResponse)
 	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]`, "", nil)
 
-	requestedAttributes := hubRequestedAttributes.Query(nil, `//md:RequestedAttribute`)
+	requestedAttributes := hubSpMd.Query(nil, `//md:RequestedAttribute`)
 	for _, requestedAttribute := range requestedAttributes {
-		friendlyName := hubRequestedAttributes.Query1(requestedAttribute, "@FriendlyName")
-		if _, ok := attrs[friendlyName]; !ok {
+		name := hubSpMd.Query1(requestedAttribute, "@Name")
+		if _, ok := attrs[name]; !ok {
 			continue
 		}
-		attr := response.QueryDashP(destinationAttributes, `saml:Attribute[@Name=`+strconv.Quote(friendlyName)+`]`, "", nil)
-		response.QueryDashP(attr, `@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
-		for _, value := range attrs[friendlyName].([]interface{}) {
+		attr := response.QueryDashP(destinationAttributes, `saml:Attribute[@Name=`+strconv.Quote(name)+`]`, "", nil)
+		response.QueryDashP(attr, `@NameFormat`, hubSpMd.Query1(requestedAttribute, "@NameFormat"), nil)
+		for _, value := range attrs[name].([]interface{}) {
 			response.QueryDashP(attr, "saml:AttributeValue[0]", value.(string), nil)
 		}
 	}
@@ -413,7 +389,6 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		//request.QueryDashP(nil, "@Destination", "https://birk.wayf.dk/birk.php/idp.entity.test:8080", nil)
 		relayState := ""
 		u, err := gosaml.SAMLRequest2Url(request, relayState, "", "", "")
 		if err != nil {
@@ -423,12 +398,14 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return err
 	} else {
-		http.Redirect(w, r, "https://wayf.wayf.dk/ds/?returnIDParam=idpentityid&entityID="+entityID+"&return="+acs, http.StatusFound)
+		buf := new(bytes.Buffer)
+		discoveryURL.Execute(buf, struct{ EntityID, ACS string }{entityID, acs})
+		http.Redirect(w, r, buf.String(), http.StatusFound)
 	}
 	return
 }
 
-func verify(cert, payload, signature string) ( bool) {
+func verify(cert, payload, signature string) bool {
 
 	digest := sha256.Sum256([]byte(payload))
 	sign, _ := base64.RawURLEncoding.DecodeString(signature)
