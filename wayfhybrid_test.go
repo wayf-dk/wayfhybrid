@@ -432,15 +432,15 @@ func ExampleHandleAttributeNameFormat() {
 }
 
 func ExampleDebify() {
-    fmt.Println(debify.ReplaceAllString("https://birk.wayf.dk/birk.php/example.com/test", "$1$2"))
-    fmt.Println(debify.ReplaceAllString("https://example.com/test", "$1$2"))
-    fmt.Println(debify.ReplaceAllString("urn:oid:1.3.6.1.4.1.39153:42:idp.entity.test", "$1$2"))
-    fmt.Println(debify.ReplaceAllString("idp.entity.test", "$1$2"))
+	fmt.Println(debify.ReplaceAllString("https://birk.wayf.dk/birk.php/example.com/test", "$1$2"))
+	fmt.Println(debify.ReplaceAllString("https://example.com/test", "$1$2"))
+	fmt.Println(debify.ReplaceAllString("urn:oid:1.3.6.1.4.1.39153:42:idp.entity.test", "$1$2"))
+	fmt.Println(debify.ReplaceAllString("idp.entity.test", "$1$2"))
 	// Output:
-    // https://example.com/test
-    // https://example.com/test
-    // idp.entity.test
-    // idp.entity.test
+	// https://example.com/test
+	// https://example.com/test
+	// idp.entity.test
+	// idp.entity.test
 }
 
 func PrintMemUsage() {
