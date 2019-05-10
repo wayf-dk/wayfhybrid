@@ -49,7 +49,7 @@ type (
 		stmt              *sql.Stmt
 		Path              string
 		Cache             map[string]*MdXp
-		Lock              sync.Mutex
+		Lock              sync.RWMutex
 		Table, Rev, Short string
 	}
 	// MdXp refers to check validity
@@ -86,8 +86,8 @@ func (mdq *MDQ) Open() (err error) {
 	if err != nil {
 		return
 	}
-	// This is supposed to be a very smart wayf do to prefix search - keep an eye on whether a 10 char prefix ie. using 40 bits is enough
 	mdq.stmt, err = mdq.db.Prepare("select e.md md from entity_" + mdq.Table + " e, lookup_" + mdq.Table + " l where ? < l.hash||'z' and l.hash||'z' <= ? and l.entity_id_fk = e.id")
+	// This is supposed to be a very smart wayf do to prefix search - keep an eye on whether a 10 char prefix ie. using 40 bits is enough
 	if err != nil {
 		return
 	}
@@ -110,9 +110,6 @@ func (mdq *MDQ) WebMDQ(key string) (xp *goxml.Xp, xml []byte, err error) {
 }
 
 func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err error) {
-	mdq.Lock.Lock()
-	defer mdq.Lock.Unlock()
-
 	k := key
 	if strings.HasPrefix(key, "{sha1}") {
 		key = key[6:]
@@ -123,12 +120,14 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 		key = hex.EncodeToString(append(hash[:]))
 	}
 	key = key[:10] // only use the first 10 chars for key
+	mdq.Lock.RLock()
 	cachedxp := mdq.Cache[key]
 	if cachedxp != nil && cachedxp.Valid(cacheduration) {
 		xp = cachedxp.Xp.CpXp()
 		xml = cachedxp.xml
 		return
 	}
+	mdq.Lock.Unlock()
 
 	err = mdq.stmt.QueryRow(key, key+"z").Scan(&xml)
 	switch {
@@ -146,7 +145,9 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 		mdxp.Xp = xp
 		mdxp.xml = xml
 		mdxp.created = time.Now()
+	    mdq.Lock.Lock()
 		mdq.Cache[key] = mdxp
+	    mdq.Lock.Unlock()
 	}
 	return
 }
