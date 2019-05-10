@@ -1660,7 +1660,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 // SPSLOService refers to SP single logout service. Takes request as a parameter and returns an error if any
 func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, Md.Internal, Md.Hub, []gosaml.Md{Md.ExternalIdP, Md.Hub}, []gosaml.Md{Md.ExternalSP, Md.Internal}, gosaml.SPRole, "SLO")
+	return SLOService(w, r, Md.Internal, Md.Hub, []gosaml.Md{Md.ExternalIdP, Md.Hub}, []gosaml.Md{Md.Internal, Md.ExternalSP}, gosaml.SPRole, "SLO")
 }
 
 // BirkSLOService refers to birk single logout service. Takes request as a parameter and returns an error if any
