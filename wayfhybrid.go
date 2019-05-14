@@ -1354,13 +1354,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return
 		}
-		mappedIdP := idpMd.Query1(nil, xprefix+"map2IdP")
-		if mappedIdP != "" {
-			idpMd, err = Md.Internal.MDQ(mappedIdP)
-			if err != nil {
-				return
-			}
-		}
 
 		mappedSP := idpMd.Query1(nil, xprefix+"map2SP")
 		if mappedSP == "" {
@@ -1370,6 +1363,14 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		hubSPMd, err = Md.Hub.MDQ(mappedSP)
 		if err != nil {
 			return
+		}
+
+		mappedIdP := idpMd.Query1(nil, xprefix+"map2IdP")
+		if mappedIdP != "" {
+			idpMd, err = Md.Internal.MDQ(mappedIdP)
+			if err != nil {
+				return
+			}
 		}
 	} else { // Krib request to ext IdP
 		hubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
