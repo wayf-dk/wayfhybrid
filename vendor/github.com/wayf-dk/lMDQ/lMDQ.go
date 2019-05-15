@@ -125,9 +125,10 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 	if cachedxp != nil && cachedxp.Valid(cacheduration) {
 		xp = cachedxp.Xp.CpXp()
 		xml = cachedxp.xml
+    	mdq.Lock.RUnlock()
 		return
 	}
-	mdq.Lock.Unlock()
+	mdq.Lock.RUnlock()
 
 	err = mdq.stmt.QueryRow(key, key+"z").Scan(&xml)
 	switch {
