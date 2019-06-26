@@ -125,7 +125,7 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 	if cachedxp != nil && cachedxp.Valid(cacheduration) {
 		xp = cachedxp.Xp.CpXp()
 		xml = cachedxp.xml
-    	mdq.Lock.RUnlock()
+		mdq.Lock.RUnlock()
 		return
 	}
 	mdq.Lock.RUnlock()
@@ -146,9 +146,9 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 		mdxp.Xp = xp
 		mdxp.xml = xml
 		mdxp.created = time.Now()
-	    mdq.Lock.Lock()
+		mdq.Lock.Lock()
 		mdq.Cache[key] = mdxp
-	    mdq.Lock.Unlock()
+		mdq.Lock.Unlock()
 	}
 	return
 }
