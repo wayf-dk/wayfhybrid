@@ -661,61 +661,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-// SloRequest generates a single logout request
-func SloRequest(w http.ResponseWriter, r *http.Request, response, issuer, destination *goxml.Xp, pk string) {
-	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-                     xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                     ID=""
-                     Version="2.0"
-                     IssueInstant=""
-                     Destination=""
-                     >
-    <saml:Issuer></saml:Issuer>
-    <saml:NameID>
-    </saml:NameID>
-</samlp:LogoutRequest>
-`
-	request := goxml.NewXpFromString(template)
-	slo := destination.Query1(nil, `./md:IDPSSODescriptor/md:SingleLogoutService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
-	request.QueryDashP(nil, "./@IssueInstant", time.Now().Format(gosaml.XsDateTime), nil)
-	request.QueryDashP(nil, "./@ID", gosaml.Id(), nil)
-	request.QueryDashP(nil, "./@Destination", slo, nil)
-	request.QueryDashP(nil, "./saml:Issuer", issuer.Query1(nil, `/md:EntityDescriptor/@entityID`), nil)
-	request.QueryDashP(nil, "./saml:NameID/@SPNameQualifier", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@SPNameQualifier"), nil)
-	request.QueryDashP(nil, "./saml:NameID/@Format", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@Format"), nil)
-	request.QueryDashP(nil, "./saml:NameID", response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID"), nil)
-	u, _ := gosaml.SAMLRequest2Url(request, "", pk, "-", "")
-	http.Redirect(w, r, u.String(), http.StatusFound)
-}
-
-// SloResponse generates a single logout reponse
-func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destination *goxml.Xp) {
-	template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-                      xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                      ID="_7e3ee93a09570edc9bb85a2d300e6f701dc74393"
-                      Version="2.0"
-                      IssueInstant="2018-01-31T14:01:19Z"
-                      Destination="https://wayfsp.wayf.dk/ss/module.php/saml/sp/saml2-logout.php/default-sp"
-                      InResponseTo="_7645977ce3d668e7ef9d650f4361e350f612a178eb">
-    <saml:Issuer>
-     https://wayf.wayf.dk
-    </saml:Issuer>
-    <samlp:Status>
-        <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
-    </samlp:Status>
-</samlp:LogoutResponse>
-`
-	response := goxml.NewXpFromString(template)
-	slo := destination.Query1(nil, `./md:IDPSSODescriptor/md:SingleLogoutService[@Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"]/@Location`)
-	response.QueryDashP(nil, "./@IssueInstant", time.Now().Format(gosaml.XsDateTime), nil)
-	response.QueryDashP(nil, "./@ID", gosaml.Id(), nil)
-	response.QueryDashP(nil, "./@Destination", slo, nil)
-	response.QueryDashP(nil, "./@InResponseTo", request.Query1(nil, "./@ID"), nil)
-	response.QueryDashP(nil, "./saml:Issuer", issuer.Query1(nil, `/md:EntityDescriptor/@entityID`), nil)
-	u, _ := gosaml.SAMLRequest2Url(response, "", "", "", "")
-	http.Redirect(w, r, u.String(), http.StatusFound)
-}
-
 // attributeValues returns all the attribute values
 func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrValue) {
 	seen := map[string]bool{}
