@@ -639,9 +639,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		var vals []attrValue
 		protocol := response.QueryString(nil, "local-name(/*)")
 		if protocol == "Response" {
-            if _, err = RequestHandler(response, issuerMd, destinationMd); err != nil {
-                return err
-            }
+            Attributesc14n(response, issuerMd, destinationMd)
 			err = wayfScopeCheck(response, issuerMd)
 			if err != nil {
 				messages = err.Error()
