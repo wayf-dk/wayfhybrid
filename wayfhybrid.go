@@ -2,12 +2,10 @@ package wayfhybrid
 
 import (
 	"crypto"
-	"crypto/rsa"
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"github.com/gorilla/securecookie"
@@ -24,7 +22,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-
 	//"net/http/pprof"
 	"net/url"
 	"os"
@@ -66,7 +63,7 @@ type (
 		Maxsessions   string
 	}
 
-	wayfHybridConfig struct {
+	WayfHybridConfig struct {
 		Path                                                                                     string
 		DiscoveryService                                                                         string
 		Domain                                                                                   string
@@ -95,14 +92,6 @@ type (
 	}
 
 	logWriter struct {
-	}
-
-	formdata struct {
-		Acs          string
-		Samlresponse string
-		RelayState   string
-		WsFed        bool
-		Ard          template.JS
 	}
 
 	AttributeReleaseData struct {
@@ -164,12 +153,13 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	config = wayfHybridConfig{Path: "/opt/wayf/"}
-	remap  = map[string]idpsppair{}
+	config = WayfHybridConfig{Path: "/opt/wayf/"}
+    X      = &config
+
+	remap = map[string]idpsppair{}
 
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
 	debify        = regexp.MustCompile("^((?:https?://)?)(?:(?:(?:birk|krib)\\.wayf\\.dk/(?:birk\\.php|[a-f0-9]{40})/)|(?:urn:oid:1.3.6.1.4.1.39153:42:))(.+)$")
-	deproxy       = regexp.MustCompile("(.+)-proxy$")
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
 	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
 	aauscope      = regexp.MustCompile(`[@\.]aau\.dk$`)
@@ -180,11 +170,11 @@ var (
 	session = wayfHybridSession{}
 
 	sloInfoCookie, authnRequestCookie *securecookie.SecureCookie
-	postForm, attributeReleaseForm    *template.Template
+	attributeReleaseForm    *template.Template
 	hashKey                           []byte
 	hostName                          string
 
-	hubRequestedAttributes *goxml.Xp
+	hubRequestedAttributes, hubMd *goxml.Xp
 
 	Md        MdSets
 	basic2uri map[string]attrName
@@ -238,7 +228,7 @@ func Main() {
 	}
 
 	metadataUpdateGuard = make(chan int, 1)
-	postForm = template.Must(template.New("PostForm").Parse(config.PostFormTemplate))
+	gosaml.PostForm = template.Must(template.New("PostForm").Parse(config.PostFormTemplate))
 	attributeReleaseForm = template.Must(template.New("AttributeRelease").Parse(config.AttributeReleaseTemplate))
 
 	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
@@ -274,7 +264,7 @@ func Main() {
 		webMdMap[md.Short] = m
 	}
 
-	hubMd, err := Md.Hub.MDQ(config.HubEntityID)
+	hubMd, err = Md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
 		panic(err)
 	}
@@ -306,6 +296,7 @@ func Main() {
 	}
 
 	httpMux.Handle("/production", appHandler(OkService))
+	httpMux.Handle("/hsmstatus", appHandler(HSMStatus))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.Sso_Service, appHandler(SSOService))
 	httpMux.Handle(config.Idpslo, appHandler(IdPSLOService))
@@ -410,6 +401,14 @@ func (writer logWriter) Write(bytes []byte) (int, error) {
 	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ")+string(bytes))
 }
 
+func birkify(idp string) (birk string) {
+	birk = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
+	if birk == idp {
+		birk = "urn:oid:1.3.6.1.4.1.39153:42:" + idp
+	}
+    return
+}
+
 func legacyLog(stat, tag, idp, sp, hash string) {
 	log.Printf("5 %s[%d] %s %s %s %s\n", stat, time.Now().UnixNano(), tag, idp, sp, hash)
 }
@@ -441,6 +440,12 @@ func prepareTables(attrs *goxml.Xp) {
 }
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	remoteAddr := r.RemoteAddr
+	if ra, ok := r.Header["X-Forwarded-For"]; ok {
+		remoteAddr = ra[0]
+	}
+
+	log.Printf("%s %s %s %+v", remoteAddr, r.Method, r.Host, r.URL)
 	starttime := time.Now()
 	err := fn(w, r)
 
@@ -453,11 +458,6 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), status)
 	} else {
 		err = fmt.Errorf("OK")
-	}
-
-	remoteAddr := r.RemoteAddr
-	if ra, ok := r.Header["X-Forwarded-For"]; ok {
-		remoteAddr = ra[0]
 	}
 
 	log.Printf("%s %s %s %+v %1.3f %d %s", remoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
@@ -554,6 +554,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	idp := r.Form.Get("idpentityid")
 	idpList := r.Form.Get("idplist")
 	login := r.Form.Get("login") == "1"
+
 	if login || idp != "" || idpList != "" {
 
 		if err != nil {
@@ -576,7 +577,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, scoping)
+		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, scoping, "")
 
 		options := []struct{ name, path, value string }{
 			{"isPassive", "./@IsPassive", "true"},
@@ -608,18 +609,18 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return nil
 	} else if r.Form.Get("logout") == "1" || r.Form.Get("logoutresponse") == "1" {
-		destinationMdSet := Md.Internal
-		issuerMdSet := Md.Hub
-		if r.Form.Get("external") == "1" {
-			destinationMdSet = Md.ExternalSP
-			issuerMdSet = Md.ExternalIdP
+		spMd, _, err := gosaml.FindInMetadataSets(gosaml.MdSets{Md.Internal, Md.ExternalSP}, r.Form.Get("destination"))
+		if err != nil {
+		    return err
 		}
-		destination, _ := destinationMdSet.MDQ(r.Form.Get("destination"))
-		issuer, _ := issuerMdSet.MDQ(r.Form.Get("issuer"))
+		idpMd, _, err := gosaml.FindInMetadataSets(gosaml.MdSets{Md.Hub, Md.ExternalIdP}, r.Form.Get("issuer"))
+		if err != nil {
+		    return err
+		}
 		if r.Form.Get("logout") == "1" {
-			SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), destination, issuer, string(pk))
+			gosaml.SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, string(pk))
 		} else {
-			SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), destination, issuer)
+			gosaml.SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, string(pk))
 		}
 	} else if r.Form.Get("SAMLRequest") != "" || r.Form.Get("SAMLResponse") != "" {
 		// try to decode SAML message to ourselves or just another SP
@@ -638,7 +639,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		var vals []attrValue
 		protocol := response.QueryString(nil, "local-name(/*)")
 		if protocol == "Response" {
-			_, _, _, _, err = checkScope(response, issuerMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
+            if _, err = requestHandler(response, issuerMd, destinationMd); err != nil {
+                return err
+            }
+			err = wayfScopeCheck(response, issuerMd)
 			if err != nil {
 				messages = err.Error()
 			}
@@ -693,189 +697,56 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 }
 
 // checkForCommonFederations checks for common federation in sp and idp
-func checkForCommonFederations(idpMd, spMd *goxml.Xp) (err error) {
-	idpFeds := idpMd.QueryMulti(nil, xprefix+"feds")
-	tmp := idpFeds[:0]
-	for _, federation := range idpFeds {
-		fed := allowedInFeds.ReplaceAllLiteralString(strings.TrimSpace(federation), "")
-		tmp = append(tmp, strconv.Quote(fed))
-	}
-	idpFedsQuery := strings.Join(idpFeds, " or .=")
-	commonFeds := spMd.QueryMulti(nil, xprefix+`feds[.=`+idpFedsQuery+`]`)
-	if len(commonFeds) == 0 {
+func checkForCommonFederations(response *goxml.Xp) (err error) {
+    if response.Query1(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name='commonfederations']/saml:AttributeValue[1]") != "true" {
 		err = fmt.Errorf("no common federations")
+    }
+	return
+}
+
+func wayfScopeCheck(response, idpMd *goxml.Xp) (err error) {
+	as := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+	if response.QueryBool(as, "count(saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue) != 1") {
+		err = fmt.Errorf("isRequired: eduPersonPrincipalName")
 		return
+	}
+
+	eppn := response.Query1(as, "saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	securitydomain := response.Query1(as, "./saml:Attribute[@Name='securitydomain']/saml:AttributeValue")
+	if securitydomain == "" {
+		err = fmt.Errorf("not a scoped value: %s", eppn)
+		return
+	}
+
+	if idpMd.QueryBool(nil, "count(//shibmd:Scope[.="+strconv.Quote(securitydomain)+"]) = 0") {
+		err = fmt.Errorf("security domain '%s' does not match any scopes", securitydomain)
+		return
+	}
+
+	subsecuritydomain := response.Query1(as, "./saml:Attribute[@Name='subsecuritydomain']/saml:AttributeValue")
+	for _, epsa := range response.QueryMulti(as, "./saml:Attribute[@Name='eduPersonScopedAffiliation']/saml:AttributeValue") {
+		epsaparts := scoped.FindStringSubmatch(epsa)
+		if len(epsaparts) != 3 {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
+			return
+		}
+		domain := epsaparts[1] + epsaparts[2]
+		if domain != subsecuritydomain && !strings.HasSuffix(domain, "."+subsecuritydomain) {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security sub domain", epsa, subsecuritydomain)
+			return
+		}
 	}
 	return
 }
 
 func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk bool) (ard AttributeReleaseData, err error) {
 	ard = AttributeReleaseData{IdPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
-	idp := debify.ReplaceAllString(idpMd.Query1(nil, "@entityID"), "$1$2")
+	idp := idpMd.Query1(nil, "@entityID")
 
-	base64encodedIn := idpMd.QueryXMLBool(nil, xprefix+"base64attributes")
-
-	switch idp {
-	case "https://nemlogin.wayf.dk":
-		base64encodedIn = false
-		nemloginAttributeHandler(response)
-	case "https://eidasconnector.test.eid.digst.dk/idp":
-		eidasAttributeHandler(response)
-	default:
-	}
-
-	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
-	destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
-	//response.QueryDashP(destinationAttributes, "@xmlns:xs", "http://www.w3.org/2001/XMLSchema", nil)
-
-	attCS := hubMd.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService")[0]
-
-	// First check for required and multiplicity
-	requestedAttributes := hubMd.Query(attCS, `md:RequestedAttribute[not(@computed)]`) // [@isRequired='true' or @isRequired='1']`)
-	for _, requestedAttribute := range requestedAttributes {
-		name := hubMd.Query1(requestedAttribute, "@Name")
-		friendlyName := hubMd.Query1(requestedAttribute, "@FriendlyName")
-		singular := hubMd.QueryBool(requestedAttribute, "boolean(@singular)")
-		isRequired := hubMd.QueryBool(requestedAttribute, "boolean(@isRequired)")
-
-		// accept attributes in both uri and basic format
-		attributesValues := response.QueryMulti(sourceAttributes, `saml:Attribute[@Name=`+strconv.Quote(name)+` or @Name=`+strconv.Quote(friendlyName)+`]/saml:AttributeValue`)
-		if len(attributesValues) == 0 && isRequired {
-			err = fmt.Errorf("isRequired: %s", friendlyName)
-			return
-		}
-		if len(attributesValues) > 1 && singular {
-			err = fmt.Errorf("multiple values for singular attribute: %s", name)
-			return
-		}
-		if len(attributesValues) == 0 {
-			continue
-		}
-		attr := response.QueryDashP(destinationAttributes, `saml:Attribute[@Name=`+strconv.Quote(name)+`]`, "", nil)
-		response.QueryDashP(attr, `@FriendlyName`, friendlyName, nil)
-		response.QueryDashP(attr, `@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
-
-		index := 1
-		for _, value := range attributesValues {
-			if base64encodedIn {
-				v, _ := base64.StdEncoding.DecodeString(value)
-				value = string(v)
-			}
-			response.QueryDashP(attr, "saml:AttributeValue["+strconv.Itoa(index)+"]", value, nil)
-			index++
-		}
-	}
-
-	goxml.RmElement(sourceAttributes)
-
-	// check that the security domain of eppn is one of the domains in the shib:scope list
-	// we just check that everything after the (leftmost|rightmost) @ is in the scope list and save the value for later
-	eppn, eppnForEptid, securitydomain, epsas, err := checkScope(response, idpMd, destinationAttributes, true)
-	if err != nil {
+	if err = wayfScopeCheck(response, idpMd); err != nil {
 		return
 	}
 
-	val := idpMd.Query1(nil, xprefix+"wayf_schacHomeOrganizationType")
-	setAttribute("schacHomeOrganizationType", val, response, destinationAttributes)
-
-	val = idpMd.Query1(nil, xprefix+"wayf_schacHomeOrganization")
-	setAttribute("schacHomeOrganization", val, response, destinationAttributes)
-
-	if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="displayName"]/saml:AttributeValue`) == "" {
-		if cn := response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="cn"]/saml:AttributeValue`); cn != "" {
-			setAttribute("displayName", cn, response, destinationAttributes)
-		}
-	}
-
-	// Use kribified?, use birkified?
-	idpPEID := idp
-	if tmp := idpMd.Query1(nil, xprefix+"persistentEntityID"); tmp != "" {
-		idpPEID = tmp
-	}
-
-	sp := spMd.Query1(nil, "@entityID")
-	spPEID := sp
-	if tmp := spMd.Query1(nil, xprefix+"persistentEntityID"); tmp != "" {
-		spPEID = tmp
-	}
-	spPEID = deproxy.ReplaceAllString(debify.ReplaceAllString(spPEID, "$1$2"), "$1") // Transition hack - old BIRK new hub interaction
-
-	uidhashbase := "uidhashbase" + config.EptidSalt
-	uidhashbase += strconv.Itoa(len(idpPEID)) + ":" + idpPEID
-	uidhashbase += strconv.Itoa(len(spPEID)) + ":" + spPEID
-	uidhashbase += strconv.Itoa(len(eppnForEptid)) + ":" + eppnForEptid
-	uidhashbase += config.EptidSalt
-
-	hash := sha1.Sum([]byte(uidhashbase))
-	eptid := "WAYF-DK-" + hex.EncodeToString(append(hash[:]))
-	setAttribute("eduPersonTargetedID", eptid, response, destinationAttributes)
-
-	for _, cpr := range response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="schacPersonalUniqueID"]`) {
-		// schacPersonalUniqueID is multi - use the first DK cpr found
-		if matches := dkcprpreg.FindStringSubmatch(cpr); len(matches) > 0 {
-			cpryear, _ := strconv.Atoi(matches[3])
-			c7, _ := strconv.Atoi(matches[4])
-			year := strconv.Itoa(yearfromyearandcifferseven(cpryear, c7))
-			if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacDateOfBirth"]`) == "" {
-				setAttribute("schacDateOfBirth", year+matches[2]+matches[1], response, destinationAttributes)
-			}
-			if response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="schacYearOfBirth"]`) == "" {
-				setAttribute("schacYearOfBirth", year, response, destinationAttributes)
-			}
-			break
-		}
-	}
-
-	// primaryaffiliation => affiliation
-	eppa := response.Query1(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonPrimaryAffiliation"]/saml:AttributeValue`)
-	epas := response.QueryMulti(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue`)
-	if eppa != "" {
-		epas = append([]string{eppa}, epas...)
-	}
-
-	for _, epa := range epas {
-		switch epa {
-		case "student", "faculty", "staff", "employee":
-			epas = append(epas, "member")
-			break
-		}
-	}
-
-	name := hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonAffiliation"]/@Name`)
-	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@Name`, name, nil)
-	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
-
-	seenEpas := make(map[string]bool)
-	i := 1
-	for _, epa := range epas {
-		if seenEpas[epa] {
-			continue
-		}
-		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i)+`]`, epa, nil)
-		i += 1
-		seenEpas[epa] = true
-		epsas = append(epsas, epa+"@"+securitydomain)
-	}
-
-	name = hubMd.Query1(attCS, `md:RequestedAttribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`)
-	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@Name`, name, nil)
-	response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
-
-	seenEpsas := make(map[string]bool)
-	i = 1
-	for _, epsa := range epsas {
-		if seenEpsas[epsa] {
-			continue
-		}
-		response.QueryDashP(destinationAttributes, `saml:Attribute[@FriendlyName="eduPersonScopedAffiliation"]/saml:AttributeValue[`+strconv.Itoa(i)+`]`, epsa, nil)
-		i += 1
-		seenEpsas[epsa] = true
-	}
-
-	// legal affiliations 'student', 'faculty', 'staff', 'affiliate', 'alum', 'employee', 'library-walk-in', 'member'
-	// affiliations => scopedaffiliations
-	// Fill out the info needed for AttributeReleaseData
-	// to-do add value filtering
 	arp := spMd.QueryMulti(nil, "md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute/@Name")
 	arpmap := make(map[string]bool)
 	for _, attrName := range arp {
@@ -885,10 +756,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard.IdPDisplayName["en"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
 	ard.IdPDisplayName["da"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
 	ard.IdPLogo = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
-	ard.IdPEntityID = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
-	if ard.IdPEntityID == idp {
-		ard.IdPEntityID = "urn:oid:1.3.6.1.4.1.39153:42:" + idp
-	}
+	ard.IdPEntityID = idp
 	ard.SPDisplayName["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
 	ard.SPDisplayName["da"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
 	ard.SPDescription["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`)
@@ -915,6 +783,7 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		}
 		legacyStatJsonLog(jsonlog)
 	}
+	eppn := response.Query1(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
 	hashedEppn := fmt.Sprintf("%x", goxml.Hash(crypto.SHA256, config.SaltForHashedEppn+eppn))
 	legacyStatLog("saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
 	return
@@ -922,73 +791,28 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
 	// we ignore the qualifiers and use the idp and sp entityIDs
-	_, _, _, _, err = checkScope(response, idpMd, response.Query(nil, `./saml:Assertion/saml:AttributeStatement`)[0], false)
-	if err != nil {
+	as := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+	securitydomain := response.Query1(as, "./saml:Attribute[@Name='securitydomain']/saml:AttributeValue")
+	if idpMd.QueryBool(nil, "count(//shibmd:Scope[.="+strconv.Quote(securitydomain)+"]) = 0") {
+		err = fmt.Errorf("security domain '%s' does not match any scopes", securitydomain)
 		return
 	}
-	eptid := response.Query1(nil, "./saml:Assertion/saml:Subject/saml:NameID[@Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent']")
-	if eptid == "" {
-		eptid = response.Query1(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.10' or @Name='eduPersonTargetedID']/saml:AttributeValue/saml:NameID")
-	}
 
-	if eptid != "" { // convert to WAYF format eptid - legacy ...
-		idp := idpMd.Query1(nil, "@entityID")
-		sp := spMd.Query1(nil, "@entityID")
-		if tmp := spMd.Query1(nil, xprefix+"persistentEntityID"); tmp != "" {
-			sp = tmp
+	for _, epsa := range response.QueryMulti(as, "./saml:Attribute[@Name='eduPersonScopedAffiliation']/saml:AttributeValue") {
+		epsaparts := scoped.FindStringSubmatch(epsa)
+		if len(epsaparts) != 3 {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
+			return
 		}
-
-		uidhashbase := "uidhashbase" + config.EptidSalt
-		uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
-		uidhashbase += strconv.Itoa(len(sp)) + ":" + sp
-		uidhashbase += strconv.Itoa(len(eptid)) + ":" + eptid
-		uidhashbase += config.EptidSalt
-
-		hash := sha1.Sum([]byte(uidhashbase))
-		eptid = "WAYF-DK-" + hex.EncodeToString(append(hash[:]))
-		response.QueryDashP(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonTargetedID"]/saml:AttributeValue`, eptid, nil)
+		domain := epsaparts[1] + epsaparts[2]
+		if domain != securitydomain {
+			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security domain", epsa, securitydomain)
+			return
+		}
 	}
+
 	ard = AttributeReleaseData{BypassConfirmation: true}
 	return
-}
-
-// nemloginAttributeHandler handles nemlogin attributes
-func nemloginAttributeHandler(response *goxml.Xp) {
-	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.3"]/saml:AttributeValue`)
-	names := strings.Split(value, " ")
-	l := len(names) - 1
-	//setAttribute("cn", value, response, sourceAttributes) // already there
-	setAttribute("gn", strings.Join(names[0:l], " "), response, sourceAttributes)
-	// sn seems to be empty from from Nemlog-in - remove it
-	response.Rm(sourceAttributes, `./saml:Attribute[@Name="urn:oid:2.5.4.4"]`)
-	setAttribute("sn", names[l], response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.1"]/saml:AttributeValue`)
-	setAttribute("eduPersonPrincipalName", value+"@sikker-adgang.dk", response, sourceAttributes)
-	//value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="urn:oid:0.9.2342.19200300.100.1.3"]/saml:AttributeValue`)
-	//setAttribute("mail", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:AssuranceLevel"]/saml:AttributeValue`)
-	setAttribute("eduPersonAssurance", value, response, sourceAttributes)
-	if value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:CprNumberIdentifier"]/saml:AttributeValue`); value != "" {
-		setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"+value, response, sourceAttributes)
-	}
-	setAttribute("eduPersonPrimaryAffiliation", "member", response, sourceAttributes)
-	setAttribute("organizationName", "NemLogin", response, sourceAttributes)
-}
-
-// eidasAttributeHandler handles eidas attributes
-func eidasAttributeHandler(response *goxml.Xp) {
-	sourceAttributes := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement`)[0]
-	value := response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:CurrentFamilyName"]/saml:AttributeValue`)
-	setAttribute("gn", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:CurrentGivenName"]/saml:AttributeValue`)
-	setAttribute("sn", value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:PersonIdentifier"]/saml:AttributeValue`)
-	setAttribute("eduPersonPrincipalName", value+"@eidasconnector.test.eid.digst.dk", response, sourceAttributes)
-	setAttribute("schacPersonalUniqueID", "urn:mace:terena.org:schac:personalUniqueID:dk:PersonIdentifier:"+value, response, sourceAttributes)
-	value = response.Query1(sourceAttributes, `./saml:Attribute[@Name="dk:gov:saml:attribute:eidas:naturalperson:DateOfBirth"]/saml:AttributeValue`)
-	setAttribute("schacDateOfBirth", value, response, sourceAttributes)
-	setAttribute("organizationName", "eIDAS", response, sourceAttributes)
 }
 
 /* see http://www.cpr.dk/cpr_artikler/Files/Fil1/4225.pdf or http://da.wikipedia.org/wiki/CPR-nummer for algorithm */
@@ -1016,15 +840,17 @@ func yearfromyearandcifferseven(year, c7 int) int {
 }
 
 func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
-	attr := response.QueryDashP(element, `/saml:Attribute[@Name=`+strconv.Quote(basic2uri[name].uri)+`]`, "", nil)
-	response.QueryDashP(attr, `./@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:uri", nil)
-	response.QueryDashP(attr, `./@FriendlyName`, name, nil)
+	attr := response.QueryDashP(element, `/saml:Attribute[@Name="`+name+`"]`, "", nil)
 	values := len(response.Query(attr, `./saml:AttributeValue`)) + 1
 	response.QueryDashP(attr, `./saml:AttributeValue[`+strconv.Itoa(values)+`]`, value, nil)
 }
 
 func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
+}
+
+func HSMStatus(w http.ResponseWriter, r *http.Request) (err error) {
+	return goeleven.HSMStatus()
 }
 
 // VeryVeryPoorMansScopingService handles poors man scoping
@@ -1037,9 +863,24 @@ func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err
 	return
 }
 
-func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLists [][]string) (idp string) {
+func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp) (idp string) {
+    defer func () { idp = debify.ReplaceAllString(idp, "$1$2") }()
+	if idp = idpMd.Query1(nil, "@entityID"); idp != config.HubEntityID {
+		return
+	}
 	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
 	data := url.Values{}
+	vvpmss := ""
+	if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
+		vvpmss = tmp.Value
+	}
+
+	idpLists := [][]string{
+		spMd.QueryMulti(nil, xprefix+"IDPList"),
+		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
+		{r.URL.Query().Get("idpentityid")},
+		strings.Split(r.URL.Query().Get("idplist"), ","),
+		strings.Split(vvpmss, ",")}
 
 	for _, idpList := range idpLists {
 		switch len(idpList) {
@@ -1047,7 +888,7 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 			continue
 		case 1:
 			if idpList[0] != "" {
-				return idpList[0]
+		        return idpList[0]
 			}
 		default:
 			data.Set("idplist", strings.Join(idpList, ","))
@@ -1059,59 +900,34 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd *goxml.Xp, idpLi
 	data.Set("returnIDParam", "idpentityid")
 	data.Set("entityID", sp)
 	http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
-	return
+	return "" // needed to tell our caller to return for discovery ...
 }
 
 // SSOService handles single sign on requests
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	request, spMd, hubIdpMd, relayState, spIndex, hubIdpIndex, err := gosaml.ReceiveAuthnRequest(r, intExtSP, hubExtIdP, "https://"+r.Host+r.URL.Path)
+	request, spMd, hubBirkMd, relayState, spIndex, hubBirkIndex, err := gosaml.ReceiveAuthnRequest(r, intExtSP, hubExtIdP, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
 	}
 
-	hubIdp := hubIdpMd.Query1(nil, "@entityID") // birk or hub entityid, hub will be fixed below
-	idp := hubIdp                               // we need to keep the original 'Destination' around in hubIdp, idp will become a backend idp after discovery
-	idpMd := hubIdpMd
-	idpIndex := 1
-
-	if hubIdpIndex == 0 { // Request to hub - do Scoping/Discovery
-		vvpmss := ""
-		if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
-			vvpmss = tmp.Value
-		}
-
-		idpLists := [][]string{
-			spMd.QueryMulti(nil, xprefix+"IDPList"),
-			request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
-			{r.URL.Query().Get("idpentityid")},
-			strings.Split(r.URL.Query().Get("idplist"), ","),
-			strings.Split(vvpmss, ",")}
-
-		idp = wayf(w, r, request, spMd, idpLists)
-		if idp == "" {
-			return
-		}
-		idp = debify.ReplaceAllString(idp, "$1$2")
-		idpMd, idpIndex, err = gosaml.FindInMetadataSets(intExtIdP, idp)
-		if err != nil {
-			return
-		}
+	idp := wayf(w, r, request, spMd, hubBirkMd)
+	q.Q(idp)
+	if idp == "" {
+		return
+	}
+	idpMd, idpIndex, err := gosaml.FindInMetadataSets(intExtIdP, idp) // find internal if birk'ified
+	if err != nil {
+		return
 	}
 
 	// check for common feds before remapping!
-	if err = checkForCommonFederations(spMd, idpMd); err != nil {
-		return err
-	}
+    if _, err = RequestHandler(request, idpMd, spMd); err != nil {
+        return
+    }
 
-	var hubSPMd *goxml.Xp
-	if idpIndex == hubIdpIndex { // Hub to Int or Birk
-		idp = debify.ReplaceAllString(idp, "$1$2")
-		idpMd, err = Md.Internal.MDQ(idp)
-		if err != nil {
-			return
-		}
-
+    var hubSPMd *goxml.Xp
+	if idpIndex == 0 { // to internal IdP - also via BIRK
 		mappedSP := idpMd.Query1(nil, xprefix+"map2SP")
 		if mappedSP == "" {
 			mappedSP = config.HubEntityID
@@ -1129,25 +945,22 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 				return
 			}
 		}
-	} else { // Krib request to ext IdP
+	} else { // to external IdP - send as KRIB
 		hubSPMd, err = Md.ExternalSP.MDQ(spMd.Query1(nil, "@entityID"))
 		if err != nil {
 			return
 		}
 	}
 
-	err = sendRequestToIdP(w, r, request, hubSPMd, idpMd, hubIdp, relayState, "SSO-", "", config.Domain, spIndex, hubIdpIndex, nil)
+	err = sendRequestToIdP(w, r, request, hubSPMd, idpMd, idp, relayState, "SSO-", "", config.Domain, spIndex, hubBirkIndex, nil)
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, hubIdp, relayState, prefix, altAcs, domain string, spIndex, hubIdpIndex int, idPList []string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, idp, relayState, prefix, altAcs, domain string, spIndex, hubIdpIndex int, idPList []string) (err error) {
 	// why not use orig request?
-	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList)
+	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList, altAcs)
 	if err != nil {
 		return
-	}
-	if altAcs != "" {
-		newrequest.QueryDashP(nil, "./@AssertionConsumerServiceURL", altAcs, nil)
 	}
 
 	if idpMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) {
@@ -1165,7 +978,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		Nid:   id,
 		Id:    request.Query1(nil, "./@ID"),
 		Is:    request.Query1(nil, "./saml:Issuer"),
-		De:    hubIdp,
+		De:    idp,
 		Fo:    gosaml.NameIDMap[request.Query1(nil, "./samlp:NameIDPolicy/@Format")],
 		Acs:   request.Query1(nil, "./@AssertionConsumerServiceIndex"),
 		SPi:   spIndex,
@@ -1189,10 +1002,6 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 		algo = sigAlg
 	}
 
-	if idpMd.Query1(nil, "@entityID") == "https://eidasconnector.test.eid.digst.dk/idp" {
-		eIdasExtras(newrequest)
-	}
-
 	u, err := gosaml.SAMLRequest2Url(newrequest, relayState, string(privatekey), "-", algo)
 	if err != nil {
 		return
@@ -1204,7 +1013,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 			"action": "receive",
 			"type":   "samlp:AuthnRequest",
 			"src":    request.Query1(nil, "./saml:Issuer"),
-			"us":     hubIdp,
+			"us":     idp,
 			"ip":     r.RemoteAddr,
 			"ts":     strconv.FormatInt(time.Now().Unix(), 10),
 			"host":   hostName,
@@ -1218,30 +1027,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	return
 }
 
-// eIdasExtras
-func eIdasExtras(request *goxml.Xp) {
-	request.QueryDashP(nil, "@ForceAuthn", "true", nil)
-	request.QueryDashP(nil, "@IsPassive", "false", nil)
-	request.Rm(nil, "@ProtocolBinding")
-	request.Rm(nil, "@AssertionConsumerServiceURL")
-	//        nameIDPolicyNode := request.Query(nil, "./samlp:NameIDPolicy")[0]
-	//        extensions := request.QueryDashP(nil, "./samlp:Extensions", "", nameIDPolicyNode)
-	//        request.QueryDashP(extensions, "./eidas:SPType", "public", nil)
-	//        ras := request.QueryDashP(extensions, "./eidas:RequestedAttributes", "", nil)
-	//        for i, n := range []string{"CurrentFamilyName", "CurrentGivenName", "DateOfBirth", "PersonIdentifier"} {
-	//            ra := request.QueryDashP(ras, "eidas:RequestedAttribute["+strconv.Itoa(i+1)+"]", "", nil)
-	//            request.QueryDashP(ra, "./@FriendlyName", n, nil)
-	//            request.QueryDashP(ra, "@Name", "dk:gov:saml:attribute:eidas:naturalperson:"+n, nil)
-	//            request.QueryDashP(ra, "@NameFormat", "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
-	//            request.QueryDashP(ra, "@isRequired", "true", nil)
-	//        }
-	request.Rm(nil, "./samlp:NameIDPolicy")
-	//request.QueryDashP(nil, "samlp:NameIDPolicy/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
-	request.QueryDashP(nil, `samlp:RequestedAuthnContext[@Comparison="minimum"]/saml:AuthnContextClassRef`, "http://eidas.europa.eu/LoA/high", nil)
-	return
-}
-
-func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, issuerMdSets, destinationMdSets gosaml.MdSets, prefix string) (spMd, idpMd, request *goxml.Xp, sRequest samlRequest, err error) {
+func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, issuerMdSets, destinationMdSets gosaml.MdSets, prefix string) (spMd, hubIdp, idpMd, request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFileIfTracing(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
 	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
@@ -1250,23 +1036,30 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	}
 	// to minimize the size of the cookies we have saved the original request in a json'ed struct
 	err = json.Unmarshal(value, &sRequest)
+
 	if inResponseTo != sRequest.Nid {
 		err = fmt.Errorf("response.InResponseTo != request.ID")
 		return
 	}
 
 	if sRequest.Id == "" { // This is a non-hub request - no original actual original request - just checking if response/@InResponseTo == request/@ID
-		return nil, nil, nil, sRequest, nil
+		return nil, nil, nil, nil, sRequest, nil
 	}
 
-	spMd, err = issuerMdSets[sRequest.SPi].MDQ(sRequest.Is)
-	if err != nil {
+	if spMd, err = issuerMdSets[sRequest.SPi].MDQ(sRequest.Is); err != nil {
 		return
 	}
 
-	idpMd, err = destinationMdSets[sRequest.Hubi].MDQ(sRequest.De)
-	if err != nil {
-		return
+	if idpMd, err = Md.ExternalIdP.MDQ(sRequest.De); err != nil { // Always BIRK - for getting the right cert,  contains same info as internal - try first with std. name
+        if idpMd, err = Md.ExternalIdP.MDQ(birkify(sRequest.De)); err != nil {
+		    return
+		}
+	}
+	hubIdp = idpMd          // who to send the response as - BIRK
+	if sRequest.Hubi == 0 { // or hub is request was to the hub
+		if hubIdp, err = Md.Hub.MDQ(config.HubEntityID); err != nil {
+			return
+		}
 	}
 
 	request = goxml.NewXpFromString("")
@@ -1285,16 +1078,12 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 // ACSService handles all the stuff related to receiving response and attribute handling
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
-	response, idpMd, hubSpMd, relayState, _, hubSpIndex, err := gosaml.ReceiveSAMLResponse(r, intExtIdP, hubExtSP, "https://"+r.Host+r.URL.Path, hubIdpCerts)
+	response, _, hubSpMd, relayState, _, hubSpIndex, err := gosaml.ReceiveSAMLResponse(r, intExtIdP, hubExtSP, "https://"+r.Host+r.URL.Path, hubIdpCerts)
 	if err != nil {
 		return
 	}
-	spMd, hubIdpMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIdP, "SSO-")
+	spMd, hubIdpMd, idpMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIdP, "SSO-")
 	if err != nil {
-		return
-	}
-
-	if err = checkForCommonFederations(idpMd, spMd); err != nil {
 		return
 	}
 
@@ -1303,6 +1092,10 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
+		Attributesc14n(response, idpMd, spMd)
+        if err = checkForCommonFederations(response); err != nil {
+           return
+        }
 		if hubSpIndex == 0 { // to the hub itself
 			ard, err = WayfACSServiceHandler(idpMd, hubRequestedAttributes, spMd, request, response, sRequest.Hubi == 1)
 		} else { // krib
@@ -1313,7 +1106,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if gosaml.DebugSetting(r, "scopingError") != "" {
-			eppnPath := `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonPrincipalName"]/saml:AttributeValue`
+			eppnPath := `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`
 			response.QueryDashP(nil, eppnPath, response.Query1(nil, eppnPath)+"1", nil)
 		}
 
@@ -1323,11 +1116,11 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameid := gosaml.Id()
 		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
-		// The response at this time contains a full attribute set
+		// The response (but not newreponse) at this time contains a full attribute set
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
 		nameidformatMap := map[string]string{gosaml.Persistent: "eduPersonTargetedID", gosaml.Email: "eduPersonPrincipalName"}
-		if friendlyname, ok := nameidformatMap[nameidformat]; ok {
-			nameid = response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="`+friendlyname+`"]/saml:AttributeValue`)
+		if name, ok := nameidformatMap[nameidformat]; ok {
+			nameid = response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="`+name+`"]/saml:AttributeValue`)
 		}
 
 		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
@@ -1335,7 +1128,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
 		if spMd.QueryBool(nil, "count("+xprefix+"feds[.='eduGAIN']) > 0") {
-			if eptidAttr := newresponse.Query(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@FriendlyName="eduPersonTargetedID"]`); eptidAttr != nil {
+			if eptidAttr := newresponse.Query(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="urn:oid:1.3.6.1.4.1.5923.1.1.1.10"]`); eptidAttr != nil {
 				value := newresponse.Query1(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.Rm(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID", value, nil)
@@ -1360,8 +1153,6 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			signingType = gosaml.WSFedSign
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
 		}
-
-		handleAttributeNameFormat(newresponse, spMd)
 
 		for _, q := range elementsToSign {
 			err = gosaml.SignResponse(newresponse, q, hubIdpMd, signingMethod, signingType)
@@ -1411,7 +1202,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	} else {
 		samlResponse = base64.StdEncoding.EncodeToString(newresponse.Dump())
 	}
-	data := formdata{WsFed: sRequest.WsFed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
+	data := gosaml.Formdata{WsFed: sRequest.WsFed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
 	attributeReleaseForm.Execute(w, data)
 	return
 }
@@ -1429,6 +1220,14 @@ func BirkSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 // KribSLOService refers to krib single logout service. Takes request as a parameter and returns an error if any
 func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, Md.ExternalIdP, Md.ExternalSP, []gosaml.Md{Md.Hub}, []gosaml.Md{Md.Internal}, gosaml.SPRole, "SLO")
+}
+
+func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
+	return gosaml.Jwt2saml(w, r, Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP, RequestHandler, hubMd)
+}
+
+func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
+	return gosaml.Saml2jwt(w, r, Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP, RequestHandler, config.HubEntityID, true)
 }
 
 // IdPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
@@ -1456,7 +1255,12 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			if role == gosaml.IdPRole { // reverse if we are getting the request from a SP
 				sloinfo.Is, sloinfo.De = sloinfo.De, sloinfo.Is
 			}
-			finalIssuer, finalDestination, err := findMdPair(finalIssuerMdSets, finalDestinationMdSets, "{sha1}"+sloinfo.Is, "{sha1}"+sloinfo.De)
+
+			finalIssuer, _, err := gosaml.FindInMetadataSets(finalIssuerMdSets, "{sha1}"+sloinfo.Is)
+			if err != nil {
+				return err
+			}
+			finalDestination, _, err := gosaml.FindInMetadataSets(finalDestinationMdSets, "{sha1}"+sloinfo.De)
 			if err != nil {
 				return err
 			}
@@ -1464,7 +1268,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			sloinfo.Is = finalIssuer.Query1(nil, "./@entityID")
 			sloinfo.De = finalDestination.Query1(nil, "./@entityID")
 
-			newRequest, err := gosaml.NewLogoutRequest(finalIssuer, finalDestination, request, sloinfo, role)
+			newRequest, binding, err := gosaml.NewLogoutRequest(finalDestination, sloinfo, role)
 			if err != nil {
 				return err
 			}
@@ -1486,15 +1290,20 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 				algo = sigAlg
 			}
-
-			u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", algo)
-			http.Redirect(w, r, u.String(), http.StatusFound)
+			switch binding {
+			case gosaml.REDIRECT:
+				u, _ := gosaml.SAMLRequest2Url(newRequest, relayState, string(privatekey), "-", algo)
+				http.Redirect(w, r, u.String(), http.StatusFound)
+			case gosaml.POST:
+				data := gosaml.Formdata{Acs: newRequest.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(newRequest.Dump())}
+				gosaml.PostForm.Execute(w, data)
+			}
 		} else {
 			err = fmt.Errorf("no Logout info found")
 			return err
 		}
 	} else if _, ok := r.Form["SAMLResponse"]; ok {
-		response, issuer, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
+		_, issuer, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
 		if err != nil {
 			return err
 		}
@@ -1506,7 +1315,12 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		legacyStatLog("saml20-idp-SLO "+res[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), "")
 
 		request := goxml.NewXp(value)
-		issuerMd, destinationMd, err := findMdPair(finalIssuerMdSets, finalDestinationMdSets, request.Query1(nil, "@Destination"), request.Query1(nil, "./saml:Issuer"))
+
+		issuerMd, _, err := gosaml.FindInMetadataSets(finalIssuerMdSets, request.Query1(nil, "@Destination"))
+		if err != nil {
+			return err
+		}
+		destinationMd, _, err := gosaml.FindInMetadataSets(finalDestinationMdSets, request.Query1(nil, "./saml:Issuer"))
 		if err != nil {
 			return err
 		}
@@ -1516,7 +1330,10 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			return err
 		}
 
-		newResponse := gosaml.NewLogoutResponse(issuerMd, destinationMd, request, response)
+		newResponse, binding, err := gosaml.NewLogoutResponse(issuerMd, destinationMd, request, role)
+		if err != nil {
+			return err
+		}
 
 		privatekey, err := gosaml.GetPrivateKey(issuerMd)
 
@@ -1529,29 +1346,18 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
 			algo = sigAlg
 		}
-
-		u, _ := gosaml.SAMLRequest2Url(newResponse, relayState, string(privatekey), "-", algo)
-		http.Redirect(w, r, u.String(), http.StatusFound)
 		// forward the LogoutResponse to orig sender
+		switch binding {
+		case gosaml.REDIRECT:
+			u, _ := gosaml.SAMLRequest2Url(newResponse, relayState, string(privatekey), "-", algo)
+			http.Redirect(w, r, u.String(), http.StatusFound)
+		case gosaml.POST:
+			data := gosaml.Formdata{Acs: newResponse.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(newResponse.Dump())}
+			gosaml.PostForm.Execute(w, data)
+		}
 	} else {
 		err = fmt.Errorf("no LogoutRequest/logoutResponse found")
 		return err
-	}
-	return
-}
-
-// findMdPair finds a pair of metdata in the metadatasets - both must come from the corresponding paris in the sets
-func findMdPair(finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, issuer, destination string) (issuerMd, destinationMd *goxml.Xp, err error) {
-	for i := range finalIssuerMdSets {
-		issuerMd, err = finalIssuerMdSets[i].MDQ(issuer)
-		if err != nil {
-			continue
-		}
-		destinationMd, err = finalDestinationMdSets[i].MDQ(destination)
-		if err != nil {
-			continue
-		}
-		return
 	}
 	return
 }
@@ -1565,7 +1371,6 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 	var key, idp, sp, spIdPHash string
 	hashIn := fmt.Sprintf("%s-%d-%s", tag, gosaml.SPRole, idHash(samlIn.Query1(nil, "//saml:NameID")))
 	hashOut := fmt.Sprintf("%s-%d-%s", tag, gosaml.IdPRole, idHash(samlOut.Query1(nil, "//saml:NameID")))
-
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
 		switch role {
@@ -1619,13 +1424,13 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		bytes, err := json.Marshal(&unique)
 		session.Set(w, r, spIdPHash, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 
-		slo := gosaml.NewSLOInfo(samlIn, destinationInMd)
+		slo := gosaml.NewSLOInfo(samlIn, destinationInMd.Query1(nil, "@entityID"))
 		slo.Is = idHash(slo.Is)
 		slo.De = idHash(slo.De)
 		bytes, _ = json.Marshal(&slo)
 		session.Set(w, r, hashOut, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 
-		slo = gosaml.NewSLOInfo(samlOut, destinationOutMd)
+		slo = gosaml.NewSLOInfo(samlOut, destinationOutMd.Query1(nil, "@entityID"))
 		slo.Is = idHash(slo.Is)
 		slo.De = idHash(slo.De)
 		bytes, _ = json.Marshal(&slo)
@@ -1640,199 +1445,6 @@ func idHash(data string) string {
 	return fmt.Sprintf("%.5x", sha1.Sum([]byte(data)))
 }
 
-// handleAttributeNameFormat handles attribute name format
-func handleAttributeNameFormat(response, mdsp *goxml.Xp) {
-	requestedattributes := mdsp.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute")
-	attributestatements := response.Query(nil, "(./saml:Assertion/saml:AttributeStatement | ./t:RequestedSecurityToken/saml1:Assertion/saml1:AttributeStatement)")
-	if len(attributestatements) > 0 {
-		attributestatement := attributestatements[0]
-		for _, attr := range requestedattributes {
-			name := mdsp.Query1(attr, "@Name")
-			uriname := basic2uri[name].uri // maps to it self if already in uri format
-			responseattribute := response.Query(attributestatement, "(saml:Attribute[@Name="+strconv.Quote(uriname)+"] | saml1:Attribute[@Name="+strconv.Quote(uriname)+"])")
-			if len(responseattribute) > 0 {
-				switch mdsp.Query1(attr, "@NameFormat") {
-				case basic:
-					response.QueryDashP(responseattribute[0], "@NameFormat", basic, nil)
-					response.QueryDashP(responseattribute[0], "@Name", name, nil)
-				case claims, unspecified:
-					response.QueryDashP(responseattribute[0], "@AttributeNamespace", claims, nil)
-					response.QueryDashP(responseattribute[0], "@AttributeName", basic2uri[name].AttributeName, nil)
-					responseattribute[0].(types.Element).RemoveAttribute("Name")
-					responseattribute[0].(types.Element).RemoveAttribute("NameFormat")
-					responseattribute[0].(types.Element).RemoveAttribute("FriendlyName")
-				}
-			}
-		}
-	}
-}
-
-// CopyAttributes copies the attributes
-func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
-	ardValues = make(map[string][]string)
-	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
-
-	sourceAttributes := sourceResponse.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
-	attrcache := map[string]types.Element{}
-	for _, attr := range sourceAttributes {
-		name := sourceResponse.Query1(attr, "@Name") // always uri, but cache in all 3 formats
-		attrcache[name] = attr.(types.Element)
-		attrcache[basic2uri[name].basic] = attr.(types.Element)
-		attrcache[basic2uri[name].AttributeName] = attr.(types.Element)
-	}
-
-	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
-
-	saml := "saml"
-	assertionList := response.Query(nil, "./saml:Assertion")
-	if len(assertionList) == 0 {
-		saml = "saml1"
-		assertionList = response.Query(nil, "./t:RequestedSecurityToken/saml1:Assertion")
-	}
-	assertion := assertionList[0]
-	destinationAttributes := response.QueryDashP(assertion, saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
-
-	h := sha1.New()
-	for _, requestedAttribute := range requestedAttributes {
-		attribute := attrcache[spMd.Query1(requestedAttribute, "@Name")]
-		if attribute == nil {
-			continue
-		}
-
-		name := sourceResponse.Query1(attribute, "@Name")
-		friendlyName := sourceResponse.Query1(attribute, "@FriendlyName")
-		io.WriteString(h, name)
-		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@Name", name, nil)
-		response.QueryDashP(newAttribute, "@NameFormat", sourceResponse.Query1(attribute, "@NameFormat"), nil)
-		response.QueryDashP(newAttribute, "@FriendlyName", friendlyName, nil)
-		allowedValues := spMd.Query(requestedAttribute, `saml:AttributeValue`)
-		regexps := []*regexp.Regexp{}
-		for _, attr := range allowedValues {
-			tp := ""
-			tpAttribute, _ := attr.(types.Element).GetAttribute("type")
-			if tpAttribute != nil {
-				tp = tpAttribute.Value()
-			}
-			val := attr.NodeValue()
-			var reg string
-			switch tp {
-			case "prefix":
-				reg = "^" + regexp.QuoteMeta(val)
-			case "postfix":
-				reg = regexp.QuoteMeta(val) + "$"
-			case "wildcard":
-				reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
-			case "regexp":
-				reg = val
-			default:
-				reg = "^" + regexp.QuoteMeta(val) + "$"
-			}
-			regexps = append(regexps, regexp.MustCompile(reg))
-		}
-
-		for _, value := range sourceResponse.QueryMulti(attribute, `saml:AttributeValue`) {
-			if len(allowedValues) == 0 || matchRegexpArray(value, regexps) {
-				io.WriteString(h, value)
-				ardValues[friendlyName] = append(ardValues[friendlyName], value)
-				if base64encodedOut {
-					v := base64.StdEncoding.EncodeToString([]byte(value))
-					value = string(v)
-				}
-				response.QueryDashP(newAttribute, saml+":AttributeValue[0]", value, nil)
-			}
-		}
-	}
-
-	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`))
-	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`))
-	ardHash = fmt.Sprintf("%x", h.Sum(nil))
-	return
-}
-
-func matchRegexpArray(item string, array []*regexp.Regexp) bool {
-	for _, i := range array {
-		if i.MatchString(item) {
-			return true
-		}
-	}
-	return false
-}
-
-// checkScope checks for scope. Takes an xp, metadata. requireppn refers to as bolean if it is required. Returns eppn, securitydomain and list of epsas.
-func checkScope(xp, md *goxml.Xp, context types.Node, requireEppn bool) (eppn, eppnForEptid, securityDomain string, epsas []string, err error) {
-	eppns := xp.QueryMulti(context, "saml:Attribute[@Name='eduPersonPrincipalName' or @Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.6']/saml:AttributeValue")
-	epsas = xp.QueryMulti(context, `saml:Attribute[@Name="eduPersonScopedAffiliation" or @Name='urn:oid:1.3.6.1.4.1.5923.1.1.1.9']/saml:AttributeValue`)
-	l := len(eppns)
-	switch {
-	case l == 1:
-		eppn = eppns[0]
-		eppnForEptid = eppn
-		matches := scoped.FindStringSubmatch(eppn)
-		if len(matches) != 3 {
-			err = fmt.Errorf("not a scoped value: %s", eppn)
-			return
-		}
-		securityDomain = matches[1] + matches[2]                  // rm matches[2] when @aau.dk goes away
-		if matches[2] == "" && aauscope.MatchString(matches[1]) { // legacy support for old @aau.dk scopes for persistent nameid and eptid
-			eppnForEptid += "@aau.dk"
-		}
-	case requireEppn:
-		err = fmt.Errorf("Mandatory 'eduPersonPrincipalName' attribute missing")
-		return
-	case l == 0: // try to get a security domain from a epsa value
-		if len(epsas) > 0 {
-			matches := scoped.FindStringSubmatch(epsas[0])
-			if len(matches) != 3 {
-				err = fmt.Errorf("not a scoped value: %s", eppn)
-				return
-			}
-			securityDomain = matches[1] + matches[2] // rm matches[2] when @aau.dk goes away
-		} else {
-			return // no scoped values found and we don't require eppn so just return with no error
-		}
-	default: // never more than one
-		err = fmt.Errorf("More than one 'eduPersonPrincipalName' value")
-		return
-	}
-
-	scope := md.Query(nil, "//shibmd:Scope[.="+strconv.Quote(securityDomain)+"]")
-	if len(scope) == 0 {
-		err = fmt.Errorf("security domain '%s' does not match any scopes", securityDomain)
-		return
-	}
-
-	// special case for ku.dk
-	if strings.HasSuffix(securityDomain, ".ku.dk") {
-		securityDomain = "ku.dk"
-	}
-
-	if strings.HasSuffix(securityDomain, ".aau.dk@aau.dk") {
-		securityDomain = "aau.dk@aau.dk"
-	}
-
-	subSecurityDomain := "." + securityDomain
-	for _, epsa := range epsas {
-		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 3 {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
-			return
-		}
-		domain := epsaparts[1] + epsaparts[2]
-		if requireEppn {
-			if domain != securityDomain && !strings.HasSuffix(domain, subSecurityDomain) {
-				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security sub domain", epsa, securityDomain)
-				return
-			}
-		} else {
-			if domain != securityDomain {
-				err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security domain", epsa, securityDomain)
-				return
-			}
-		}
-	}
-	return
-}
-
 func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	var rawPath string
 	if rawPath = r.URL.RawPath; rawPath == "" {
@@ -1840,7 +1452,7 @@ func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	path := strings.Split(rawPath, "/")
 	path = path[2:] // need a way to do this automatically
-	fmt.Printf("%q %q %q\n", r.URL, r.URL.RawPath, path)
+
 	md, ok := webMdMap[path[0]]
 	if !ok {
 		return fmt.Errorf("Metadata set not found")
