@@ -37,7 +37,7 @@ var (
 		{basic: "Issuer", nameformat: "internal", op: "xp:msg:./saml:Issuer"},
 
 		// nemlogin computed
-		{basic: "nemlogin", nameformat: "internal", op: "eq:Issuer:https://birk.wayf.dk/birk.php/nemlogin.wayf.dk"},
+		{basic: "nemlogin", nameformat: "internal", op: "eq:Issuer:https://saml.nemlog-in.dk"},
 		{basic: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", nameformat: "internal", op: "nemlogin:val:member"},
 		{basic: "organizationName", nameformat: "internal", op: "nemlogin:val:NemLog-in"},
 		{basic: "schacPersonalUniqueID", name: "schacPersonalUniqueID", nameformat: "internal", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
