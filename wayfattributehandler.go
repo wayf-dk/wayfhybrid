@@ -64,6 +64,7 @@ var (
 		{basic: "idpfeds", nameformat: "internal", op: "xp:idp://wayf:wayf/wayf:feds"},
 		{basic: "spfeds", nameformat: "internal", op: "xp:sp://wayf:wayf/wayf:feds"},
 		{basic: "commonfederations", nameformat: "internal", op: "commonfederations:"},
+		{basic: "oioCvrNumberIdentifier", nameformat: "internal", op: "xp:idp://wayf:wayf/wayf:oioCvrNumberIdentifier"},
 
         // from a request
 		{basic: "idpfeds", nameformat: "request", op: "xp:idp://wayf:wayf/wayf:feds"},
@@ -114,7 +115,9 @@ var (
 		{basic: "mail", name: "emailaddress", nameformat: "claims2005"},
 		{basic: "mail", name: "mail", nameformat: "basic"},
 		{basic: "mail", name: "urn:oid:0.9.2342.19200300.100.1.3", nameformat: "uri"},
-		{basic: "mail", name: "urn:oid:0.9.2342.19200300.100.1.3", nameformat: "basic"},
+		{basic: "mobile", name: "mobile", nameformat: "basic"},
+		{basic: "mobile", name: "urn:oid:0.9.2342.19200300.100.1.41", nameformat: "uri"},
+		{basic: "mobile", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone", nameformat: "claims2005"},
 		{basic: "norEduPersonLIN", name: "norEduPersonLIN", nameformat: "basic"},
 		{basic: "norEduPersonLIN", name: "norEduPersonLIN", nameformat: "claims2005"},
 		{basic: "norEduPersonLIN", name: "urn:oid:1.3.6.1.4.1.2428.90.1.4", nameformat: "uri"},
@@ -148,6 +151,18 @@ var (
 		{basic: "subject-id", name: "urn:oasis:names:tc:SAML:attribute:subject-id", nameformat: "uri"},
 		{basic: "subject-id", name: "subject-id", nameformat: "basic"},
 		{basic: "pairwise-id", name: "urn:oasis:names:tc:SAML:attribute:pairwise-id", nameformat: "uri"},
+
+		// Modst specials
+		{basic: "mail", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", nameformat: "modst"},
+		{basic: "oioCvrNumberIdentifier", name: "https://modst.dk/sso/claims/cvr", nameformat: "modst"},
+		{basic: "mail", name: "https://modst.dk/sso/claims/userid", nameformat: "modst"},
+		{basic: "mail", name: "https://modst.dk/sso/claims/email", nameformat: "modst"},
+		{basic: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid", nameformat: "modst"},
+		{basic: "mobile", name: "https://modst.dk/sso/claims/mobile", nameformat: "modst"},
+		{basic: "eduPersonAssurance", name: "https://modst.dk/sso/claims/assurancelevel", nameformat: "modst"},
+		{basic: "modstlogonmethod", name: "https://modst.dk/sso/claims/logonmethod", nameformat: "modst", op:"eq:username-password-protected-transport"},
+		{basic: "sn", name: "https://modst.dk/sso/claims/surname", nameformat: "modst"},
+		{basic: "gn", name: "https://modst.dk/sso/claims/givenname", nameformat: "modst"},
 	}
 
 	attributenameFormats = map[string]string{
@@ -157,6 +172,7 @@ var (
 		"claims2000":  "http://schemas.xmlsoap.org/ws/2008/05/identity/claims",
 		"internal":    "internal",
 		"unspecified": "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified",
+		"modst":       "https://modst.dk/sso/claims",
 	}
 
 	AttributeDescriptions     = attributeDescriptionsMap{}
