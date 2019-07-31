@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -147,8 +148,11 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mdq *MDQ) MDQ(key string) (xp *goxml.Xp, err error) {
+	urlParts := strings.Split(mdq.Mdq, "/")
+	escapedKey := url.PathEscape(key)
+	l := len(urlParts)-2
+	cacheKey := strings.Join(append(urlParts[:l], escapedKey, urlParts[l], escapedKey), "/")
 	mdqCache.Lock.RLock()
-	cacheKey := mdq.Mdq + key
 	xp, ok := mdqCache.Cache[cacheKey]
 	if ok {
 		if xp != nil {
@@ -163,7 +167,8 @@ func (mdq *MDQ) MDQ(key string) (xp *goxml.Xp, err error) {
 	mdqCache.Lock.RUnlock()
 
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", mdq.Mdq+url.PathEscape(key), nil)
+
+	req, _ := http.NewRequest("GET", cacheKey, nil)
 	req.Header.Add("Cookie", "wayfid=wayf-qa")
 	response, err := client.Do(req)
 
