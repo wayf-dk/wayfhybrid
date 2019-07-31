@@ -676,7 +676,7 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 		friendlyName := destinationMd.Query1(requestedAttribute, "@FriendlyName")
 		seen[friendlyName] = true
 
-		must := hubMd.Query1(nil, `.//md:RequestedAttribute[@FriendlyName=`+strconv.Quote(friendlyName)+`]/@must`) == "true"
+		must := hubMd.Query1(nil, `.//md:RequestedAttribute[@Name=`+strconv.Quote(name)+`]/@must`) == "true"
 
 		// accept attributes in both uri and basic format
 		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+` or @Name=`+strconv.Quote(friendlyName)+`]/saml:AttributeValue`)
