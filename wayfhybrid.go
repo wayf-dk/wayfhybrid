@@ -1451,31 +1451,27 @@ func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	if rawPath = r.URL.RawPath; rawPath == "" {
 		rawPath = r.URL.Path
 	}
-	path := strings.Split(rawPath, "/")
-	path = path[2:] // need a way to do this automatically
-
-	md, ok := webMdMap[path[0]]
-	if !ok {
-		return fmt.Errorf("Metadata set not found")
-	}
+	path := strings.Split(rawPath, "/")[2:] // need a way to do this automatically
 	var xml []byte
 	var en1, en2 string
 	var xp1, xp2 *goxml.Xp
 	switch len(path) {
-	case 2:
-		en1, err = url.PathUnescape(path[1])
-		_, xml, err = md.md.WebMDQ(en1)
-		if err != nil {
-			return
-		}
 	case 3:
-		en1, _ = url.PathUnescape(path[1])
+        md, ok := webMdMap[path[1]]
+        if !ok {
+            return fmt.Errorf("Metadata set not found")
+        }
+		en1, _ = url.PathUnescape(path[0])
 		en2, _ = url.PathUnescape(path[2])
 		xp1, _, err = md.md.WebMDQ(en1)
 		if err != nil {
 			return
 		}
-		xp2, xml, err = md.revmd.WebMDQ(en2)
+        if en1 == en2 { // hack to allow asking for a specific entity, by using the same entity twice
+    		xp2, xml, err = md.md.WebMDQ(en2)
+        } else {
+    		xp2, xml, err = md.revmd.WebMDQ(en2)
+    	}
 		if err != nil {
 			return err
 		}
