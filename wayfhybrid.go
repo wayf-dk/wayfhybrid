@@ -892,6 +892,9 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 		        return idpList[0]
 			}
 		default:
+            for i, idp := range idpList {
+                idpList[i] = birkify(idp)
+            }
 			data.Set("idplist", strings.Join(idpList, ","))
 			break
 		}
