@@ -171,7 +171,7 @@ var (
 		"basic":       "urn:oasis:names:tc:SAML:2.0:attrname-format:basic",
 		"uri":         "urn:oasis:names:tc:SAML:2.0:attrname-format:uri",
 		"claims2005":  "http://schemas.xmlsoap.org/ws/2005/05/identity/claims",
-		"claims2000":  "http://schemas.xmlsoap.org/ws/2008/05/identity/claims",
+		"claims2008":  "http://schemas.xmlsoap.org/ws/2008/05/identity/claims",
 		"internal":    "internal",
 		"unspecified": "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified",
 		"modst":       "https://modst.dk/sso/claims",
@@ -183,8 +183,9 @@ var (
 
 func init() {
 	for _, ad := range attributeDescriptionBase {
-		k := attributeKey{ad.name, attributenameFormats[ad.nameformat]}
-		AttributeDescriptions[k] = ad
+		AttributeDescriptions[attributeKey{ad.name, attributenameFormats[ad.nameformat]}] = ad
+        // we also need it in a name only format for being liberal in what we accept ...
+		AttributeDescriptions[attributeKey{ad.name, ""}] = ad
 		AttributeDescriptionsList[ad.nameformat] = append(AttributeDescriptionsList[ad.nameformat], ad)
 	}
 }
@@ -204,6 +205,9 @@ func Attributesc14n(response, idpMd, spMd *goxml.Xp) {
 		}
 
 		atd, ok := AttributeDescriptions[attributeKey{name, nameFormat}]
+		if !ok {
+    		atd, ok = AttributeDescriptions[attributeKey{name, ""}]
+		}
 		if ok {
 			atds = append(atds, atd)
 			values[atd.basic] = response.QueryMulti(attribute, `saml:AttributeValue`)
