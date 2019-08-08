@@ -151,6 +151,8 @@ var (
 		{basic: "subject-id", name: "urn:oasis:names:tc:SAML:attribute:subject-id", nameformat: "uri"},
 		{basic: "subject-id", name: "subject-id", nameformat: "basic"},
 		{basic: "pairwise-id", name: "urn:oasis:names:tc:SAML:attribute:pairwise-id", nameformat: "uri"},
+		{basic: "role", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role", nameformat: "claims2008"},
+		{basic: "role", name: "role", nameformat: "basic"},
 
 		// Modst specials
 		{basic: "mail", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", nameformat: "modst"},
