@@ -913,7 +913,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	idp := wayf(w, r, request, spMd, hubBirkMd)
-	q.Q(idp)
 	if idp == "" {
 		return
 	}
