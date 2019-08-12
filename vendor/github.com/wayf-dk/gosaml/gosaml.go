@@ -1336,7 +1336,7 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 	    payload := []byte(jwt)
 	    var headerPayloadSignature []string
 	    if checksign {
-    		headerPayloadSignature := strings.SplitN(jwt, ".", 3)
+    		headerPayloadSignature = strings.SplitN(jwt, ".", 3)
 	    	payload, _ = base64.RawURLEncoding.DecodeString(headerPayloadSignature[1])
         }
 
