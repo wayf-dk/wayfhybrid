@@ -448,7 +448,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		remoteAddr = ra[0]
 	}
 
-	log.Printf("%s %s %s %+v", remoteAddr, r.Method, r.Host, r.URL)
+	//log.Printf("%s %s %s %+v", remoteAddr, r.Method, r.Host, r.URL)
 	starttime := time.Now()
 	err := fn(w, r)
 
