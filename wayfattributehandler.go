@@ -273,12 +273,12 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			case "sn":
 				if *v == "" && len(values["cn"]) > 0 {
 					names := strings.Fields(values["cn"][0])
-					values[atd.name] = append(values[atd.basic], names[len(names)-1])
+					*v =  names[len(names)-1]
 				}
 			case "gn":
 				if *v == "" && len(values["cn"]) > 0 {
 					names := strings.Fields(values["cn"][0])
-					values[atd.name] = append(values[atd.basic], strings.Join(names[0:len(names)-1], " "))
+					*v = strings.Join(names[0:len(names)-1], " ")
 				}
 			case "xidp":
 				*v = idpMd.Query1(nil, xprefix+opParam[1])
@@ -341,7 +341,6 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
 			}
 	}
-	q.Q(values)
 }
 
 func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
