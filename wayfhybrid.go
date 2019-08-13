@@ -371,7 +371,7 @@ func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domai
 	cookie, err := secCookie.Encode(id, gosaml.Deflate(data))
 //	http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge})
     cc := http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge}
-    v := cc.String() + "; SameSite=None"
+    v := cc.String() // + "; SameSite=None"
     w.Header().Add("Set-Cookie", v)
 	return
 }
