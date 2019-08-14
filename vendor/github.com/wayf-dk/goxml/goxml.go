@@ -705,6 +705,8 @@ func (xp *Xp) VerifySignature(context types.Node, publicKeys []*rsa.PublicKey) (
 	signatureMethod := xp.Query1(signedInfo, "ds:SignatureMethod/@Algorithm")
 	signedInfoDigest := Hash(Algos[signatureMethod].Algo, signedInfoC14n)
 
+    log.Printf("SigAlg: %s %s %s %s\n", xp.QueryString(context, "local-name(.)"), xp.Query1(context, "saml:Issuer"), digestMethod, signatureMethod)
+
 	ds, _ := base64.StdEncoding.DecodeString(signatureValue)
 
 	for _, pub := range publicKeys {
