@@ -598,7 +598,14 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
+
 		q := u.Query()
+
+        if gosaml.DebugSetting(r, "signingError") == "1" {
+            signature := q.Get("Signature")
+            q.Set("Signature", signature[:len(signature)-4]+"QEBA")
+        }
+
 		if idpList != "" {
 			q.Set("idplist", idpList)
 		}
