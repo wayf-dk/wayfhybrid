@@ -1456,6 +1456,7 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
     			w.Header().Set("Authorization", "Bearer "+payload)
 			}
 
+            w.Header().Set("X-Accel-Redirect", r.Header.Get("X-App"))
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(payload))
 			return err
@@ -1501,20 +1502,12 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			return err
 		}
 
-		/*
-			relayState, err := authnRequestCookie.Encode("app", []byte(app))
-			if err != nil {
-				return err
-			}
-		*/
-		relayState := ""
-
 		request, err := NewAuthnRequest(nil, spMd, idpMd, strings.Split(r.Form.Get("idplist"), ","), acs)
 		if err != nil {
 			return err
 		}
 
-		u, err := SAMLRequest2Url(request, relayState, "", "", "")
+		u, err := SAMLRequest2Url(request, "", "", "", "")
 		if err != nil {
 			return err
 		}
