@@ -962,11 +962,11 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 
-	err = sendRequestToIdP(w, r, request, hubSPMd, idpMd, idp, relayState, "SSO-", "", config.Domain, spIndex, hubBirkIndex, nil)
+	err = sendRequestToIdP(w, r, request, spMd, hubSPMd, idpMd, idp, relayState, "SSO-", "", config.Domain, spIndex, hubBirkIndex, nil)
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp, idp, relayState, prefix, altAcs, domain string, spIndex, hubIdpIndex int, idPList []string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpMd, spMd, idpMd *goxml.Xp, idp, relayState, prefix, altAcs, domain string, spIndex, hubIdpIndex int, idPList []string) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList, altAcs)
 	if err != nil {
@@ -999,7 +999,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, spMd, idp
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
-	if idpMd.QueryBool(nil, `boolean(./md:IDPSSODescriptor/@WantAuthnRequestsSigned[.='1' or .='true'])`) {
+	if idpMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || issuerSpMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
 		privatekey, err = gosaml.GetPrivateKey(spMd)
 		if err != nil {
 			return
