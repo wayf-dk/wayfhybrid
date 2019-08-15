@@ -982,7 +982,6 @@ func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *g
 	sloinfo := NewSLOInfo(response, spMd.Query1(nil, "@entityID"))
 	sloinfo.Is = spMd.Query1(nil, "@entityID")
 	request, binding, err := NewLogoutRequest(IdpMd, sloinfo, IdPRole)
-	fmt.Println(sloinfo, request.PP(), binding, err)
 	switch binding {
 	case REDIRECT:
 		u, _ := SAMLRequest2Url(request, "", pk, "-", "")
@@ -1375,7 +1374,6 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		}
 		if spMd.QueryXMLBool(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:assertion.encryption") {
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+EncryptionCertQuery) // actual encryption key is always first
-			fmt.Println("cert", cert)
 			_, publicKey, _ := PublicKeyInfo(cert)
 			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
 			assertion := response.Query(nil, "saml:Assertion[1]")[0]
