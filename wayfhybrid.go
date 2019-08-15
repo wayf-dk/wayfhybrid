@@ -999,7 +999,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 
 	var privatekey []byte
-	if idpMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || issuerSpMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
+	if idpMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || spMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
 		privatekey, err = gosaml.GetPrivateKey(spMd)
 		if err != nil {
 			return
