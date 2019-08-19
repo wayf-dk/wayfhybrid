@@ -451,6 +451,10 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 		values := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="`+atd.basic+`"]/saml:AttributeValue`)
 		values = filterValues(values, spMd.Query(requestedAttribute, `saml:AttributeValue`))
 
+		if len(values) == 0 {
+			continue
+		}
+
 		io.WriteString(h, atd.basic)
 
 		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@"+nameName, atd.name, nil)
