@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/goxml"
+	"github.com/wayf-dk/gosaml"
 	"github.com/y0ssar1an/q"
 	"io"
 	"regexp"
@@ -65,6 +66,7 @@ var (
 		{basic: "spfeds", nameformat: "internal", op: "xp:sp://wayf:wayf/wayf:feds"},
 		{basic: "commonfederations", nameformat: "internal", op: "commonfederations:"},
 		{basic: "oioCvrNumberIdentifier", nameformat: "internal", op: "xp:idp://wayf:wayf/wayf:oioCvrNumberIdentifier"},
+		{basic: "nameID", nameformat: "internal", op: "nameid:"},
 
         // from a request
 		{basic: "idpfeds", nameformat: "request", op: "xp:idp://wayf:wayf/wayf:feds"},
@@ -153,6 +155,7 @@ var (
 		{basic: "pairwise-id", name: "urn:oasis:names:tc:SAML:attribute:pairwise-id", nameformat: "uri"},
 		{basic: "role", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role", nameformat: "claims2008"},
 		{basic: "role", name: "role", nameformat: "basic"},
+		{basic: "ImmutableID", name: "ImmutableID", nameformat: "basic"},
 
 		// Modst specials
 		{basic: "mail", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", nameformat: "modst"},
@@ -190,7 +193,7 @@ func init() {
 	}
 }
 
-func Attributesc14n(response, idpMd, spMd *goxml.Xp) {
+func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	base64encoded := idpMd.QueryXMLBool(nil, xprefix+"base64attributes")
 	attributeStatement := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
 	sourceAttributes := response.Query(attributeStatement, `./saml:Attribute`)
@@ -220,8 +223,8 @@ func Attributesc14n(response, idpMd, spMd *goxml.Xp) {
 		}
 	}
 
-	attributeOpsHandler(values, atds, response, idpMd, spMd)
-	attributeOpsHandler(values, AttributeDescriptionsList["internal"], response, idpMd, spMd)
+	attributeOpsHandler(values, atds, request, response, idpMd, spMd)
+	attributeOpsHandler(values, AttributeDescriptionsList["internal"], request, response, idpMd, spMd)
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 
@@ -241,14 +244,14 @@ func Attributesc14n(response, idpMd, spMd *goxml.Xp) {
 
 func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string, err error){
 	values = map[string][]string{}
-	attributeOpsHandler(values, AttributeDescriptionsList["request"], request, idpMd, spMd)
+	attributeOpsHandler(values, AttributeDescriptionsList["request"], request, request, idpMd, spMd)
 	if values["commonfederations"][0] != "true" {
     	err = fmt.Errorf("no common federations")
     }
 	return
 }
 
-func attributeOpsHandler(values map[string][]string, atds []attributeDescription, msg, idpMd, spMd *goxml.Xp) {
+func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp) {
 	for _, atd := range atds {
 			opParam := strings.SplitN(atd.op, ":", 2)
 			if len(values[atd.basic]) == 0 {
@@ -339,7 +342,21 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				}
 			case "commonfederations":
 				*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
-			}
+			case "nameid":
+                switch request.Query1(nil, "./samlp:NameIDPolicy/@Format") { // always prechecked when receiving
+                    case gosaml.Persistent:
+                        *v = values["eduPersonTargetedID"][0]
+                    case gosaml.Email:
+                        *v = values["eduPersonPrincipalName"][0]
+                    default:
+                        *v = gosaml.Id()
+                }
+                switch attr := spMd.Query1(nil, xprefix+"nameIDAttribute"); {
+                    case attr == "":
+                    default:
+                        *v = values[attr][0]
+                }
+            }
 	}
 }
 
@@ -430,52 +447,24 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 		if !ok {
 			continue
 		}
-		values := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="`+atd.basic+`"]/saml:AttributeValue`)
 
-		if len(values) == 0 {
-			continue
-		}
+		values := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="`+atd.basic+`"]/saml:AttributeValue`)
+		values = filterValues(values, spMd.Query(requestedAttribute, `saml:AttributeValue`))
 
 		io.WriteString(h, atd.basic)
 
 		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@"+nameName, atd.name, nil)
 		response.QueryDashP(newAttribute, "@"+nameFormatName, attributenameFormats[atd.nameformat], nil)
 		response.QueryDashP(newAttribute, "@FriendlyName", atd.basic, nil)
-		allowedValues := spMd.Query(requestedAttribute, `saml:AttributeValue`)
-		regexps := []*regexp.Regexp{}
-		for _, attr := range allowedValues {
-			tp := ""
-			tpAttribute, _ := attr.(types.Element).GetAttribute("type")
-			if tpAttribute != nil {
-				tp = tpAttribute.Value()
-			}
-			val := attr.NodeValue()
-			var reg string
-			switch tp {
-			case "prefix":
-				reg = "^" + regexp.QuoteMeta(val)
-			case "postfix":
-				reg = regexp.QuoteMeta(val) + "$"
-			case "wildcard":
-				reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
-			case "regexp":
-				reg = val
-			default:
-				reg = "^" + regexp.QuoteMeta(val) + "$"
-			}
-			regexps = append(regexps, regexp.MustCompile(reg))
-		}
 
 		for _, value := range values {
-			if len(allowedValues) == 0 || matchRegexpArray(value, regexps) {
-				io.WriteString(h, value)
-				ardValues[atd.basic] = append(ardValues[atd.basic], value)
-				if base64encodedOut {
-					v := base64.StdEncoding.EncodeToString([]byte(value))
-					value = string(v)
-				}
-				response.QueryDashP(newAttribute, saml+":AttributeValue[0]", value, nil)
-			}
+            io.WriteString(h, value)
+            ardValues[atd.basic] = append(ardValues[atd.basic], value)
+            if base64encodedOut {
+                v := base64.StdEncoding.EncodeToString([]byte(value))
+                value = string(v)
+            }
+            response.QueryDashP(newAttribute, saml+":AttributeValue[0]", value, nil)
 		}
 	}
 
@@ -483,6 +472,39 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`))
 	ardHash = fmt.Sprintf("%x", h.Sum(nil))
 	return
+}
+
+func filterValues(values []string, allowedValues types.NodeList) (filteredValues []string) {
+    regexps := []*regexp.Regexp{}
+    for _, attr := range allowedValues {
+        tp := ""
+        tpAttribute, _ := attr.(types.Element).GetAttribute("type")
+        if tpAttribute != nil {
+            tp = tpAttribute.Value()
+        }
+        val := attr.NodeValue()
+        var reg string
+        switch tp {
+        case "prefix":
+            reg = "^" + regexp.QuoteMeta(val)
+        case "postfix":
+            reg = regexp.QuoteMeta(val) + "$"
+        case "wildcard":
+            reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
+        case "regexp":
+            reg = val
+        default:
+            reg = "^" + regexp.QuoteMeta(val) + "$"
+        }
+        regexps = append(regexps, regexp.MustCompile(reg))
+    }
+
+    for _, value := range values {
+        if len(allowedValues) == 0 || matchRegexpArray(value, regexps) {
+            filteredValues = append(filteredValues, value)
+        }
+    }
+    return
 }
 
 func matchRegexpArray(item string, array []*regexp.Regexp) bool {
