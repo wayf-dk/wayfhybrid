@@ -1103,7 +1103,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		Attributesc14n(response, idpMd, spMd)
+		Attributesc14n(request, response, idpMd, spMd)
         if err = checkForCommonFederations(response); err != nil {
            return
         }
@@ -1125,14 +1125,8 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
-		nameid := gosaml.Id()
-		// respect nameID in req, give persistent id + all computed attributes + nameformat conversion
-		// The response (but not newreponse) at this time contains a full attribute set
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
-		nameidformatMap := map[string]string{gosaml.Persistent: "eduPersonTargetedID", gosaml.Email: "eduPersonPrincipalName"}
-		if name, ok := nameidformatMap[nameidformat]; ok {
-			nameid = response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="`+name+`"]/saml:AttributeValue`)
-		}
+        nameid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="nameID"]/saml:AttributeValue`)
 
 		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
 		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
