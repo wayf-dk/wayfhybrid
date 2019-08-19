@@ -547,7 +547,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	type testSPFormData struct {
 		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP string
 		Messages                                                                   string
-		AttrValues                                                                 []attrValue
+		AttrValues, DebugValues                                                    []attrValue
 	}
 
 	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
@@ -646,19 +646,20 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		var vals []attrValue
+		var vals, debugVals []attrValue
 		protocol := response.QueryString(nil, "local-name(/*)")
 		if protocol == "Response" {
-            Attributesc14n(response, issuerMd, destinationMd)
+			vals = attributeValues(response, destinationMd, hubRequestedAttributes)
+			Attributesc14n(response, response, issuerMd, destinationMd)
 			err = wayfScopeCheck(response, issuerMd)
 			if err != nil {
 				messages = err.Error()
 			}
-			vals = attributeValues(response, destinationMd, hubRequestedAttributes)
+            debugVals = attributeValues(response, destinationMd, hubRequestedAttributes)
 		}
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"), Messages: messages,
-			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
+			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, DebugValues: debugVals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
 		testSPForm.Execute(w, data)
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
