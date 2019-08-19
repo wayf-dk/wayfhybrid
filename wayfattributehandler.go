@@ -319,11 +319,18 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			case "cpr":
 				cpr(idpMd, spMd, values)
 			case "epa":
+			    // get rid of the optional default ""
+			    if values[atd.basic][0] == "" {
+			        values[atd.basic] = values[atd.basic][1:]
+			    }
 				values[atd.basic] = append(values[atd.basic], values["eduPersonPrimaryAffiliation"]...)
 				if intersectionNotEmpty(values[atd.basic], []string{"student", "faculty", "staff", "employee"}) {
 					values[atd.basic] = append(values[atd.basic], "member")
 				}
 			case "epsa":
+			    if values[atd.basic][0] == "" {
+			        values[atd.basic] = values[atd.basic][1:]
+			    }
 				for _, epa := range values["eduPersonAffiliation"] {
 					if epa == "" {
 						continue
@@ -343,7 +350,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			case "commonfederations":
 				*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
 			case "nameid":
-                switch request.Query1(nil, "./samlp:NameIDPolicy/@Format") { // always prechecked when receiving
+               switch request.Query1(nil, "./samlp:NameIDPolicy/@Format") { // always prechecked when receiving
                     case gosaml.Persistent:
                         *v = values["eduPersonTargetedID"][0]
                     case gosaml.Email:
