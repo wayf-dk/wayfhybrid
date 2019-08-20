@@ -652,6 +652,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		var vals, debugVals []attrValue
 		protocol := response.QueryString(nil, "local-name(/*)")
 		if protocol == "Response" {
+            if err := gosaml.CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, issuerMd.QueryMulti(nil, xprefix+"SigningMethod")); err != nil {
+                return err
+            }
 			vals = attributeValues(response, destinationMd, hubRequestedAttributes)
 			Attributesc14n(response, response, issuerMd, destinationMd)
 			err = wayfScopeCheck(response, issuerMd)
@@ -1099,6 +1102,10 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	spMd, hubIdpMd, idpMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIdP, "SSO-")
 	if err != nil {
 		return
+	}
+
+	if err = gosaml.CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, idpMd.QueryMulti(nil, xprefix+"SigningMethod")); err != nil {
+	    return
 	}
 
 	signingMethod := spMd.Query1(nil, xprefix+"SigningMethod")
