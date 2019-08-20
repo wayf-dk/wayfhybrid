@@ -164,6 +164,8 @@ var (
 	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
 	aauscope      = regexp.MustCompile(`[@\.]aau\.dk$`)
 	dkcprpreg     = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
+	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
+	defaultDigestAndSignatureAlgorithm = "sha256"
 
 	metadataUpdateGuard chan int
 
@@ -228,6 +230,7 @@ func Main() {
 	}
 
 	metadataUpdateGuard = make(chan int, 1)
+	goxml.Algos[""] = goxml.Algos[defaultDigestAndSignatureAlgorithm]
 	gosaml.PostForm = template.Must(template.New("PostForm").Parse(config.PostFormTemplate))
 	attributeReleaseForm = template.Must(template.New("AttributeRelease").Parse(config.AttributeReleaseTemplate))
 
