@@ -1242,7 +1242,7 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
-	return gosaml.Saml2jwt(w, r, Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP, RequestHandler, config.HubEntityID, true)
+	return gosaml.Saml2jwt(w, r, Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP, RequestHandler, config.HubEntityID, true, allowedDigestAndSignatureAlgorithms, xprefix+"SigningMethod")
 }
 
 // IdPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
