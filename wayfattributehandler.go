@@ -67,6 +67,7 @@ var (
 		{basic: "commonfederations", nameformat: "internal", op: "commonfederations:"},
 		{basic: "oioCvrNumberIdentifier", nameformat: "internal", op: "xp:idp://wayf:wayf/wayf:oioCvrNumberIdentifier"},
 		{basic: "nameID", nameformat: "internal", op: "nameid:"},
+		{basic: "modstlogonmethod", nameformat: "internal", op:"val:username-password-protected-transport"},
 
         // from a request
 		{basic: "idpfeds", nameformat: "request", op: "xp:idp://wayf:wayf/wayf:feds"},
@@ -168,7 +169,7 @@ var (
 		{basic: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid", nameformat: "modst"},
 		{basic: "mobile", name: "https://modst.dk/sso/claims/mobile", nameformat: "modst"},
 		{basic: "eduPersonAssurance", name: "https://modst.dk/sso/claims/assurancelevel", nameformat: "modst"},
-		{basic: "modstlogonmethod", name: "https://modst.dk/sso/claims/logonmethod", nameformat: "modst", op:"eq:username-password-protected-transport"},
+		{basic: "modstlogonmethod", name: "https://modst.dk/sso/claims/logonmethod", nameformat: "modst"},
 		{basic: "sn", name: "https://modst.dk/sso/claims/surname", nameformat: "modst"},
 		{basic: "gn", name: "https://modst.dk/sso/claims/givenname", nameformat: "modst"},
 	}
