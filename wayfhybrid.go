@@ -161,7 +161,7 @@ var (
 	bify          = regexp.MustCompile("^(https?://)(.*)$")
 	debify        = regexp.MustCompile("^((?:https?://)?)(?:(?:(?:birk|krib)\\.wayf\\.dk/(?:birk\\.php|[a-f0-9]{40})/)|(?:urn:oid:1.3.6.1.4.1.39153:42:))(.+)$")
 	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
-	scoped        = regexp.MustCompile(`^[^\@]+\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
+	scoped        = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
 	aauscope      = regexp.MustCompile(`[@\.]aau\.dk$`)
 	dkcprpreg     = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
@@ -741,11 +741,11 @@ func wayfScopeCheck(response, idpMd *goxml.Xp) (err error) {
 	subsecuritydomain := response.Query1(as, "./saml:Attribute[@Name='subsecuritydomain']/saml:AttributeValue")
 	for _, epsa := range response.QueryMulti(as, "./saml:Attribute[@Name='eduPersonScopedAffiliation']/saml:AttributeValue") {
 		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 3 {
+		if len(epsaparts) != 4 {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
-		domain := epsaparts[1] + epsaparts[2]
+		domain := epsaparts[2] + epsaparts[3]
 		if domain != subsecuritydomain && !strings.HasSuffix(domain, "."+subsecuritydomain) {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security sub domain", epsa, subsecuritydomain)
 			return
@@ -815,11 +815,11 @@ func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeRel
 
 	for _, epsa := range response.QueryMulti(as, "./saml:Attribute[@Name='eduPersonScopedAffiliation']/saml:AttributeValue") {
 		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 3 {
+		if len(epsaparts) != 4 {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
-		domain := epsaparts[1] + epsaparts[2]
+		domain := epsaparts[2] + epsaparts[3]
 		if domain != securitydomain {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security domain", epsa, securitydomain)
 			return

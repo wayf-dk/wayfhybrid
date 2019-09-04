@@ -160,6 +160,8 @@ var (
 		{basic: "role", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role", nameformat: "claims2008"},
 		{basic: "role", name: "role", nameformat: "basic"},
 		{basic: "immutableID", name: "immutableID", nameformat: "basic"},
+		{basic: "uid", name: "uid", nameformat: "basic"},
+		{basic: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1", nameformat: "uri"},
 
 		// Modst specials
 		{basic: "eduPersonPrincipalName", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name", nameformat: "modst"},
@@ -297,7 +299,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				if len(eppns) > 0 {
 					matches := scoped.FindStringSubmatch(eppns[0])
 					if len(matches) > 1 {
-						*v = matches[1] + matches[2]
+						*v = matches[2] + matches[3]
 						subsecuritydomain := *v
 						for _, specialdomain := range strings.Split(opParam[1], ":") {
 							if strings.HasSuffix(*v, "."+specialdomain) {
@@ -306,6 +308,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 							}
 						}
 						values["subsecuritydomain"] = []string{subsecuritydomain}
+						values["uid"] = []string{matches[1]}
 					}
 				}
 			case "subsecuritydomain":
@@ -314,7 +317,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 					if len(epsas) > 0 {
 						matches := scoped.FindStringSubmatch(epsas[0])
 						if len(matches) > 1 {
-							*v = matches[1] + matches[2]
+							*v = matches[2] + matches[3]
 						}
 					}
 				}
@@ -382,7 +385,7 @@ func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
 	}
 
 	matches := scoped.FindStringSubmatch(epid)
-	if len(matches) != 3 {
+	if len(matches) != 4 {
 		return ""
 	}
 
