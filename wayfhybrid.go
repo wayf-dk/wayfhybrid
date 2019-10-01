@@ -291,6 +291,7 @@ func Main() {
 	authnRequestCookie = securecookie.New(hashKey, nil)
 	authnRequestCookie.SetSerializer(securecookie.NopEncoder{})
 	authnRequestCookie.MaxAge(authnRequestTTL)
+    gosaml.AuthnRequestCookie = authnRequestCookie
 
 	httpMux := http.NewServeMux()
 
