@@ -159,7 +159,7 @@ var (
 		{basic: "pairwise-id", name: "urn:oasis:names:tc:SAML:attribute:pairwise-id", nameformat: "uri"},
 		{basic: "role", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role", nameformat: "claims2008"},
 		{basic: "role", name: "role", nameformat: "basic"},
-		{basic: "immutableID", name: "immutableID", nameformat: "basic"},
+		{basic: "entryUUID", name: "entryUUID", nameformat: "basic"},
 		{basic: "uid", name: "uid", nameformat: "basic"},
 		{basic: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1", nameformat: "uri"},
 
@@ -168,7 +168,7 @@ var (
 		{basic: "oioCvrNumberIdentifier", name: "https://modst.dk/sso/claims/cvr", nameformat: "modst"},
 		{basic: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid", nameformat: "modst"},
 		{basic: "mail", name: "https://modst.dk/sso/claims/email", nameformat: "modst"},
-		{basic: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid", nameformat: "modst"},
+		{basic: "entryUUID", name: "https://modst.dk/sso/claims/uniqueid", nameformat: "modst"},
 		{basic: "mobile", name: "https://modst.dk/sso/claims/mobile", nameformat: "modst"},
 		{basic: "eduPersonAssurance", name: "https://modst.dk/sso/claims/assurancelevel", nameformat: "modst"},
 		{basic: "modstlogonmethod", name: "https://modst.dk/sso/claims/logonmethod", nameformat: "modst"},
