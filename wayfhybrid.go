@@ -409,10 +409,7 @@ func (writer logWriter) Write(bytes []byte) (int, error) {
 }
 
 func birkify(idp string) (birk string) {
-	birk = bify.ReplaceAllString(idp, "${1}birk.wayf.dk/birk.php/$2")
-	if birk == idp {
-		birk = "urn:oid:1.3.6.1.4.1.39153:42:" + idp
-	}
+    birk = idp
     return
 }
 
