@@ -471,7 +471,16 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 
 		io.WriteString(h, atd.basic)
 
-		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@"+nameName, atd.name, nil)
+
+		adobeMap := map[string]string{"gn": "FirstName", "sn": "LastName", "mail": "Email"}
+
+        atdname := atd.name
+		n, ok := adobeMap[atd.basic]
+		if ok && sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`) == "https://www.okta.com/saml2/service-provider/spinjci8c1TToFxy00x7" {
+            atdname = n
+		}
+
+		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@"+nameName, atdname, nil)
 		response.QueryDashP(newAttribute, "@"+nameFormatName, attributenameFormats[atd.nameformat], nil)
 		response.QueryDashP(newAttribute, "@FriendlyName", atd.basic, nil)
 
