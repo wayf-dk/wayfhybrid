@@ -806,7 +806,8 @@ func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeRel
 	// we ignore the qualifiers and use the idp and sp entityIDs
 	as := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
 	securitydomain := response.Query1(as, "./saml:Attribute[@Name='securitydomain']/saml:AttributeValue")
-	if idpMd.QueryBool(nil, "count(//shibmd:Scope[.="+strconv.Quote(securitydomain)+"]) = 0") {
+	eppn := response.Query1(as, "./saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	if eppn != "" && idpMd.QueryBool(nil, "count(//shibmd:Scope[.="+strconv.Quote(securitydomain)+"]) = 0") {
 		err = fmt.Errorf("security domain '%s' does not match any scopes", securitydomain)
 		return
 	}
@@ -818,12 +819,11 @@ func WayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeRel
 			return
 		}
 		domain := epsaparts[2] + epsaparts[3]
-		if domain != securitydomain {
-			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security domain", epsa, securitydomain)
-			return
+	    if idpMd.QueryBool(nil, "count(//shibmd:Scope[.="+strconv.Quote(domain)+"]) = 0") {
+		    err = fmt.Errorf("security domain '%s' does not match any scopes", securitydomain)
+		    return
 		}
 	}
-
 	ard = AttributeReleaseData{BypassConfirmation: true}
 	return
 }
