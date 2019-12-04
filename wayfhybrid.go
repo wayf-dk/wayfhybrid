@@ -1245,7 +1245,7 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 
 // IdPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
 func IdPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, Md.Internal, Md.Hub, []gosaml.Md{Md.ExternalSP, Md.Hub}, []gosaml.Md{Md.ExternalIdP, Md.Internal}, gosaml.IdPRole, "SLO")
+	return SLOService(w, r, Md.Internal, Md.Hub, []gosaml.Md{Md.ExternalSP, Md.Hub}, []gosaml.Md{Md.Internal, Md.ExternalIdP}, gosaml.IdPRole, "SLO")
 }
 
 // SLOService refers to single logout service. Takes request and issuer and destination metadata sets, role refers to if it as IDP or SP.
