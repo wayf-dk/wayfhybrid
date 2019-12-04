@@ -210,10 +210,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	for _, attribute := range sourceAttributes {
 		name := response.Query1(attribute, "@Name")
 		nameFormat := response.Query1(attribute, "@NameFormat")
-		if nameFormat == "" {
-			nameFormat = attributenameFormats["basic"]
-		}
-
 		atd, ok := AttributeDescriptions[attributeKey{name, nameFormat}]
 		if !ok {
     		atd, ok = AttributeDescriptions[attributeKey{name, ""}]
