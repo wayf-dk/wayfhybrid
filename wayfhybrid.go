@@ -780,7 +780,6 @@ func WayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(`+xprefix+`consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
 	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryXMLBool(nil, xprefix+`consent.disable`)
 	ard.ForceConfirmation = ard.SPEntityID == "https://wayfsp2.wayf.dk"
-
 	ard.ConsentAsAService = config.ConsentAsAService
 
 	if birk {
@@ -887,6 +886,7 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 	vvpmss := ""
 	if tmp, _ := r.Cookie("vvpmss"); tmp != nil {
 		vvpmss = tmp.Value
+	    http.SetCookie(w, &http.Cookie{Name: "vvpmss", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
 	}
 
 	idpLists := [][]string{
