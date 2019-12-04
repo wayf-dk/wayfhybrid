@@ -569,13 +569,14 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
+        scopedIdP := r.Form.Get("scopedidp") + r.Form.Get("entityID")
 		scoping := []string{}
 		if r.Form.Get("scoping") == "scoping" {
-			scoping = strings.Split(r.Form.Get("scopedidp"), ",")
+			scoping = strings.Split(scopedIdP, ",")
 		}
 
 		if r.Form.Get("scoping") == "birk" {
-			idpMd, err = Md.ExternalIdP.MDQ(r.Form.Get("scopedidp"))
+			idpMd, err = Md.ExternalIdP.MDQ(scopedIdP)
 			if err != nil {
 				return err
 			}
@@ -611,7 +612,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			q.Set("idplist", idpList)
 		}
 		if r.Form.Get("scoping") == "param" {
-			idp = r.Form.Get("scopedidp")
+			idp = scopedIdP
 		}
 		if idp != "" {
 			q.Set("idplist", idp)
