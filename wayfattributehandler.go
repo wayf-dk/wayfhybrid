@@ -10,6 +10,7 @@ import (
 	"github.com/wayf-dk/gosaml"
 	"github.com/y0ssar1an/q"
 	"io"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -433,6 +434,9 @@ func cpr(idpMd, spMd *goxml.Xp, values map[string][]string) {
 
 // CopyAttributes copies the attributes
 func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
+    // log eduPersonScopedAffiliation
+    log.Printf("epsa: %s\n", strings.Join(sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonScopedAffiliation"]/saml:AttributeValue`), ","))
+
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 
