@@ -501,7 +501,9 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 
 	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`))
 	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`))
-	ardHash = fmt.Sprintf("%x", h.Sum(nil))
+	io.WriteString(h, spMd.Query1(nil, `@entityID`))
+	io.WriteString(h, response.Query1(nil, `saml:Issuer`))
+	ardHash = fmt.Sprintf("%.5x", h.Sum(nil))
 	return
 }
 
