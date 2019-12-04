@@ -1066,11 +1066,10 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 		return
 	}
 
-	if idpMd, err = Md.ExternalIdP.MDQ(sRequest.De); err != nil { // Always BIRK - for getting the right cert,  contains same info as internal - try first with std. name
-        if idpMd, err = Md.ExternalIdP.MDQ(birkify(sRequest.De)); err != nil {
-		    return
-		}
-	}
+    if idpMd, err = Md.ExternalIdP.MDQ(sRequest.De); err != nil {
+        return
+    }
+
 	hubIdp = idpMd          // who to send the response as - BIRK
 	if sRequest.Hubi == 0 { // or hub is request was to the hub
 		if hubIdp, err = Md.Hub.MDQ(config.HubEntityID); err != nil {
