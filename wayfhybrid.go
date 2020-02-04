@@ -570,7 +570,18 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-        scopedIdP := r.Form.Get("scopedidp") + r.Form.Get("entityID")
+		if idp == "" {
+			data := url.Values{}
+			data.Set("return", "https://"+r.Host+r.RequestURI)
+			data.Set("returnIDParam", "idpentityid")
+			data.Set("entityID", "https://"+r.Host)
+			http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
+			return err
+		}
+
+		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
+
+		scopedIdP := r.Form.Get("scopedidp") + r.Form.Get("entityID")
 		scoping := []string{}
 		if r.Form.Get("scoping") == "scoping" {
 			scoping = strings.Split(scopedIdP, ",")
