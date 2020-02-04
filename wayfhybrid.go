@@ -1133,12 +1133,17 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newresponse = gosaml.NewResponse(hubIdpMd, spMd, request, response)
+
 		// add "front-end" IdP if it maps to another IdP
+		if idpMd.Query1(nil, xprefix+"map2IdP") != "" {
+			newresponse.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", idpMd.Query1(nil, "@entityID"), nil)
+		}
+
 		ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
-        nameid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="nameID"]/saml:AttributeValue`)
+		nameid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="nameID"]/saml:AttributeValue`)
 
 		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
 		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
