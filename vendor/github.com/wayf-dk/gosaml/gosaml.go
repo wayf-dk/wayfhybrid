@@ -132,9 +132,9 @@ var (
 	// NameIDList list of supported nameid formats
 	NameIDList = []string{"", Transient, Persistent, X509, Email, Unspecified}
 	// NameIDMap refers to mapping the nameid formats
-	NameIDMap  = map[string]int{"": 1, Transient: 1, Persistent: 2, X509: 3, Email: 4, Unspecified: 5} // Unspecified accepted but not sent upstream
-	whitespace = regexp.MustCompile("\\s")
-	PostForm   *template.Template
+	NameIDMap          = map[string]int{"": 1, Transient: 1, Persistent: 2, X509: 3, Email: 4, Unspecified: 5} // Unspecified accepted but not sent upstream
+	whitespace         = regexp.MustCompile("\\s")
+	PostForm           *template.Template
 	AuthnRequestCookie *securecookie.SecureCookie
 )
 
@@ -1190,10 +1190,10 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 	//response.QueryDashP(authstatement, "@SessionIndex", "missing", nil)
 
 	if sourceResponse != nil {
-	    ac := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="AuthnContextClassRef"]/saml:AttributeValue`)
-	    if ac == "" {
-	        ac = "urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified"
-	    }
+		ac := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="AuthnContextClassRef"]/saml:AttributeValue`)
+		if ac == "" {
+			ac = "urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified"
+		}
 		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", ac, nil)
 		for _, aa := range sourceResponse.QueryMulti(nil, "//saml:AuthnContext/saml:AuthenticatingAuthority") {
 			response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa, nil)
@@ -1390,12 +1390,12 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 }
 
 // saml2jwt handles saml2jwt request
-func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExternalIdP, mdExternalSP Md, requestHandler func (*goxml.Xp, *goxml.Xp, *goxml.Xp) (map[string][]string, error), defaultIdpentityid string, sign bool, allowedDigestAndSignatureAlgorithms []string, signingMethodPath string) (err error) {
+func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExternalIdP, mdExternalSP Md, requestHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (map[string][]string, error), defaultIdpentityid string, sign bool, allowedDigestAndSignatureAlgorithms []string, signingMethodPath string) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
 	// backward compatible - use either or
-    entityID := r.Header.Get("X-Issuer") + r.Form.Get("issuer")
+	entityID := r.Header.Get("X-Issuer") + r.Form.Get("issuer")
 
 	spMd, _, err := FindInMetadataSets(MdSets{mdInternal, mdExternalSP}, entityID)
 	if err != nil {
@@ -1418,12 +1418,12 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		switch response.QueryString(nil, "local-name(/*)") {
 		case "Response":
 
-	        if err = CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, idpMd.QueryMulti(nil, signingMethodPath)); err != nil {
-	            return err
-	        }
-            if _, err = requestHandler(response, idpMd, spMd); err != nil {
-                return err
-            }
+			if err = CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, idpMd.QueryMulti(nil, signingMethodPath)); err != nil {
+				return err
+			}
+			if _, err = requestHandler(response, idpMd, spMd); err != nil {
+				return err
+			}
 			attrs := map[string]interface{}{}
 
 			assertion := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
@@ -1447,21 +1447,21 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 
 			payload := string(json)
 
-            if sign {
-			    payload = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."+strings.TrimRight(base64.URLEncoding.EncodeToString(json), "=")
-                privatekey, err := GetPrivateKey(idpMd)
-                if err != nil {
-                    return err
-                }
+			if sign {
+				payload = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + strings.TrimRight(base64.URLEncoding.EncodeToString(json), "=")
+				privatekey, _, err := GetPrivateKey(idpMd)
+				if err != nil {
+					return err
+				}
 
-                digest := goxml.Hash(goxml.Algos["sha256"].Algo, payload)
-                signature, err := goxml.Sign([]byte(digest), privatekey, []byte(""), "sha256")
-                if err != nil {
-                    return err
-                }
+				digest := goxml.Hash(goxml.Algos["sha256"].Algo, payload)
+				signature, err := goxml.Sign([]byte(digest), privatekey, []byte("-"), "sha256")
+				if err != nil {
+					return err
+				}
 
-                payload += "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
-    			w.Header().Set("Authorization", "Bearer "+payload)
+				payload += "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
+				w.Header().Set("Authorization", "Bearer "+payload)
 			}
 
 			var app []byte
@@ -1516,17 +1516,17 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			return err
 		}
 
-        relayState, err := AuthnRequestCookie.Encode("app", []byte(app))
-        if err != nil {
-            return err
-        }
+		relayState, err := AuthnRequestCookie.Encode("app", []byte(app))
+		if err != nil {
+			return err
+		}
 
 		request, err := NewAuthnRequest(nil, spMd, idpMd, strings.Split(r.Form.Get("idplist"), ","), acs)
 		if err != nil {
 			return err
 		}
 
-        u, err := SAMLRequest2Url(request, relayState, "", "", "")
+		u, err := SAMLRequest2Url(request, relayState, "", "", "")
 		if err != nil {
 			return err
 		}
@@ -1591,29 +1591,3 @@ func sign(plaintext, privatekeypem, pw []byte) (signature []byte, err error) {
 }
 
 func CheckDigestAndSignatureAlgorithms(response *goxml.Xp, allowedDigestAndSignatureAlgorithms, xtraAlgos []string) (err error) {
-    contexts := []string{"/samlp:Response/ds:Signature/ds:SignedInfo/", "/samlp:Response/saml:Assertion/ds:Signature/ds:SignedInfo/"}
-    paths := []string{"ds:SignatureMethod/@Algorithm", "ds:Reference/ds:DigestMethod/@Algorithm" }
-    seen := 0
-    allowedAlgosMap := map[string]bool{}
-    for _,algo := range allowedDigestAndSignatureAlgorithms {
-        allowedAlgosMap[algo] = true
-    }
-    for _, algo := range xtraAlgos {
-        allowedAlgosMap[goxml.Algos[algo].Short] = true
-    }
-    for _, context := range contexts {
-        for _, path := range paths {
-            algo := response.Query1(nil, context+path)
-            if algo != "" {
-                if !allowedAlgosMap[goxml.Algos[algo].Short] {
-                    return fmt.Errorf("Unsupported Digest/Signing algorithm: %s", algo)
-                }
-                seen++
-            }
-        }
-    }
-    if seen < 2 {
-        return fmt.Errorf("No or to few Digest/Signing algoritms found")
-    }
-    return
-}
