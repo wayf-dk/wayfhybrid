@@ -1300,66 +1300,65 @@ func samlTime2JwtTime(xmlTime string) int64 {
 	return samlTime.Unix()
 }
 
-func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExternalIdP, mdExternalSP Md, requestHandler func (*goxml.Xp, *goxml.Xp, *goxml.Xp) (map[string][]string, error), signerMd *goxml.Xp) (err error) {
+func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExternalIdP, mdExternalSP Md, requestHandler func(*goxml.Xp, *goxml.Xp, *goxml.Xp) (map[string][]string, error), signerMd *goxml.Xp) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-    request, spMd, idpMd, _, _, _, err := ReceiveAuthnRequest(r, MdSets{mdHub, mdExternalSP}, MdSets{mdInternal, mdExternalIdP}, r.Form.Get("sso"))
-    if err != nil {
-        return
-    }
+	request, spMd, idpMd, _, _, _, err := ReceiveAuthnRequest(r, MdSets{mdHub, mdExternalSP}, MdSets{mdInternal, mdExternalIdP}, r.Form.Get("sso"))
+	if err != nil {
+		return
+	}
 
-    req, err := requestHandler(request, idpMd, spMd)
-    if err != nil {
-        return
-    }
-
-    checksign := signerMd != nil // if we are running locally we don't need to check
-    if signerMd == nil {
-        signerMd = idpMd
-    }
-
-    jwt := r.Form.Get("jwt")
+	jwt := r.Form.Get("jwt")
 	if jwt == "" {
-        json, err := json.MarshalIndent(&req, "  ", "  ")
-        if err != nil {
-            return err
-        }
+		req, err := requestHandler(request, idpMd, spMd)
+		if err != nil {
+			return err
+		}
+		json, err := json.MarshalIndent(&req, "  ", "  ")
+		if err != nil {
+			return err
+		}
 
 		w.Header().Set("Content-Type", "application/json")
-        w.Header().Set("Content-Length", strconv.Itoa(len(json)))
-        w.Write(json)
-        return err
+		w.Header().Set("Content-Length", strconv.Itoa(len(json)))
+		w.Write(json)
+		return err
 	} else {
-	    payload := []byte(jwt)
-	    var headerPayloadSignature []string
-	    if checksign {
-    		headerPayloadSignature = strings.SplitN(jwt, ".", 3)
-	    	payload, _ = base64.RawURLEncoding.DecodeString(headerPayloadSignature[1])
-        }
-
-		var attrs map[string][]string
+		zzz, err := jwtVerify(jwt, idpMd.QueryMulti(nil, "./md:IDPSSODescriptor"+SigningCertQuery))
+		if err != nil {
+			return err
+		}
+		payload, _ := base64.RawURLEncoding.DecodeString(zzz)
+		var attrs map[string]interface{}
 		err = json.Unmarshal(payload, &attrs)
 		if err != nil {
 			return err
 		}
 
-        if checksign {
-            certificates := idpMd.QueryMulti(nil, "./md:IDPSSODescriptor"+SigningCertQuery)
-            err = verify(certificates, strings.Join(headerPayloadSignature[:2], "."), headerPayloadSignature[2])
-            if err != nil {
-                return
-            }
-        }
-
 		response := NewResponse(idpMd, spMd, request, nil)
+
+		iat, _ := attrs["iat"].(float64)
+		delete(attrs, "iat")
+
+		if math.Abs(float64(time.Now().Unix())-iat) > timeskew {
+			return fmt.Errorf("jwt timed out")
+		}
+
+		for _, aa := range attrs["saml:AuthenticatingAuthority"].([]interface{}) {
+			response.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa.(string), nil)
+		}
+		delete(attrs, "saml:AuthenticatingAuthority")
 
 		destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]`, "", nil)
 		for name, vals := range attrs {
 			attr := response.QueryDashP(destinationAttributes, `saml:Attribute[@Name=`+strconv.Quote(name)+`]`, "", nil)
 			response.QueryDashP(attr, `@NameFormat`, "urn:oasis:names:tc:SAML:2.0:attrname-format:basic", nil)
-			for _, value := range vals {
-				response.QueryDashP(attr, "saml:AttributeValue[0]", value, nil)
+			switch v := vals.(type) {
+			case []interface{}:
+				for _, value := range v {
+					response.QueryDashP(attr, "saml:AttributeValue[0]", value.(string), nil)
+				}
 			}
 		}
 
