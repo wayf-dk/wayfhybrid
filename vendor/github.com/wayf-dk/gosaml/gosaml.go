@@ -511,7 +511,7 @@ func CheckSAMLMessage(r *http.Request, xp, issuerMd, destinationMd *goxml.Xp, ro
 	// add checks for xtra element on top level in tests - does schema checks handle that or should we do it here???
 	protoChecks := map[string]protoCheckInfoStruct{
 		"AuthnRequest": {
-			minSignatures:     0,
+			minSignatures:     map[bool]int{true: 1, false: 0}[destinationMd.QueryXMLBool(nil, "./md:IDPSSODescriptor/@WantAuthnRequestsSigned")],
 			service:           "md:SingleSignOnService",
 			signatureElements: []string{"/samlp:AuthnRequest[1]/ds:Signature[1]/..]", ""}},
 		"Response": {
