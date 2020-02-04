@@ -824,8 +824,6 @@ func VerifySign(xp *goxml.Xp, certificates []string, signature types.Node) (err 
 
 // VerifyTiming verify the presence and value of timestamps
 func VerifyTiming(xp *goxml.Xp) (verifiedXp *goxml.Xp, err error) {
-	const timeskew = 90
-
 	type timing struct {
 		required     bool
 		notonorafter bool
