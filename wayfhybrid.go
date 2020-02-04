@@ -981,6 +981,9 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 
 	if idpMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) {
 		newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
+		if idp != idpMd.Query1(nil, "@entityID") { // add virtual idp to wayf extension if mapped
+			newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID[0]", idp, nil)
+		}
 	}
 
 	// Save the request in a session for when the response comes back
