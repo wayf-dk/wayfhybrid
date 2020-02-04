@@ -555,7 +555,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
 
 	spMd, err := Md.Internal.MDQ("https://" + r.Host)
-	pk, _ := gosaml.GetPrivateKey(spMd)
+	pk, _, _ := gosaml.GetPrivateKey(spMd)
 	idp := r.Form.Get("idpentityid")
 	idpList := r.Form.Get("idplist")
 	login := r.Form.Get("login") == "1"
@@ -1006,7 +1006,7 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 
 	var privatekey []byte
 	if idpMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || spMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
-		privatekey, err = gosaml.GetPrivateKey(spMd)
+		privatekey, _, err = gosaml.GetPrivateKey(spMd)
 		if err != nil {
 			return
 		}
@@ -1292,7 +1292,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			// send LogoutRequest to sloinfo.EntityID med sloinfo.NameID as nameid
 			legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.Na+fmt.Sprintf(" async:%t", async))
 			// always sign if a private key is available - ie. ignore missing keys
-			privatekey, err := gosaml.GetPrivateKey(finalIssuer)
+			privatekey, _, err := gosaml.GetPrivateKey(finalIssuer)
 
 			if err != nil {
 				return err
@@ -1348,7 +1348,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			return err
 		}
 
-		privatekey, err := gosaml.GetPrivateKey(issuerMd)
+		privatekey, _, err := gosaml.GetPrivateKey(issuerMd)
 
 		if err != nil {
 			return err
