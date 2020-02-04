@@ -1130,6 +1130,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newresponse = gosaml.NewResponse(hubIdpMd, spMd, request, response)
+		// add "front-end" IdP if it maps to another IdP
 		ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
