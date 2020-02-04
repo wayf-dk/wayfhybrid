@@ -189,8 +189,8 @@ func PublicKeyInfo(cert string) (keyname string, publickey *rsa.PublicKey, err e
 }
 
 // GetPrivateKey extract the key from Metadata and builds a name and reads the key
-func GetPrivateKey(md *goxml.Xp) (privatekey []byte, err error) {
-	cert := md.Query1(nil, "./"+SigningCertQuery) // actual signing key is always first
+func GetPrivateKey(md *goxml.Xp) (privatekey []byte, cert string, err error) {
+	cert = md.Query1(nil, "./"+SigningCertQuery) // actual signing key is always first
 	keyname, _, err := PublicKeyInfo(cert)
 	if err != nil {
 		return
@@ -1027,14 +1027,7 @@ func NewSLOInfo(response *goxml.Xp, de string) (slo *SLOInfo) {
 // SignResponse signs the response with the given method.
 // Returns an error if unable to sign.
 func SignResponse(response *goxml.Xp, elementQuery string, md *goxml.Xp, signingMethod string, signFor int) (err error) {
-	cert := md.Query1(nil, "md:IDPSSODescriptor"+SigningCertQuery) // actual signing key is always first
-	var keyname string
-	keyname, _, err = PublicKeyInfo(cert)
-	if err != nil {
-		return
-	}
-	var privatekey []byte
-	privatekey, err = ioutil.ReadFile(Config.CertPath + keyname + ".key")
+	privatekey, cert, err := GetPrivateKey(md)
 	if err != nil {
 		return
 	}
