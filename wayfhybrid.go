@@ -345,8 +345,9 @@ func Main() {
 	mdUpdateMux.Handle("/", appHandler(updateMetadataService)) // need a root "/" for routing
 
 	go func() {
-		log.Println("listening on 0.0.0.0:9000")
-		err = http.ListenAndServe(":9000", mdUpdateMux)
+		intf := regexp.MustCompile(`^(.*:).*$`).ReplaceAllString(config.Intf, "$1") + "9000"
+		log.Println("listening on ", intf)
+		err = http.ListenAndServe(intf, mdUpdateMux)
 		if err != nil {
 			log.Printf("main(): %s\n", err)
 		}
