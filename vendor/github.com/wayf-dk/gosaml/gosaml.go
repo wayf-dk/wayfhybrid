@@ -1537,49 +1537,45 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 	return
 }
 
-func verify(certificates []string, payload, signature string) (err error) {
-    if len(certificates) == 0 {
-        return errors.New("No Certs found")
-    }
-
-	digest := sha256.Sum256([]byte(payload))
-	sign, _ := base64.RawURLEncoding.DecodeString(signature)
-
-    var pub *rsa.PublicKey
-    for _, certificate := range certificates {
-        _, pub, err = PublicKeyInfo(certificate)
-        if err != nil {
-            return err
-        }
-        err = rsa.VerifyPKCS1v15(pub, goxml.Algos["sha256"].Algo, digest[:], sign)
-        if err == nil {
-            break
-        }
-    }
-    return
-}
-
-func sign(plaintext, privatekeypem, pw []byte) (signature []byte, err error) {
-	digest := sha256.Sum256(plaintext)
-
-	var privateKey *rsa.PrivateKey
-
-	block, _ := pem.Decode(privatekeypem) // not used rest
-	derbytes := block.Bytes
-	if string(pw) != "" {
-		if derbytes, err = x509.DecryptPEMBlock(block, pw); err != nil {
-			return nil, err
-		}
+func jwtVerify(jwt string, certificates []string) (payload string, err error) {
+	if len(certificates) == 0 {
+		return payload, errors.New("No Certs found")
 	}
-	if privateKey, err = x509.ParsePKCS1PrivateKey(derbytes); err != nil {
-		var pk interface{}
-		if pk, err = x509.ParsePKCS8PrivateKey(derbytes); err != nil {
-			return nil, err
-		}
-		privateKey = pk.(*rsa.PrivateKey)
+	hps := strings.SplitN(jwt, ".", 3)
+	hp := []byte(strings.Join(hps[:2], "."))
+	headerJSON, _ := base64.RawURLEncoding.DecodeString(hps[0])
+	header := struct{ Alg string }{}
+	err = json.Unmarshal(headerJSON, &header)
+	if err != nil {
+		return
+	}
+	var hh crypto.Hash
+	var digest []byte
+	switch header.Alg {
+	case "RS256":
+		dg := sha256.Sum256(hp)
+		digest = dg[:]
+		hh = crypto.SHA256
+	case "RS512":
+		dg := sha512.Sum512(hp)
+		digest = dg[:]
+		hh = crypto.SHA512
+	default:
+		return payload, fmt.Errorf("Unsupported alg: %s", header.Alg)
 	}
 
-	signature, err = rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, digest[:])
+	sign, _ := base64.RawURLEncoding.DecodeString(hps[2])
+	var pub *rsa.PublicKey
+	for _, certificate := range certificates {
+		_, pub, err = PublicKeyInfo(certificate)
+		if err != nil {
+			return
+		}
+		err = rsa.VerifyPKCS1v15(pub, hh, digest, sign)
+		if err == nil {
+			return hps[1], err
+		}
+	}
 	return
 }
 
