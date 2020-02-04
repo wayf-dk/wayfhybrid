@@ -1429,6 +1429,9 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			attrs["nbf"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
 			attrs["exp"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
 			attrs["iat"] = samlTime2JwtTime(response.Query1(assertion, "@IssueInstant"))
+			attrs["saml:AuthenticatingAuthority"] = response.QueryMulti(assertion, "./saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority")
+			//attrs["saml:AuthenticatingAuthority"] = append(attrs["saml:AuthenticatingAuthority"].([]string), attrs["iss"].(string))
+
 			//sloinfoJson, _ := json.Marshal(NewSLOInfo(response, spMd.Query1(nil, "@entityID")))
 			//attrs["sloinfo"] = sloinfoJson
 
@@ -1439,22 +1442,20 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 
 			payload := string(json)
 
-			if sign {
-				payload = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + strings.TrimRight(base64.URLEncoding.EncodeToString(json), "=")
-				privatekey, _, err := GetPrivateKey(idpMd)
-				if err != nil {
-					return err
-				}
-
-				digest := goxml.Hash(goxml.Algos["sha256"].Algo, payload)
-				signature, err := goxml.Sign([]byte(digest), privatekey, []byte("-"), "sha256")
-				if err != nil {
-					return err
-				}
-
-				payload += "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
-				w.Header().Set("Authorization", "Bearer "+payload)
+			payload = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." + strings.TrimRight(base64.URLEncoding.EncodeToString(json), "=")
+			privatekey, _, err := GetPrivateKey(idpMd)
+			if err != nil {
+				return err
 			}
+
+			digest := goxml.Hash(goxml.Algos["sha256"].Algo, payload)
+			signature, err := goxml.Sign([]byte(digest), privatekey, []byte("-"), "sha256")
+			if err != nil {
+				return err
+			}
+
+			payload += "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
+			w.Header().Set("Authorization", "Bearer "+payload)
 
 			var app []byte
 			err = AuthnRequestCookie.Decode("app", relayState, &app)
