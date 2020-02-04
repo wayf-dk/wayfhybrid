@@ -80,7 +80,7 @@ const (
 	// SIMPLESIGN refers to HTTP-POST-SimpleSign
 	SIMPLESIGN = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST-SimpleSign"
 	// Allowed slack for timingchecks
-    timeskew = 90
+	timeskew = 90
 )
 
 type (
