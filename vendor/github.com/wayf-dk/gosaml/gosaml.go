@@ -1346,10 +1346,12 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			return fmt.Errorf("jwt timed out")
 		}
 
-		for _, aa := range attrs["saml:AuthenticatingAuthority"].([]interface{}) {
-			response.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa.(string), nil)
+        if aas := attrs["saml:AuthenticatingAuthority"]; aas != nil {
+            for _, aa := range aas.([]interface{}) {
+                response.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa.(string), nil)
+            }
+            delete(attrs, "saml:AuthenticatingAuthority")
 		}
-		delete(attrs, "saml:AuthenticatingAuthority")
 
 		destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]`, "", nil)
 		for name, vals := range attrs {
