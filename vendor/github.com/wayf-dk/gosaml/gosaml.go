@@ -991,7 +991,7 @@ func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *g
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case POST:
 		data := Formdata{Acs: request.Query1(nil, "./@Destination"), Samlrequest: base64.StdEncoding.EncodeToString(request.Dump())}
-		PostForm.Execute(w, data)
+		PostForm.ExecuteTemplate(w, "postform", data)
 	}
 }
 
@@ -1004,7 +1004,7 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case POST:
 		data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump())}
-		PostForm.Execute(w, data)
+		PostForm.ExecuteTemplate(w, "postform", data)
 	}
 }
 
@@ -1021,7 +1021,8 @@ func NewSLOInfo(response *goxml.Xp, de string) (slo *SLOInfo) {
 		Fo: NameIDMap[response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@Format")],
 		Sp: response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@SPNameQualifier"),
 		Si: response.Query1(nil, "/samlp:Response/saml:Assertion/saml:AuthnStatement/@SessionIndex"),
-		De: de}
+		De: de,
+	}
 	return
 }
 
@@ -1379,7 +1380,7 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		}
 
 		data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: r.Form.Get("RelayState")}
-		PostForm.Execute(w, data)
+		PostForm.ExecuteTemplate(w, "postform", data)
 	}
 	return
 }
