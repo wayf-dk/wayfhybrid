@@ -40,9 +40,6 @@ var (
 const (
 	authnRequestTTL = 180
 	sloInfoTTL      = 8 * 3600
-	basic           = "urn:oasis:names:tc:SAML:2.0:attrname-format:basic"
-	claims          = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims"
-	unspecified     = "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified"
 	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
 )
 
@@ -64,31 +61,23 @@ type (
 	}
 
 	WayfHybridConfig struct {
-		Path                                                                                     string
 		DiscoveryService                                                                         string
 		Domain                                                                                   string
 		HubEntityID                                                                              string
 		EptidSalt                                                                                string
 		SecureCookieHashKey                                                                      string
-		PostFormTemplate                                                                         string
-		AttributeReleaseTemplate, WayfSPTestServiceTemplate                                      string
 		Certpath                                                                                 string
-		Intf, Hubrequestedattributes, Sso_Service, Https_Key, Https_Cert, Acs, Vvpmss            string
+		Intf, Sso_Service, Https_Key, Https_Cert, Acs, Vvpmss                                    string
 		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
 		Testsp, Testsp_Acs, Testsp_Slo, Testsp2, Testsp2_Acs, Testsp2_Slo, MDQ                   string
-		Eidas_Acs, Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                         string
+		Nemlogin_Acs, CertPath, SamlSchema, ConsentAsAService                                    string
 		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, Saml2jwt, Jwt2saml, SaltForHashedEppn      string
+		Oauth                                                                                    string
 		ElementsToSign                                                                           []string
 		NotFoundRoutes                                                                           []string
 		Hub, Internal, ExternalIdP, ExternalSP                                                   struct{ Path, Table string }
 		MetadataFeeds                                                                            []struct{ Path, URL string }
 		GoEleven                                                                                 goElevenConfig
-		IdpRemapSource                                                                           []struct{ Key, Idp, Sp string }
-	}
-
-	idpsppair struct {
-		Idp string
-		Sp  string
 	}
 
 	logWriter struct {
@@ -154,10 +143,7 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	config = WayfHybridConfig{Path: "/opt/wayf/"}
-	X      = &config
-
-	remap = map[string]idpsppair{}
+	config = WayfHybridConfig{}
 
 	bify                                = regexp.MustCompile("^(https?://)(.*)$")
 	debify                              = regexp.MustCompile("^((?:https?://)?)(?:(?:(?:birk|krib)\\.wayf\\.dk/(?:birk\\.php|[a-f0-9]{40})/)|(?:urn:oid:1.3.6.1.4.1.39153:42:))(.+)$")
@@ -173,14 +159,13 @@ var (
 	session = wayfHybridSession{}
 
 	sloInfoCookie, authnRequestCookie *securecookie.SecureCookie
-	attributeReleaseForm              *template.Template
+	tmpl                              *template.Template
 	hashKey                           []byte
 	hostName                          string
 
-	hubRequestedAttributes, hubMd *goxml.Xp
+	hubMd *goxml.Xp
 
 	Md        MdSets
-	basic2uri map[string]attrName
 
 	intExtSP, intExtIdP, hubExtIdP, hubExtSP gosaml.MdSets
 
@@ -192,15 +177,13 @@ var (
 func Main() {
 	log.SetFlags(0) // no predefined time
 	//log.SetOutput(new(logWriter))
+	hostName, _ = os.Hostname()
 
 	bypassMdUpdate := flag.Bool("nomd", false, "bypass MD update at start")
 	flag.Parse()
+	path := env("WAYF_PATH", "/opt/wayf/")
 
-	hostName, _ = os.Hostname()
-
-	overrideConfig(&config, []string{"Path"})
-
-	tomlConfig, err := toml.LoadFile(config.Path + "hybrid-config/hybrid-config.toml")
+	tomlConfig, err := toml.LoadFile(path + "hybrid-config/hybrid-config.toml")
 
 	if err != nil { // Handle errors reading the config file
 		panic(fmt.Errorf("Fatal error config file: %s\n", err))
@@ -226,17 +209,12 @@ func Main() {
 		})
 	}
 
-	for _, r := range config.IdpRemapSource { // toml does not allow arbitrary chars in keys for mapss
-		remap[r.Key] = idpsppair{Idp: r.Idp, Sp: r.Sp}
-	}
+	tmpl = template.Must(template.ParseFiles(path + "hybrid-config/templates/hybrid.tmpl"))
+	gosaml.PostForm = tmpl
 
 	metadataUpdateGuard = make(chan int, 1)
-	goxml.Algos[""] = goxml.Algos[defaultDigestAndSignatureAlgorithm]
-	gosaml.PostForm = template.Must(template.New("PostForm").Parse(config.PostFormTemplate))
-	attributeReleaseForm = template.Must(template.New("AttributeRelease").Parse(config.AttributeReleaseTemplate))
 
-	hubRequestedAttributes = goxml.NewXpFromString(config.Hubrequestedattributes)
-	prepareTables(hubRequestedAttributes)
+	goxml.Algos[""] = goxml.Algos[defaultDigestAndSignatureAlgorithm]
 
 	Md.Hub = &lMDQ.MDQ{Path: config.Hub.Path, Table: config.Hub.Table, Rev: config.Hub.Table, Short: "hub"}
 	Md.Internal = &lMDQ.MDQ{Path: config.Internal.Path, Table: config.Internal.Table, Rev: config.Internal.Table, Short: "int"}
@@ -313,7 +291,6 @@ func Main() {
 
 	httpMux.Handle(config.Acs, appHandler(ACSService))
 	httpMux.Handle(config.Nemlogin_Acs, appHandler(ACSService))
-	httpMux.Handle(config.Eidas_Acs, appHandler(ACSService))
 	httpMux.Handle(config.Birk, appHandler(SSOService))
 	httpMux.Handle(config.Krib, appHandler(ACSService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
@@ -356,6 +333,13 @@ func Main() {
 	}()
 
 	<-finish
+}
+
+func env(name, defaultvalue string) (string) {
+    if val, ok := os.LookupEnv(name); ok {
+        return val
+    }
+    return defaultvalue
 }
 
 func overrideConfig(config interface{}, envvars []string) {
@@ -428,22 +412,6 @@ func legacyStatLog(tag, idp, sp, hash string) {
 func legacyStatJsonLog(rec map[string]string) {
 	b, _ := json.Marshal(rec)
 	log.Printf("%d %s\n", time.Now().UnixNano(), b)
-}
-
-func prepareTables(attrs *goxml.Xp) {
-	basic2uri = make(map[string]attrName)
-	for _, attr := range attrs.Query(nil, "./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute") {
-		friendlyName := attrs.Query1(attr, "@FriendlyName")
-		uri := attrs.Query1(attr, "@Name")
-		attributeName := attrs.Query1(attr, "@AttributeName")
-		if attributeName == "" {
-			attributeName = friendlyName
-		}
-		attributeNameMap := attrName{uri: uri, basic: friendlyName, AttributeName: attributeName}
-		basic2uri[friendlyName] = attributeNameMap
-		basic2uri[uri] = attributeNameMap
-		basic2uri[attributeName] = attributeNameMap
-	}
 }
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -553,8 +521,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		Messages                                                                   string
 		AttrValues, DebugValues                                                    []attrValue
 	}
-
-	testSPForm := template.Must(template.New("Test").Parse(config.WayfSPTestServiceTemplate))
 
 	spMd, err := Md.Internal.MDQ("https://" + r.Host)
 	pk, _, _ := gosaml.GetPrivateKey(spMd)
@@ -668,18 +634,18 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			if err := gosaml.CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, issuerMd.QueryMulti(nil, xprefix+"SigningMethod")); err != nil {
 				return err
 			}
-			vals = attributeValues(response, destinationMd, hubRequestedAttributes)
+			vals = attributeValues(response, destinationMd, hubMd)
 			Attributesc14n(response, response, issuerMd, destinationMd)
 			err = wayfScopeCheck(response, issuerMd)
 			if err != nil {
 				messages = err.Error()
 			}
-			debugVals = attributeValues(response, destinationMd, hubRequestedAttributes)
+			debugVals = attributeValues(response, destinationMd, hubMd)
 		}
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"), Messages: messages,
 			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, DebugValues: debugVals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
-		testSPForm.Execute(w, data)
+		tmpl.ExecuteTemplate(w, "testSPForm", data)
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
 		data.Set("return", "https://"+r.Host+r.RequestURI+"?previdplist="+r.Form.Get("scopedidp"))
@@ -688,7 +654,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
 		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedIDP")+","+r.Form.Get("previdplist"), " ,")}
-		testSPForm.Execute(w, data)
+		tmpl.ExecuteTemplate(w, "testSPForm", data)
 	}
 	return
 }
