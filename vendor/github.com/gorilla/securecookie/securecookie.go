@@ -486,15 +486,15 @@ func (e NopEncoder) Deserialize(src []byte, dst interface{}) error {
 
 // encode encodes a value using base64.
 func encode(value []byte) []byte {
-	encoded := make([]byte, base64.URLEncoding.EncodedLen(len(value)))
-	base64.URLEncoding.Encode(encoded, value)
+	encoded := make([]byte, base64.RawURLEncoding.EncodedLen(len(value)))
+	base64.RawURLEncoding.Encode(encoded, value)
 	return encoded
 }
 
 // decode decodes a cookie using base64.
 func decode(value []byte) ([]byte, error) {
-	decoded := make([]byte, base64.URLEncoding.DecodedLen(len(value)))
-	b, err := base64.URLEncoding.Decode(decoded, value)
+	decoded := make([]byte, base64.RawURLEncoding.DecodedLen(len(value)))
+	b, err := base64.RawURLEncoding.Decode(decoded, value)
 	if err != nil {
 		return nil, cookieError{cause: err, typ: decodeError, msg: "base64 decode failed"}
 	}
