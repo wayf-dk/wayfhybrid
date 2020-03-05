@@ -416,9 +416,9 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 	if msg == "" {
 		msg = r.Form.Get("SAMLResponse")
 		if msg == "" {
-			msg, relayState = wsfedRequest2samlRequest(r, issuerMdSets, destinationMdSets)
+			msg, relayState, err = request2samlRequest(r, issuerMdSets, destinationMdSets)
 			if msg == "" {
-				err = fmt.Errorf("no SAMLRequest/SAMLResponse found")
+				err = fmt.Errorf("no SAMLRequest/SAMLResponse found: %s", err)
 				return
 			}
 		}
@@ -1200,26 +1200,26 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 	return
 }
 
-// wsfedRequest2samlRequest does the protocol translation from ws-fed to saml
-func wsfedRequest2samlRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets) (msg, relayState string) {
-	if r.Form.Get("wa") == "wsignin1.0" {
-		relayState = r.Form.Get("wctx")
-		issuer := r.Form.Get("wtrealm")
+// request2samlRequest does the protocol translation from ws-fed to saml
+func request2samlRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets) (msg, relayState string, err error) {
+	if r.Form.Get("wa") == "wsignin1.0" || r.Form.Get("response_type") != "" {
+		relayState = r.Form.Get("wctx") + r.Form.Get("state")
+		issuer := r.Form.Get("wtrealm") + r.Form.Get("client_id")
+		acs := r.Form.Get("wreply") + r.Form.Get("redirect_uri")
 		location := "https://" + r.Host + r.URL.Path
+
+		issuerMd, _, err := FindInMetadataSets(issuerMdSets, issuer)
+		if err != nil {
+			return "", "", err
+		}
 
 		destinationMd, _, err := FindInMetadataSets(destinationMdSets, location)
 		if err != nil {
-			return
+			return "", "", err
 		}
 
-		issuerMd, _, err := FindInMetadataSets(issuerMdSets, issuer)
-
-		if err != nil {
-			return
-		}
-
-		samlrequest, _ := NewAuthnRequest(nil, issuerMd, destinationMd, nil, r.Form.Get("wreply"))
-
+		samlrequest, _ := NewAuthnRequest(nil, issuerMd, destinationMd, nil, acs)
+		samlrequest.QueryDashP(nil, "./@Destination", "https://"+r.Host+r.URL.Path, nil)
 		samlrequest.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", issuerMd.Query1(nil, "/md:EntityDescriptor/md:SPSSODescriptor/md:NameIDFormat"), nil)
 
 		DumpFileIfTracing(r, samlrequest)
