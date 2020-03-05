@@ -360,10 +360,7 @@ func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Set responsible for setting a cookie values
 func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domain string, data []byte, secCookie *securecookie.SecureCookie, maxAge int) (err error) {
 	cookie, err := secCookie.Encode(id, gosaml.Deflate(data))
-	//	http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge})
-	cc := http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge}
-	v := cc.String() // + "; SameSite=None"
-	w.Header().Add("Set-Cookie", v)
+	http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge, SameSite: http.SameSiteNoneMode})
 	return
 }
 
