@@ -835,6 +835,10 @@ func setAttribute(name, value string, response *goxml.Xp, element types.Node) {
 }
 
 func OkService(w http.ResponseWriter, r *http.Request) (err error) {
+	err = goeleven.HSMStatus()
+	if err != nil {
+		os.Exit(1)
+	}
 	return
 }
 
