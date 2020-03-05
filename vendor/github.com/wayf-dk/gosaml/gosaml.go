@@ -1297,7 +1297,7 @@ func NewWsFedResponse(idpMd, spMd, sourceResponse *goxml.Xp) (response *goxml.Xp
 	return
 }
 
-func samlTime2JwtTime(xmlTime string) int64 {
+func SamlTime2JwtTime(xmlTime string) int64 {
 	samlTime, _ := time.Parse(XsDateTime, xmlTime)
 	return samlTime.Unix()
 }
@@ -1347,11 +1347,11 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			return fmt.Errorf("jwt timed out")
 		}
 
-        if aas := attrs["saml:AuthenticatingAuthority"]; aas != nil {
-            for _, aa := range aas.([]interface{}) {
-                response.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa.(string), nil)
-            }
-            delete(attrs, "saml:AuthenticatingAuthority")
+		if aas := attrs["saml:AuthenticatingAuthority"]; aas != nil {
+			for _, aa := range aas.([]interface{}) {
+				response.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa.(string), nil)
+			}
+			delete(attrs, "saml:AuthenticatingAuthority")
 		}
 
 		destinationAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[1]`, "", nil)
@@ -1430,9 +1430,9 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 
 			attrs["iss"] = response.Query1(assertion, "./saml:Issuer")
 			attrs["aud"] = response.Query1(assertion, "./saml:Conditions/saml:AudienceRestriction/saml:Audience")
-			attrs["nbf"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
-			attrs["exp"] = samlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
-			attrs["iat"] = samlTime2JwtTime(response.Query1(assertion, "@IssueInstant"))
+			attrs["nbf"] = SamlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotBefore"))
+			attrs["exp"] = SamlTime2JwtTime(response.Query1(assertion, "./saml:Conditions/@NotOnOrAfter"))
+			attrs["iat"] = SamlTime2JwtTime(response.Query1(assertion, "@IssueInstant"))
 			attrs["saml:AuthenticatingAuthority"] = response.QueryMulti(assertion, "./saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority")
 			//attrs["saml:AuthenticatingAuthority"] = append(attrs["saml:AuthenticatingAuthority"].([]string), attrs["iss"].(string))
 
