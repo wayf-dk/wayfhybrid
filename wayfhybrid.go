@@ -166,7 +166,7 @@ var (
 
 	hubMd *goxml.Xp
 
-	Md        MdSets
+	Md MdSets
 
 	intExtSP, intExtIdP, hubExtIdP, hubExtSP gosaml.MdSets
 
@@ -992,7 +992,13 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 		Nonce: nonce,
 	}
 	bytes, err := json.Marshal(&sRequest)
-	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
+	//session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
+	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
+	origRequest, err := authnRequestCookie.Encode("id", gosaml.Deflate(bytes))
+	if err != nil {
+		return
+	}
+	newrequest.QueryDashP(nil, "./@ID", "_"+origRequest, nil)
 
 	var privatekey []byte
 	if idpMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || spMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
@@ -1035,18 +1041,24 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, issuerMdSets, destinationMdSets gosaml.MdSets, prefix string) (spMd, hubIdp, idpMd, request *goxml.Xp, sRequest samlRequest, err error) {
 	gosaml.DumpFileIfTracing(r, response)
-	inResponseTo := response.Query1(nil, "./@InResponseTo")
-	value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
+	inResponseTo := response.Query1(nil, "./@InResponseTo")[1:]
+	// value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
+    // extract the original request from @inResponseTo
+	value := []byte{}
+	err = authnRequestCookie.Decode("id", inResponseTo, &value)
 	if err != nil {
 		return
 	}
+	value = gosaml.Inflate(value)
+
 	// to minimize the size of the cookies we have saved the original request in a json'ed struct
 	err = json.Unmarshal(value, &sRequest)
 
-	if inResponseTo != sRequest.Nid {
-		err = fmt.Errorf("response.InResponseTo != request.ID")
-		return
-	}
+    // we need to disable the replay attack mitigation based on the cookie - we are now fully dependent on the ttl on the data - pt. 3 mins
+	//	if inResponseTo != sRequest.Nid {
+	//		err = fmt.Errorf("response.InResponseTo != request.ID")
+	//		return
+	//	}
 
 	if sRequest.Id == "" { // This is a non-hub request - no original actual original request - just checking if response/@InResponseTo == request/@ID
 		return nil, nil, nil, nil, sRequest, nil
