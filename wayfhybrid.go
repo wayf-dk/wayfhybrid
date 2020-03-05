@@ -141,7 +141,8 @@ type (
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
 		Fo, SPi, Hubi        int
-		WsFed                bool
+		WsFed, OAuth         bool
+		Nonce                string
 	}
 
 	webMd struct {
@@ -303,6 +304,7 @@ func Main() {
 	httpMux.Handle("/hsmstatus", appHandler(HSMStatus))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.Sso_Service, appHandler(SSOService))
+	httpMux.Handle(config.Oauth, appHandler(SSOService))
 	httpMux.Handle(config.Idpslo, appHandler(IdPSLOService))
 	httpMux.Handle(config.Birkslo, appHandler(BirkSLOService))
 	httpMux.Handle(config.Spslo, appHandler(SPSLOService))
@@ -1004,6 +1006,10 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 		request = goxml.NewXpFromString("") // an empty one to allow get "" for all the fields below ....
 	}
 
+	nonce := r.Form.Get("nonce")
+	if len(nonce) > 100 {
+		nonce = nonce[:100]
+	}
 	sRequest := samlRequest{
 		Nid:   id,
 		Id:    request.Query1(nil, "./@ID"),
@@ -1014,6 +1020,8 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 		SPi:   spIndex,
 		Hubi:  hubIdpIndex,
 		WsFed: r.Form.Get("wa") == "wsignin1.0",
+		OAuth: r.Form.Get("response_type") != "",
+		Nonce: nonce,
 	}
 	bytes, err := json.Marshal(&sRequest)
 	session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
@@ -1158,6 +1166,63 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
 		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
+
+		if sRequest.OAuth {
+			payload := map[string]interface{}{}
+			payload["aud"] = newresponse.Query1(nil, "//saml:Audience")
+			payload["iss"] = newresponse.Query1(nil, "./saml:Issuer")
+			payload["iat"] = gosaml.SamlTime2JwtTime(newresponse.Query1(nil, "./@IssueInstant"))
+			payload["exp"] = gosaml.SamlTime2JwtTime(newresponse.Query1(nil, "//@SessionNotOnOrAfter"))
+			payload["sub"] = newresponse.Query1(nil, "//saml:NameID")
+			payload["appid"] = newresponse.Query1(nil, "./saml:Issuer")
+			payload["apptype"] = "Public"
+			payload["authmethod"] = newresponse.Query1(nil, "//saml:AuthnContextClassRef")
+			payload["auth_time"] = newresponse.Query1(nil, "//@AuthnInstant")
+			payload["ver"] = "1.0"
+			payload["scp"] = "openid profile"
+			for _, attr := range newresponse.Query(nil, "//saml:Attribute") {
+				payload[newresponse.Query1(attr, "@Name")] = newresponse.QueryMulti(attr, "./saml:AttributeValue")
+			}
+
+			privatekey, _, err := gosaml.GetPrivateKey(idpMd)
+			if err != nil {
+				return err
+			}
+
+			body, err := json.Marshal(payload)
+			if err != nil {
+				return err
+			}
+
+			access_token, at_hash, err := jwt(body, privatekey)
+			if err != nil {
+				return err
+			}
+
+			payload["nonce"] = sRequest.Nonce
+			payload["at_hash"] = at_hash
+			body, err = json.Marshal(payload)
+			if err != nil {
+				return err
+			}
+
+			id_token, _, err := jwt(body, privatekey)
+			if err != nil {
+				return err
+			}
+
+			u := url.Values{}
+			// do not use a parametername that sorts before access_token !!!
+
+			u.Set("access_token", access_token)
+			u.Set("id_token", id_token)
+			u.Set("state", relayState)
+			u.Set("token_type", "bearer")
+			u.Set("expires_in", "3600")
+			u.Set("scope", "openid profile")
+			http.Redirect(w, r, fmt.Sprintf("%s#%s", newresponse.Query1(nil, "@Destination"), u.Encode()), http.StatusFound)
+			return nil
+		}
 
 		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
 		if spMd.QueryBool(nil, "count("+xprefix+"feds[.='eduGAIN']) > 0") {
@@ -1533,5 +1598,24 @@ func intersectionNotEmpty(s1, s2 []string) (res bool) {
 			return true
 		}
 	}
+	return
+}
+
+func jwt(json []byte, privatekey []byte) (jwt, at_hash string, err error) {
+	payload := base64.RawURLEncoding.EncodeToString(json)
+	//header := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." // sha256
+	//dgst := sha256.Sum256
+	header := "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9." // sha512
+	dgst := sha512.Sum512
+
+	digest := dgst([]byte(header + payload))
+	signature, err := goxml.Sign(digest[:], privatekey, []byte("-"), "sha512") // "sha256"
+	if err != nil {
+	    err = goxml.Wrap(err)
+	    return
+	}
+	jwt = header + payload + "." + base64.RawURLEncoding.EncodeToString(signature)
+	at_hash_digest := dgst([]byte(jwt))
+	at_hash = base64.RawURLEncoding.EncodeToString(at_hash_digest[:len(at_hash_digest)/2])
 	return
 }
