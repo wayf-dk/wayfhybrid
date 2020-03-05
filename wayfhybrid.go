@@ -3,6 +3,7 @@ package wayfhybrid
 import (
 	"crypto"
 	"crypto/sha1"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
