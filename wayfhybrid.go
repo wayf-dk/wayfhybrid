@@ -1104,7 +1104,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			return
 		}
 		if hubSpIndex == 0 { // to the hub itself
-			ard, err = WayfACSServiceHandler(idpMd, hubRequestedAttributes, spMd, request, response, sRequest.Hubi == 1)
+			ard, err = WayfACSServiceHandler(idpMd, hubMd, spMd, request, response, sRequest.Hubi == 1)
 		} else { // krib
 			ard, err = WayfKribHandler(idpMd, spMd, request, response)
 		}
@@ -1267,7 +1267,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		samlResponse = base64.StdEncoding.EncodeToString(newresponse.Dump())
 	}
 	data := gosaml.Formdata{WsFed: sRequest.WsFed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
-	attributeReleaseForm.Execute(w, data)
+	tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
 	return
 }
 
@@ -1360,7 +1360,8 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 				http.Redirect(w, r, u.String(), http.StatusFound)
 			case gosaml.POST:
 				data := gosaml.Formdata{Acs: newRequest.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(newRequest.Dump())}
-				gosaml.PostForm.Execute(w, data)
+				gosaml.PostForm.ExecuteTemplate(w, "postform", data)
+
 			}
 		} else {
 			err = fmt.Errorf("no Logout info found")
@@ -1417,7 +1418,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			http.Redirect(w, r, u.String(), http.StatusFound)
 		case gosaml.POST:
 			data := gosaml.Formdata{Acs: newResponse.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(newResponse.Dump())}
-			gosaml.PostForm.Execute(w, data)
+			gosaml.PostForm.ExecuteTemplate(w, "postform", data)
 		}
 	} else {
 		err = fmt.Errorf("no LogoutRequest/logoutResponse found")
