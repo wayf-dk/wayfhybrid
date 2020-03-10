@@ -633,11 +633,13 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		var vals, debugVals []attrValue
+		var incomingResponseXML string
 		protocol := response.QueryString(nil, "local-name(/*)")
 		if protocol == "Response" {
 			if err := gosaml.CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, issuerMd.QueryMulti(nil, xprefix+"SigningMethod")); err != nil {
 				return err
 			}
+			incomingResponseXML = response.PP()
 			vals = attributeValues(response, destinationMd, hubMd)
 			Attributesc14n(response, response, issuerMd, destinationMd)
 			err = wayfScopeCheck(response, issuerMd)
@@ -647,7 +649,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			debugVals = attributeValues(response, destinationMd, hubMd)
 		}
 
-		data := testSPFormData{RelayState: relayState, ResponsePP: response.PP(), Destination: destinationMd.Query1(nil, "./@entityID"), Messages: messages,
+		data := testSPFormData{RelayState: relayState, ResponsePP: incomingResponseXML, Destination: destinationMd.Query1(nil, "./@entityID"), Messages: messages,
 			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, DebugValues: debugVals, ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority")}
 		tmpl.ExecuteTemplate(w, "testSPForm", data)
 	} else if r.Form.Get("ds") != "" {
@@ -666,11 +668,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 // attributeValues returns all the attribute values
 func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrValue) {
 	seen := map[string]bool{}
-	requestedAttributes := hubMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute`) // [@isRequired='true' or @isRequired='1']`)
+	requestedAttributes := destinationMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute`) // [@isRequired='true' or @isRequired='1']`)
 	for _, requestedAttribute := range requestedAttributes {
 		name := destinationMd.Query1(requestedAttribute, "@Name")
-		seen[name] = true
 		friendlyName := destinationMd.Query1(requestedAttribute, "@FriendlyName")
+		seen[name] = true
 		seen[friendlyName] = true
 
 		must := hubMd.Query1(nil, `.//md:RequestedAttribute[@Name=`+strconv.Quote(name)+`]/@must`) == "true"
