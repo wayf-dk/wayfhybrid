@@ -43,6 +43,7 @@ var (
 		{c14n: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
+		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:cp:uid"},
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
 
 		// computed
@@ -84,8 +85,8 @@ var (
 
 	attributesBase = []attributeDescription{
 		// nemlogin specials
-		{c14n: "schacPersonalUniqueID", name: "dk:gov:saml:attribute:CprNumberIdentifier"},
-		{c14n: "eduPersonPrincipalName", name: "urn:oid:0.9.2342.19200300.100.1.1"},
+		{c14n: "schacPersonalUniqueID", name: "dk:gov:saml:attribute:CprNumberIdentifier", nameformat: "basic"},
+//		{c14n: "eduPersonPrincipalName", name: "urn:oid:0.9.2342.19200300.100.1.1", nameformat: "basic"}, // basic ???
 
 		// wayf
 		{c14n: "cn", name: "cn"},
@@ -266,6 +267,8 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "eq":
 			opParam = strings.SplitN(opParam[1], ":", 2)
 			*v = strconv.FormatBool(values[opParam[0]][0] == opParam[1])
+		case "cp":
+			values[atd.c14n] = values[opParam[1]]
 		case "val":
 			*v = opParam[1]
 		case "prefix":
