@@ -139,7 +139,7 @@ var (
 	// Config initialisation
 	Config = Conf{}
 	// ACSError refers error information
-	ACSError = errors.New("invalid AsssertionConsumerService or AsssertionConsumerServiceIndex")
+	ACSError = errors.New("invalid AsssertionConsumerServiceURL or AsssertionConsumerServiceIndex")
 	// NameIDList list of supported nameid formats
 	NameIDList = []string{"", Transient, Persistent, X509, Email, Unspecified}
 	// NameIDMap refers to mapping the nameid formats
