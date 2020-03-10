@@ -1349,13 +1349,12 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 
 		response := NewResponse(idpMd, spMd, request, nil)
 
-		iat, _ := attrs["iat"].(float64)
-		delete(attrs, "iat")
-
-		if math.Abs(float64(time.Now().Unix())-iat) > timeskew {
-			return fmt.Errorf("jwt timed out")
-		}
-
+		if iat, ok := attrs["iat"]; ok {
+        		delete(attrs, "iat")
+            if math.Abs(float64(time.Now().Unix())-iat.(float64)) > timeskew {
+                return fmt.Errorf("jwt timed out")
+            }
+        }
 		if aas := attrs["saml:AuthenticatingAuthority"]; aas != nil {
 			for _, aa := range aas.([]interface{}) {
 				response.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa.(string), nil)
