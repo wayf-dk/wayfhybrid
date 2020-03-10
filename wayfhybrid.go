@@ -337,11 +337,11 @@ func Main() {
 	<-finish
 }
 
-func env(name, defaultvalue string) (string) {
-    if val, ok := os.LookupEnv(name); ok {
-        return val
-    }
-    return defaultvalue
+func env(name, defaultvalue string) string {
+	if val, ok := os.LookupEnv(name); ok {
+		return val
+	}
+	return defaultvalue
 }
 
 func overrideConfig(config interface{}, envvars []string) {
@@ -997,14 +997,14 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 		Hubi:  hubIdpIndex,
 		Nonce: nonce,
 	}
-sRequest.Nid = ""
+	sRequest.Nid = ""
 	if r.Form.Get("wa") == "wsignin1.0" {
-	    sRequest.Type = wsfed
+		sRequest.Type = wsfed
 	} else if r.Form.Get("response_type") != "" {
-	    sRequest.Type = oauth
+		sRequest.Type = oauth
 	}
 
-    buf, n := sRequest.marshal()
+	buf, n := sRequest.marshal()
 
 	//session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
@@ -1058,7 +1058,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	gosaml.DumpFileIfTracing(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")[1:]
 	// value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
-    // extract the original request from @inResponseTo
+	// extract the original request from @inResponseTo
 	value := []byte{}
 	value, err = authnRequestCookie.SpcDecode("id", inResponseTo, 5)
 	if err != nil {
@@ -1067,7 +1067,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 
 	sRequest.unmarshal(value)
 
-    // we need to disable the replay attack mitigation based on the cookie - we are now fully dependent on the ttl on the data - pt. 3 mins
+	// we need to disable the replay attack mitigation based on the cookie - we are now fully dependent on the ttl on the data - pt. 3 mins
 	//	if inResponseTo != sRequest.Nid {
 	//		err = fmt.Errorf("response.InResponseTo != request.ID")
 	//		return
@@ -1500,7 +1500,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		spHash := idHash(sp)
 		spIdPHash = idHash(tag + "#" + idpHash + "#" + spHash)
 		// 1st delete any SLO info for the same idp-sp pair
-        var oldHashIn, oldHashOut string
+		var oldHashIn, oldHashOut string
 		data, _ := session.Get(w, r, spIdPHash, sloInfoCookie)
 		fmt.Sscanf(string(data), "%s %s", &oldHashIn, &oldHashOut)
 		session.Del(w, r, oldHashIn, sloInfoCookie)
@@ -1597,8 +1597,8 @@ func jwt(json []byte, privatekey []byte) (jwt, at_hash string, err error) {
 	digest := dgst([]byte(header + payload))
 	signature, err := goxml.Sign(digest[:], privatekey, []byte("-"), "sha512") // "sha256"
 	if err != nil {
-	    err = goxml.Wrap(err)
-	    return
+		err = goxml.Wrap(err)
+		return
 	}
 	jwt = header + payload + "." + base64.RawURLEncoding.EncodeToString(signature)
 	at_hash_digest := dgst([]byte(jwt))
@@ -1609,36 +1609,41 @@ func jwt(json []byte, privatekey []byte) (jwt, at_hash string, err error) {
 // hand-held marshal and unmarshal? for samlRequest struct
 
 func (r samlRequest) marshal() (msg []byte, n int) {
-    prefix := []byte{}
-    for _, str := range []string{r.Nid, r.Id, r.Is, r.De, r.Acs, r.Nonce} {
-        	prefix = append(prefix, uint8(len(str))) // if over 127 we are in trouble
-	    msg = append(msg, str...)
-    }
-    str := fmt.Sprintf("%1d%1d%1d%1d", r.Fo, r.SPi, r.Hubi, r.Type)
+	prefix := []byte{}
+	for _, str := range []string{r.Nid, r.Id, r.Is, r.De, r.Acs, r.Nonce} {
+		prefix = append(prefix, uint8(len(str))) // if over 127 we are in trouble
+		msg = append(msg, str...)
+	}
+	str := fmt.Sprintf("%1d%1d%1d%1d", r.Fo, r.SPi, r.Hubi, r.Type)
 	msg = append(msg, str...)
-    msg = append(prefix, msg...)
-    n = len(prefix)
+	msg = append(prefix, msg...)
+	n = len(prefix)
 	return
 }
 
 func (r *samlRequest) unmarshal(msg []byte) {
-    i := byte(6)
-    l := msg[0]
-    r.Nid = string(msg[i:i+l])
-    i = i+l; l = msg[1]
-    r.Id = string(msg[i:i+l])
-    i = i+l; l = msg[2]
-    r.Is = string(msg[i:i+l])
-    i = i+l; l = msg[3]
-    r.De = string(msg[i:i+l])
-    i = i+l; l = msg[4]
-    r.Acs = string(msg[i:i+l])
-    i = i+l; l = msg[5]
-    r.Nonce = string(msg[i:i+l])
-    i = i+l;
-    r.Fo = msg[i]-48
-    r.SPi = msg[i+1]-48
-    r.Hubi = msg[i+2]-48
-    r.Type = msg[i+3]-48
-    return
+	i := byte(6)
+	l := msg[0]
+	r.Nid = string(msg[i : i+l])
+	i = i + l
+	l = msg[1]
+	r.Id = string(msg[i : i+l])
+	i = i + l
+	l = msg[2]
+	r.Is = string(msg[i : i+l])
+	i = i + l
+	l = msg[3]
+	r.De = string(msg[i : i+l])
+	i = i + l
+	l = msg[4]
+	r.Acs = string(msg[i : i+l])
+	i = i + l
+	l = msg[5]
+	r.Nonce = string(msg[i : i+l])
+	i = i + l
+	r.Fo = msg[i] - 48
+	r.SPi = msg[i+1] - 48
+	r.Hubi = msg[i+2] - 48
+	r.Type = msg[i+3] - 48
+	return
 }
