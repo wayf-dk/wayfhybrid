@@ -1455,9 +1455,6 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 // Saves or retrieves the SLO info relevant to the contents of the samlMessage
 // For now uses cookies to keep the SLOInfo
 func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationInMd, samlOut, destinationOutMd *goxml.Xp, role int, tag string) (sloinfo *gosaml.SLOInfo, err error) {
-	type touple struct {
-		HashIn, HashOut string
-	}
 	var key, idp, sp, spIdPHash string
 	hashIn := fmt.Sprintf("%s-%d-%s", tag, gosaml.SPRole, idHash(samlIn.Query1(nil, "//saml:NameID")))
 	hashOut := fmt.Sprintf("%s-%d-%s", tag, gosaml.IdPRole, idHash(samlOut.Query1(nil, "//saml:NameID")))
@@ -1472,14 +1469,14 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		sloinfo = &gosaml.SLOInfo{}
 		data, err := session.Get(w, r, key, sloInfoCookie)
 		if err == nil {
-			err = json.Unmarshal(data, &sloinfo)
+			sloinfo.Unmarshal(data)
 		}
 		session.Del(w, r, key, sloInfoCookie)
 		key = fmt.Sprintf("%s-%d-%s", tag, (role+1)%2, idHash(sloinfo.Na))
 		sloinfo2 := &gosaml.SLOInfo{}
 		data, err = session.Get(w, r, key, sloInfoCookie)
 		if err == nil {
-			err = json.Unmarshal(data, &sloinfo2)
+			sloinfo2.Unmarshal(data)
 		}
 		session.Del(w, r, key, sloInfoCookie)
 		switch role {
@@ -1501,31 +1498,26 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		spHash := idHash(sp)
 		spIdPHash = idHash(tag + "#" + idpHash + "#" + spHash)
 		// 1st delete any SLO info for the same idp-sp pair
-		unique := &touple{}
-		data, err := session.Get(w, r, spIdPHash, sloInfoCookie)
-		if err == nil {
-			err = json.Unmarshal(data, &unique)
-		}
-		session.Del(w, r, unique.HashIn, sloInfoCookie)
-		session.Del(w, r, unique.HashOut, sloInfoCookie)
+        var oldHashIn, oldHashOut string
+		data, _ := session.Get(w, r, spIdPHash, sloInfoCookie)
+		fmt.Sscanf(string(data), "%s %s", &oldHashIn, &oldHashOut)
+		session.Del(w, r, oldHashIn, sloInfoCookie)
+		session.Del(w, r, oldHashOut, sloInfoCookie)
 		// 2nd create 2 new SLO info recs and save them under the hash of the opposite
-		unique.HashIn = hashIn
-		unique.HashOut = hashOut
-		bytes, err := json.Marshal(&unique)
-		session.Set(w, r, spIdPHash, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
+		session.Set(w, r, spIdPHash, config.Domain, []byte(fmt.Sprintf("%s %s", hashIn, hashOut)), sloInfoCookie, sloInfoTTL)
+		fmt.Println(oldHashIn, hashIn, oldHashOut, hashOut)
 
 		slo := gosaml.NewSLOInfo(samlIn, destinationInMd.Query1(nil, "@entityID"))
 		slo.Is = idHash(slo.Is)
 		slo.De = idHash(slo.De)
-		bytes, _ = json.Marshal(&slo)
+		bytes := slo.Marshal()
 		session.Set(w, r, hashOut, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 
 		slo = gosaml.NewSLOInfo(samlOut, destinationOutMd.Query1(nil, "@entityID"))
 		slo.Is = idHash(slo.Is)
 		slo.De = idHash(slo.De)
-		bytes, _ = json.Marshal(&slo)
+		bytes = slo.Marshal()
 		session.Set(w, r, hashIn, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
-
 	}
 	return
 }
