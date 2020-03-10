@@ -15,7 +15,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
     "encoding/binary"
-	"encoding/hex"
+//	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
