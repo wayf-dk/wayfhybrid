@@ -44,6 +44,12 @@ const (
 	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
 )
 
+const (
+	saml = iota
+	wsfed
+	oauth
+)
+
 type (
 	appHandler func(http.ResponseWriter, *http.Request) error
 
@@ -130,8 +136,7 @@ type (
 
 	samlRequest struct {
 		Nid, Id, Is, De, Acs string
-		Fo, SPi, Hubi        int
-		WsFed, OAuth         bool
+		Fo, SPi, Hubi, Type  uint8
 		Nonce                string
 	}
 
@@ -956,7 +961,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpMd, spMd, idpMd *goxml.Xp, idp, relayState, prefix, altAcs, domain string, spIndex, hubIdpIndex int, idPList []string) (err error) {
+func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpMd, spMd, idpMd *goxml.Xp, idp, relayState, prefix, altAcs, domain string, spIndex, hubIdpIndex uint8, idPList []string) (err error) {
 	// why not use orig request?
 	newrequest, err := gosaml.NewAuthnRequest(request, spMd, idpMd, idPList, altAcs)
 	if err != nil {
@@ -984,17 +989,23 @@ func sendRequestToIdP(w http.ResponseWriter, r *http.Request, request, issuerSpM
 	sRequest := samlRequest{
 		Nid:   id,
 		Id:    request.Query1(nil, "./@ID"),
-		Is:    request.Query1(nil, "./saml:Issuer"),
-		De:    idp,
+		Is:    idHash(request.Query1(nil, "./saml:Issuer")),
+		De:    idHash(idp),
 		Fo:    gosaml.NameIDMap[request.Query1(nil, "./samlp:NameIDPolicy/@Format")],
 		Acs:   request.Query1(nil, "./@AssertionConsumerServiceIndex"),
 		SPi:   spIndex,
 		Hubi:  hubIdpIndex,
-		WsFed: r.Form.Get("wa") == "wsignin1.0",
-		OAuth: r.Form.Get("response_type") != "",
 		Nonce: nonce,
 	}
-	bytes, err := json.Marshal(&sRequest)
+sRequest.Nid = ""
+	if r.Form.Get("wa") == "wsignin1.0" {
+	    sRequest.Type = wsfed
+	} else if r.Form.Get("response_type") != "" {
+	    sRequest.Type = oauth
+	}
+
+    buf, n := sRequest.marshal()
+
 	//session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
 	origRequest, err := authnRequestCookie.Encode("id", gosaml.Deflate(bytes))
@@ -1150,7 +1161,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
 		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
 
-		if sRequest.OAuth {
+		if sRequest.Type == oauth {
 			payload := map[string]interface{}{}
 			payload["aud"] = newresponse.Query1(nil, "//saml:Audience")
 			payload["iss"] = newresponse.Query1(nil, "./saml:Issuer")
@@ -1227,7 +1238,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
 		signingType := gosaml.SAMLSign
-		if sRequest.WsFed {
+		if sRequest.Type == wsfed {
 			newresponse = gosaml.NewWsFedResponse(hubIdpMd, spMd, newresponse)
 			ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
 
@@ -1278,12 +1289,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	gosaml.DumpFileIfTracing(r, newresponse)
 
 	var samlResponse string
-	if sRequest.WsFed {
+	if sRequest.Type == wsfed {
 		samlResponse = string(newresponse.Dump())
 	} else {
 		samlResponse = base64.StdEncoding.EncodeToString(newresponse.Dump())
 	}
-	data := gosaml.Formdata{WsFed: sRequest.WsFed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
+	data := gosaml.Formdata{WsFed: sRequest.Type == wsfed, Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
 	tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
 	return
 }
@@ -1602,4 +1613,41 @@ func jwt(json []byte, privatekey []byte) (jwt, at_hash string, err error) {
 	at_hash_digest := dgst([]byte(jwt))
 	at_hash = base64.RawURLEncoding.EncodeToString(at_hash_digest[:len(at_hash_digest)/2])
 	return
+}
+
+// hand-held marshal and unmarshal? for samlRequest struct
+
+func (r samlRequest) marshal() (msg []byte, n int) {
+    prefix := []byte{}
+    for _, str := range []string{r.Nid, r.Id, r.Is, r.De, r.Acs, r.Nonce} {
+        	prefix = append(prefix, uint8(len(str))) // if over 127 we are in trouble
+	    msg = append(msg, str...)
+    }
+    str := fmt.Sprintf("%1d%1d%1d%1d", r.Fo, r.SPi, r.Hubi, r.Type)
+	msg = append(msg, str...)
+    msg = append(prefix, msg...)
+    n = len(prefix)
+	return
+}
+
+func (r *samlRequest) unmarshal(msg []byte) {
+    i := byte(6)
+    l := msg[0]
+    r.Nid = string(msg[i:i+l])
+    i = i+l; l = msg[1]
+    r.Id = string(msg[i:i+l])
+    i = i+l; l = msg[2]
+    r.Is = string(msg[i:i+l])
+    i = i+l; l = msg[3]
+    r.De = string(msg[i:i+l])
+    i = i+l; l = msg[4]
+    r.Acs = string(msg[i:i+l])
+    i = i+l; l = msg[5]
+    r.Nonce = string(msg[i:i+l])
+    i = i+l;
+    r.Fo = msg[i]-48
+    r.SPi = msg[i+1]-48
+    r.Hubi = msg[i+2]-48
+    r.Type = msg[i+3]-48
+    return
 }

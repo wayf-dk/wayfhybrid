@@ -105,7 +105,7 @@ type (
 		//		IssuerID, NameID, SPNameQualifier, SessionIndex, DestinationID string
 		Is, Na, Sp, Si, De string
 		//		Format int
-		Fo int
+		Fo uint8
 	}
 
 	Formdata struct {
@@ -143,7 +143,7 @@ var (
 	// NameIDList list of supported nameid formats
 	NameIDList = []string{"", Transient, Persistent, X509, Email, Unspecified}
 	// NameIDMap refers to mapping the nameid formats
-	NameIDMap          = map[string]int{"": 1, Transient: 1, Persistent: 2, X509: 3, Email: 4, Unspecified: 5} // Unspecified accepted but not sent upstream
+	NameIDMap          = map[string]uint8{"": 1, Transient: 1, Persistent: 2, X509: 3, Email: 4, Unspecified: 5} // Unspecified accepted but not sent upstream
 	whitespace         = regexp.MustCompile("\\s")
 	PostForm           *template.Template
 	AuthnRequestCookie *Hm
@@ -218,7 +218,7 @@ func GetPrivateKey(md *goxml.Xp) (privatekey []byte, cert string, err error) {
 func Id() (id string) {
 	b := make([]byte, 21) // 168 bits - just over the 160 bit recomendation without base64 padding
 	rand.Read(b)
-	return "_" + hex.EncodeToString(b)
+	return "_" + base64.RawURLEncoding.EncodeToString(b)
 }
 
 // Deflate utility that compresses a string using the flate algo
@@ -334,7 +334,7 @@ func AttributeCanonicalDump(w io.Writer, xp *goxml.Xp) {
 // Checks for Subject and  NameidPolicy(Persistent or Transient)
 // Receives the metadatasets for resp. the sender and the receiver
 // Returns metadata for the sender and the receiver
-func ReceiveAuthnRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets, location string) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex int, err error) {
+func ReceiveAuthnRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets, location string) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex uint8, err error) {
 	xp, issuerMd, destinationMd, relayState, issuerIndex, destinationIndex, err = DecodeSAMLMsg(r, issuerMdSets, destinationMdSets, IdPRole, []string{"AuthnRequest"}, location, nil)
 	if err != nil {
 		return
@@ -378,8 +378,9 @@ func inArray(item string, array []string) bool {
 	return false
 }
 
-func FindInMetadataSets(metadataSets MdSets, key string) (md *goxml.Xp, index int, err error) {
-	for index, _ = range metadataSets {
+func FindInMetadataSets(metadataSets MdSets, key string) (md *goxml.Xp, index uint8, err error) {
+	for i, _ := range metadataSets {
+		index = uint8(i)
 		md, err = metadataSets[index].MDQ(key)
 		if err == nil { // if we don't get md not found the last error is as good as the first
 			return
@@ -392,14 +393,14 @@ func FindInMetadataSets(metadataSets MdSets, key string) (md *goxml.Xp, index in
 // Currently the only supported binding is POST
 // Receives the metadatasets for resp. the sender and the receiver
 // Returns metadata for the sender and the receiver
-func ReceiveSAMLResponse(r *http.Request, issuerMdSets, destinationMdSets MdSets, location string, xtraCerts []string) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex int, err error) {
+func ReceiveSAMLResponse(r *http.Request, issuerMdSets, destinationMdSets MdSets, location string, xtraCerts []string) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex uint8, err error) {
 	return DecodeSAMLMsg(r, issuerMdSets, destinationMdSets, SPRole, []string{"Response"}, location, xtraCerts)
 }
 
 // ReceiveLogoutMessage receives the Logout Message
 // Receives the metadatasets for resp. the sender and the receiver
 // Returns metadata for the sender and the receiver
-func ReceiveLogoutMessage(r *http.Request, issuerMdSets, destinationMdSets MdSets, role int) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex int, err error) {
+func ReceiveLogoutMessage(r *http.Request, issuerMdSets, destinationMdSets MdSets, role int) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex uint8, err error) {
 	return DecodeSAMLMsg(r, issuerMdSets, destinationMdSets, role, []string{"LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path, nil)
 }
 
@@ -408,7 +409,7 @@ func ReceiveLogoutMessage(r *http.Request, issuerMdSets, destinationMdSets MdSet
 // Validates the schema
 // Receives the metadatasets for resp. the sender and the receiver
 // Returns metadata for the sender and the receiver
-func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role int, protocols []string, location string, xtraCerts []string) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex int, err error) {
+func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role int, protocols []string, location string, xtraCerts []string) (xp, issuerMd, destinationMd *goxml.Xp, relayState string, issuerIndex, destinationIndex uint8, err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 	method := r.Method
