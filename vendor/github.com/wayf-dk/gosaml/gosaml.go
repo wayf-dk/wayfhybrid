@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/flate"
 	"crypto"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -13,16 +14,17 @@ import (
 	"crypto/sha512"
 	"crypto/x509"
 	"encoding/base64"
+    "encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"github.com/gorilla/securecookie"
 	//"github.com/wayf-dk/go-libxml2/clib"
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/goxml"
 	"github.com/y0ssar1an/q"
+	"hash"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -117,6 +119,12 @@ type (
 	xmapElement struct {
 		key, xpath string
 	}
+
+	Hm struct {
+		Ttl  int64
+		Hash func() hash.Hash
+		Key  []byte
+	}
 )
 
 var (
@@ -138,7 +146,7 @@ var (
 	NameIDMap          = map[string]int{"": 1, Transient: 1, Persistent: 2, X509: 3, Email: 4, Unspecified: 5} // Unspecified accepted but not sent upstream
 	whitespace         = regexp.MustCompile("\\s")
 	PostForm           *template.Template
-	AuthnRequestCookie *securecookie.SecureCookie
+	AuthnRequestCookie *Hm
 )
 
 // DebugSetting for debugging cookies
@@ -1461,8 +1469,7 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			payload += "." + strings.TrimRight(base64.URLEncoding.EncodeToString(signature), "=")
 			w.Header().Set("Authorization", "Bearer "+payload)
 
-			var app []byte
-			err = AuthnRequestCookie.Decode("app", relayState, &app)
+			app, err := AuthnRequestCookie.Decode("app", relayState)
 			if err != nil {
 				return err
 			}
@@ -1609,6 +1616,94 @@ func CheckDigestAndSignatureAlgorithms(response *goxml.Xp, allowedDigestAndSigna
 		return fmt.Errorf("No or to few Digest/Signing algoritms found")
 	}
 	return
+}
+
+// hand-held marshal and unmarshal? for SLOInfo struct
+
+func (r SLOInfo) Marshal() (msg []byte) {
+    for _, str := range []string{r.Is, r.Na, r.Sp, r.Si, r.De} {
+        	msg = append(msg, 0xd9, uint8(len(str)))
+	    msg = append(msg, str...)
+    }
+	msg = append(msg, 0xcc, r.Fo)
+	return
+}
+
+func (r *SLOInfo) Unmarshal(msg []byte) {
+    i := byte(2)
+    l := i + msg[i-1]
+    r.Is = string(msg[i:l])
+    i = l+2 ; l = i + msg[i-1]
+    r.Na = string(msg[i:l])
+    i = l+2 ; l = i + msg[i-1]
+    r.Sp = string(msg[i:l])
+    i = l+2 ; l = i + msg[i-1]
+    r.Si = string(msg[i:l])
+    i = l+2 ; l = i + msg[i-1]
+    r.De = string(msg[i:l])
+    i = l+1
+    r.Fo = msg[i]
+    return
+}
+
+// hmac using hand-held MessagePack for keeping the size down - no double base64 encodings
+
+func (h *Hm) Encode(id string, msg []byte) (str string, err error) {
+	bts, err := h.innerSign(id, msg, time.Now().Unix())
+	return base64.RawURLEncoding.EncodeToString(bts), err
+}
+
+// SpcEncode - does not base64 encodes the msg from num bytes onward - ie. it is already in
+// an allowed format for whatever purpose it is intended - this is to save space by not base64
+// encode data that does not need it
+
+func (h *Hm) SpcEncode(id string, msg []byte, num int) (str string, err error) {
+	bts, err := h.innerSign(id, msg, time.Now().Unix())
+	str = base64.RawURLEncoding.EncodeToString(bts[:24+num])+string(msg[num:]) // 24 is the size of hmac + timestamp in MP format
+	return
+}
+
+func (h *Hm) Decode(id, in string) ([]byte, error) {
+    signedMsg, _ := base64.RawURLEncoding.DecodeString(in)
+	return h.innerValidate(id, signedMsg)
+}
+
+func (h *Hm) SpcDecode(id, in string, num int) ([]byte, error) {
+    encoded, _ :=  base64.RawURLEncoding.DecodeString(in[:40]) // len(base64 encoded(24+num)) == 40
+    encoded = append(encoded, in[40:]...)
+	return h.innerValidate(id, encoded)
+}
+
+func (h *Hm) innerSign(id string, msg []byte, ts int64) (signedMsg []byte, err error) {
+	bs := make([]byte, 4)
+	binary.BigEndian.PutUint32(bs, uint32(ts))
+	hash := hmac.New(h.Hash, h.Key)
+	hash.Write([]byte(id))
+	hash.Write([]byte(bs))
+	hash.Write(msg)
+
+	signedMsg = append(signedMsg, 0xc4, 0x10)
+	signedMsg = append(signedMsg, hash.Sum(nil)[:16]...)
+	signedMsg = append(signedMsg, 0xd6, 0xFF)
+	signedMsg = append(signedMsg, bs...)
+	signedMsg = append(signedMsg, msg ...)
+	return signedMsg, nil
+}
+
+func (h *Hm) innerValidate(id string, signedMsg []byte) (msg []byte, err error) {
+    ts := int64(binary.BigEndian.Uint32(signedMsg[20:24]))
+    msg = signedMsg[24:]
+    computed, err := h.innerSign(id, msg, ts)
+	if err != nil {
+		return
+	}
+	if hmac.Equal(signedMsg[:24], []byte(computed)[:24]) {
+	    now := time.Now().Unix()
+		if now - ts < h.Ttl {
+			return msg, nil
+		}
+	}
+	return nil, errors.New("hmac failed")
 }
 
 func PP(i ...interface{}) {
