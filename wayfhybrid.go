@@ -3,13 +3,13 @@ package wayfhybrid
 import (
 	"crypto"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/securecookie"
 	toml "github.com/pelletier/go-toml"
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/godiscoveryservice"
@@ -164,7 +164,7 @@ var (
 
 	session = wayfHybridSession{}
 
-	sloInfoCookie, authnRequestCookie *securecookie.SecureCookie
+	sloInfoCookie, authnRequestCookie *gosaml.Hm
 	tmpl                              *template.Template
 	hashKey                           []byte
 	hostName                          string
@@ -233,7 +233,7 @@ func Main() {
 	hubExtSP = gosaml.MdSets{Md.Hub, Md.ExternalSP}
 
 	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
-	log.Printf("refreshAllMetadataFeeds: %s %s\n", str, err)
+	log.Printf("refreshAllMetadataFeeds: %s %v\n", str, err)
 
 	webMdMap = make(map[string]webMd)
 	for _, md := range []*lMDQ.MDQ{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
@@ -270,13 +270,9 @@ func Main() {
 	}
 
 	hashKey, _ := hex.DecodeString(config.SecureCookieHashKey)
-	sloInfoCookie = securecookie.New(hashKey, nil)
-	sloInfoCookie.SetSerializer(securecookie.NopEncoder{})
-	sloInfoCookie.MaxAge(sloInfoTTL)
-	authnRequestCookie = securecookie.New(hashKey, nil)
-	authnRequestCookie.SetSerializer(securecookie.NopEncoder{})
-	authnRequestCookie.MaxAge(authnRequestTTL)
+	authnRequestCookie = &gosaml.Hm{authnRequestTTL, sha256.New, hashKey}
 	gosaml.AuthnRequestCookie = authnRequestCookie
+	sloInfoCookie = &gosaml.Hm{sloInfoTTL, sha256.New, hashKey}
 
 	httpMux := http.NewServeMux()
 
@@ -364,8 +360,8 @@ func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Set responsible for setting a cookie values
-func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domain string, data []byte, secCookie *securecookie.SecureCookie, maxAge int) (err error) {
-	cookie, err := secCookie.Encode(id, gosaml.Deflate(data))
+func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domain string, data []byte, secCookie *gosaml.Hm, maxAge int) (err error) {
+	cookie, err := secCookie.Encode(id, data)
 	// http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge, SameSite: http.SameSiteNoneMode})
 	cc := http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge}
 	v := cc.String() // + "; SameSite=None"
@@ -374,23 +370,25 @@ func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domai
 }
 
 // Get responsible for getting the cookie values
-func (s wayfHybridSession) Get(w http.ResponseWriter, r *http.Request, id string, secCookie *securecookie.SecureCookie) (data []byte, err error) {
+func (s wayfHybridSession) Get(w http.ResponseWriter, r *http.Request, id string, secCookie *gosaml.Hm) (data []byte, err error) {
 	cookie, err := r.Cookie(id)
 	if err == nil && cookie.Value != "" {
-		err = secCookie.Decode(id, cookie.Value, &data)
+		data, err = secCookie.Decode(id, cookie.Value)
+		if err != nil {
+			return
+		}
 	}
-	data = gosaml.Inflate(data)
 	return
 }
 
 // Del responsible for deleting a cookie values
-func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id string, secCookie *securecookie.SecureCookie) (err error) {
-	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: "", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
+func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id string, secCookie *gosaml.Hm) (err error) {
+	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: "", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1, Expires: time.Unix(0, 0)})
 	return
 }
 
 // GetDel responsible for getting and then deleting cookie values
-func (s wayfHybridSession) GetDel(w http.ResponseWriter, r *http.Request, id string, secCookie *securecookie.SecureCookie) (data []byte, err error) {
+func (s wayfHybridSession) GetDel(w http.ResponseWriter, r *http.Request, id string, secCookie *gosaml.Hm) (data []byte, err error) {
 	data, err = s.Get(w, r, id, secCookie)
 	s.Del(w, r, id, secCookie)
 	return
@@ -1008,10 +1006,11 @@ sRequest.Nid = ""
 
 	//session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
 	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
-	origRequest, err := authnRequestCookie.Encode("id", gosaml.Deflate(bytes))
+	origRequest, err := authnRequestCookie.SpcEncode("id", buf, n)
 	if err != nil {
 		return
 	}
+
 	newrequest.QueryDashP(nil, "./@ID", "_"+origRequest, nil)
 
 	var privatekey []byte
@@ -1059,14 +1058,12 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	// value, err := session.GetDel(w, r, prefix+idHash(inResponseTo), authnRequestCookie)
     // extract the original request from @inResponseTo
 	value := []byte{}
-	err = authnRequestCookie.Decode("id", inResponseTo, &value)
+	value, err = authnRequestCookie.SpcDecode("id", inResponseTo, 5)
 	if err != nil {
 		return
 	}
-	value = gosaml.Inflate(value)
 
-	// to minimize the size of the cookies we have saved the original request in a json'ed struct
-	err = json.Unmarshal(value, &sRequest)
+	sRequest.unmarshal(value)
 
     // we need to disable the replay attack mitigation based on the cookie - we are now fully dependent on the ttl on the data - pt. 3 mins
 	//	if inResponseTo != sRequest.Nid {
