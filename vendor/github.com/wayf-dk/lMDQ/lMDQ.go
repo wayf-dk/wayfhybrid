@@ -114,7 +114,7 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 	if strings.HasPrefix(key, "{sha1}") {
 		key = key[6:]
 	} else if hexChars.MatchString(key) {
-
+        // already sha1'ed - do nothing
 	} else {
 		hash := sha1.Sum([]byte(key))
 		key = hex.EncodeToString(append(hash[:]))
