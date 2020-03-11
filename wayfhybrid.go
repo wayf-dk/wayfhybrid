@@ -1624,24 +1624,12 @@ func (r samlRequest) marshal() (msg []byte, n int) {
 func (r *samlRequest) unmarshal(msg []byte) {
 	i := byte(6)
 	l := msg[0]
-	r.Nid = string(msg[i : i+l])
-	i = i + l
-	l = msg[1]
-	r.Id = string(msg[i : i+l])
-	i = i + l
-	l = msg[2]
-	r.Is = string(msg[i : i+l])
-	i = i + l
-	l = msg[3]
-	r.De = string(msg[i : i+l])
-	i = i + l
-	l = msg[4]
-	r.Acs = string(msg[i : i+l])
-	i = i + l
-	l = msg[5]
-	r.Nonce = string(msg[i : i+l])
-	i = i + l
-	r.Fo = msg[i] - 48
+	for j, x := range []*string{&r.Nid, &r.Id, &r.Is, &r.De, &r.Acs, &r.Nonce} {
+	    *x = string(msg[i : i+l])
+	    i = i +l
+	    l = msg[j+1]
+	}
+	r.Fo = msg[i] - 48 // cheap char to int8
 	r.SPi = msg[i+1] - 48
 	r.Hubi = msg[i+2] - 48
 	r.Type = msg[i+3] - 48
