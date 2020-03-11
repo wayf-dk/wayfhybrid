@@ -181,14 +181,6 @@ var (
 )
 
 func init() {
-	for _, ad := range internalAttributeDescriptions {
-		internalAttributeDescriptions[attributeKey{ad.name, ""}] = ad
-		outgoingAttributeDescriptions[attributeKey{ad.name, ""}] = ad
-		outgoingAttributeDescriptionsByC14n[attributeKey{ad.c14n, ""}] = ad
-	}
-	for _, ad := range requestAttributeDescriptions {
-		requestAttributeDescriptions[attributeKey{ad.name, ""}] = ad
-	}
 	for _, ad := range attributesBase {
 		incomingAttributeDescriptions[attributeKey{ad.name, attributenameFormats[ad.nameformat]}] = ad
 		incomingAttributeDescriptions[attributeKey{ad.name, ""}] = ad
