@@ -486,10 +486,10 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 		return
 	}
 
-	destinationMd, destinationIndex, err = FindInMetadataSets(destinationMdSets, destination)
-	if err != nil {
-		return
-	}
+//	if destination != entityKey && !strings.HasPrefix(destination, entityKey+"?") { // ignore params ...
+//		err = fmt.Errorf("destinationx: %s is not here, here is %s", destination, entityKey)
+//		return
+//	}
 
 	xp, err = CheckSAMLMessage(r, tmpXp, issuerMd, destinationMd, role, destination, xtraCerts)
 	if err != nil {
