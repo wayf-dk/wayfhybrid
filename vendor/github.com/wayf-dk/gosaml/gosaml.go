@@ -1000,7 +1000,7 @@ func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *g
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case POST:
 		data := Formdata{Acs: request.Query1(nil, "./@Destination"), Samlrequest: base64.StdEncoding.EncodeToString(request.Dump())}
-		PostForm.ExecuteTemplate(w, "postform", data)
+		PostForm.ExecuteTemplate(w, "postForm", data)
 	}
 }
 
@@ -1013,7 +1013,7 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case POST:
 		data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump())}
-		PostForm.ExecuteTemplate(w, "postform", data)
+		PostForm.ExecuteTemplate(w, "postForm", data)
 	}
 }
 
@@ -1388,7 +1388,7 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		}
 
 		data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: r.Form.Get("RelayState")}
-		PostForm.ExecuteTemplate(w, "postform", data)
+		PostForm.ExecuteTemplate(w, "postForm", data)
 	}
 	return
 }

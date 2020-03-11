@@ -1387,7 +1387,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 				http.Redirect(w, r, u.String(), http.StatusFound)
 			case gosaml.POST:
 				data := gosaml.Formdata{Acs: newRequest.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(newRequest.Dump())}
-				gosaml.PostForm.ExecuteTemplate(w, "postform", data)
+				gosaml.PostForm.ExecuteTemplate(w, "postForm", data)
 
 			}
 		} else {
@@ -1445,7 +1445,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			http.Redirect(w, r, u.String(), http.StatusFound)
 		case gosaml.POST:
 			data := gosaml.Formdata{Acs: newResponse.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(newResponse.Dump())}
-			gosaml.PostForm.ExecuteTemplate(w, "postform", data)
+			gosaml.PostForm.ExecuteTemplate(w, "postForm", data)
 		}
 	} else {
 		err = fmt.Errorf("no LogoutRequest/logoutResponse found")
