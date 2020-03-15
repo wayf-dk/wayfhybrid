@@ -422,6 +422,30 @@ func cpr(idpMd, spMd *goxml.Xp, values map[string][]string) {
 	}
 }
 
+/* see http://www.cpr.dk/cpr_artikler/Files/Fil1/4225.pdf or http://da.wikipedia.org/wiki/CPR-nummer for algorithm */
+// yearfromyearandcifferseven returns a year for CPR
+func yearfromyearandcifferseven(year, c7 int) int {
+	cpr2year := [][]int{
+		{99, 1900},
+		{99, 1900},
+		{99, 1900},
+		{99, 1900},
+		{36, 2000, 1900},
+		{57, 2000, 1800},
+		{57, 2000, 1800},
+		{57, 2000, 1800},
+		{57, 2000, 1800},
+		{36, 2000, 1900},
+	}
+	century := cpr2year[c7]
+	if year <= century[0] {
+		year += century[1]
+	} else {
+		year += century[2]
+	}
+	return year
+}
+
 // CopyAttributes copies the attributes
 func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
 	// log eduPersonScopedAffiliation
