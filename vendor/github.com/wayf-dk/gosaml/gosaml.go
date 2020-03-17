@@ -1794,3 +1794,34 @@ func PP(i ...interface{}) {
 	}
 	return
 }
+
+// Marshal hand-held marshal SamlRequest
+func (r SamlRequest) Marshal() (msg []byte, n int) {
+	prefix := []byte{}
+	for _, str := range []string{r.Nonce, r.RequestID, r.SP, r.VirtualIDPID, r.AssertionConsumerIndex, r.Protocol} {
+		prefix = append(prefix, uint8(len(str))) // if over 127 we are in trouble
+		msg = append(msg, str...)
+	}
+	str := fmt.Sprintf("%1d%1d%1d", r.NameIDFormat, r.SPIndex, r.HubBirkIndex)
+	msg = append(msg, str...)
+	msg = append(prefix, msg...)
+	n = len(prefix)
+	PP("marshal", r)
+	return
+}
+
+// Unmarshal - hand held unmarshal for SamlRequest
+func (r *SamlRequest) Unmarshal(msg []byte) {
+	i := byte(6)
+	l := msg[0]
+	for j, x := range []*string{&r.Nonce, &r.RequestID, &r.SP, &r.VirtualIDPID, &r.AssertionConsumerIndex, &r.Protocol} {
+		*x = string(msg[i : i+l])
+		i = i + l
+		l = msg[j+1]
+	}
+	r.NameIDFormat = msg[i] - 48 // cheap char to int8
+	r.SPIndex = msg[i+1] - 48
+	r.HubBirkIndex = msg[i+2] - 48
+	PP("unmarshal", r)
+	return
+}
