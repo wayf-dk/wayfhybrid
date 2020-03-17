@@ -5,15 +5,16 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/wayf-dk/go-libxml2/types"
-	"github.com/wayf-dk/gosaml"
-	"github.com/wayf-dk/goxml"
-	"github.com/y0ssar1an/q"
 	"io"
 	"log"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/wayf-dk/go-libxml2/types"
+	"github.com/wayf-dk/gosaml"
+	"github.com/wayf-dk/goxml"
+	"github.com/y0ssar1an/q"
 )
 
 type (
@@ -86,7 +87,7 @@ var (
 	attributesBase = []attributeDescription{
 		// nemlogin specials
 		{c14n: "schacPersonalUniqueID", name: "dk:gov:saml:attribute:CprNumberIdentifier", nameformat: "basic"},
-//		{c14n: "eduPersonPrincipalName", name: "urn:oid:0.9.2342.19200300.100.1.1", nameformat: "basic"}, // basic ???
+		//		{c14n: "eduPersonPrincipalName", name: "urn:oid:0.9.2342.19200300.100.1.1", nameformat: "basic"}, // basic ???
 
 		// wayf
 		{c14n: "cn", name: "cn"},
@@ -189,6 +190,7 @@ func init() {
 	}
 }
 
+// Attributesc14n - Convert to - and compute canonical attributes
 func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	base64encoded := idpMd.QueryXMLBool(nil, xprefix+"base64attributes")
 	attributeStatement := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
@@ -228,7 +230,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 		seen := map[string]bool{}
 		for _, val := range vals {
 			if seen[val] || val == "" {
-//				continue
+				//				continue
 			}
 			response.QueryDashP(attr, "saml:AttributeValue[0]", val, nil)
 			seen[val] = true
@@ -238,6 +240,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	goxml.RmElement(attributeStatement)
 }
 
+// RequestHandler - runs attributeOpsHandler for requestAttributesBase and returns the result as values
 func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string, err error) {
 	values = map[string][]string{}
 	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd)
@@ -355,7 +358,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			case gosaml.Email:
 				*v = values["eduPersonPrincipalName"][0]
 			default:
-				*v = gosaml.Id()
+				*v = gosaml.ID()
 			}
 			switch attr := spMd.Query1(nil, xprefix+"nameIDAttribute"); {
 			case attr == "":
