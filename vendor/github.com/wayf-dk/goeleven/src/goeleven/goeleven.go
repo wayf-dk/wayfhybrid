@@ -15,11 +15,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/miekg/pkcs11"
 	"github.com/y0ssar1an/q"
+
 	//"github.com/wayf-dk/pkcs11"
 	"io/ioutil"
 	"log"
+
 	//	"log/syslog"
 	"math/rand"
 	"net/http"
@@ -250,7 +253,7 @@ func prepareobjects(labels string) (err error) {
 
 	for _, s := range slots {
 		tokeninfo, _ := p.GetTokenInfo(s)
-		if tokeninfo.SerialNumber == config["GOELEVEN_SERIALNUMBER"] || tokeninfo.Label == config["GOELEVEN_SERIALNUMBER"] { // tokeninfo.SerialNumber is string
+		if tokeninfo.Label == config["GOELEVEN_SLOT"] {
 			slot = s
 			log.Printf("slot: %d %s\n", slot, tokeninfo.Label)
 			break
