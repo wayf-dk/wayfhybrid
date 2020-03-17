@@ -18,22 +18,22 @@
           invalidate cache ???
 */
 
-package lMDQ
+package lmdq
 
 import (
 	"crypto/sha1"
 	"database/sql"
 	"encoding/hex"
 	"errors"
-	// 	_ "github.com/mattn/go-sqlite3" for handling sqlite3
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/wayf-dk/gosaml"
-	"github.com/wayf-dk/goxml"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	//	_ "github.com/mattn/go-sqlite3"
+	"github.com/wayf-dk/gosaml"
+	"github.com/wayf-dk/goxml"
 )
 
 type (
@@ -62,8 +62,8 @@ type (
 
 var (
 	cacheduration = time.Minute * 60
-	// MetaDataNotFoundError refers to error
-	MetaDataNotFoundError = errors.New("Metadata not found")
+	// ErrorMetadataNotFound refers to error
+	ErrorMetadataNotFound = errors.New("Metadata not found")
 	hexChars              = regexp.MustCompile("^[a-fA-F0-9]+$")
 )
 
@@ -105,6 +105,7 @@ func (mdq *MDQ) MDQ(key string) (xp *goxml.Xp, err error) {
 	return
 }
 
+// WebMDQ - Export of dbget
 func (mdq *MDQ) WebMDQ(key string) (xp *goxml.Xp, xml []byte, err error) {
 	return mdq.dbget(key, true)
 }
@@ -114,7 +115,7 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 	if strings.HasPrefix(key, "{sha1}") {
 		key = key[6:]
 	} else if hexChars.MatchString(key) {
-        // already sha1'ed - do nothing
+		// already sha1'ed - do nothing
 	} else {
 		hash := sha1.Sum([]byte(key))
 		key = hex.EncodeToString(append(hash[:]))
@@ -133,7 +134,7 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 	err = mdq.stmt.QueryRow(key, key+"z").Scan(&xml)
 	switch {
 	case err == sql.ErrNoRows:
-		err = goxml.Wrap(MetaDataNotFoundError, "err:Metadata not found", "key:"+k, "table:"+mdq.Table)
+		err = goxml.Wrap(ErrorMetadataNotFound, "err:Metadata not found", "key:"+k, "table:"+mdq.Table)
 		return
 	case err != nil:
 		return

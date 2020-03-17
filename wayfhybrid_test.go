@@ -4,10 +4,6 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"github.com/wayf-dk/gosaml"
-	"github.com/wayf-dk/goxml"
-	"github.com/wayf-dk/lMDQ"
-	"github.com/y0ssar1an/q"
 	"log"
 	"os"
 	"runtime"
@@ -15,6 +11,11 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/wayf-dk/gosaml"
+	"github.com/wayf-dk/goxml"
+	"github.com/wayf-dk/lmdq"
+	"github.com/y0ssar1an/q"
 )
 
 var (
@@ -23,13 +24,13 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	Md.Hub = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_HUB"}
-	Md.Internal = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
-	Md.ExternalIdP = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
-	Md.ExternalSP = &lMDQ.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
+	Md.Hub = &lmdq.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_HUB"}
+	Md.Internal = &lmdq.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_INTERNAL"}
+	Md.ExternalIdP = &lmdq.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_IDP"}
+	Md.ExternalSP = &lmdq.MDQ{Path: "file:testdata/test-metadata.mddb?mode=ro", Table: "HYBRID_EXTERNAL_SP"}
 
 	for _, md := range []gosaml.Md{Md.Hub, Md.Internal, Md.ExternalIdP, Md.ExternalSP} {
-		err := md.(*lMDQ.MDQ).Open()
+		err := md.(*lmdq.MDQ).Open()
 		if err != nil {
 			panic(err)
 		}
@@ -110,7 +111,7 @@ func ExampleCheckScope() {
 func ExampleNewMetadata() {
 	onetwo := map[string]bool{}
 	finish := make(chan bool)
-	mdset := &lMDQ.MDQ{Path: "file:testdata/one.mddb?mode=ro", Table: "wayf_hub_base"}
+	mdset := &lmdq.MDQ{Path: "file:testdata/one.mddb?mode=ro", Table: "wayf_hub_base"}
 	mdset.Open()
 	go func() {
 		for range [1000]int{} {
