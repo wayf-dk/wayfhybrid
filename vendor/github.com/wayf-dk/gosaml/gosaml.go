@@ -1548,6 +1548,26 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 	return
 }
 
+// JwtSign - sign a json payload, return jwt and at_atHash
+func JwtSign(json []byte, privatekey []byte) (jwt, atHash string, err error) {
+	payload := base64.RawURLEncoding.EncodeToString(json)
+	//header := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." // sha256
+	//dgst := sha256.Sum256
+	header := "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9." // sha512
+	dgst := sha512.Sum512
+
+	digest := dgst([]byte(header + payload))
+	signature, err := goxml.Sign(digest[:], privatekey, []byte("-"), "sha512") // "sha256"
+	if err != nil {
+		err = goxml.Wrap(err)
+		return
+	}
+	jwt = header + payload + "." + base64.RawURLEncoding.EncodeToString(signature)
+	atHashDigest := dgst([]byte(jwt))
+	atHash = base64.RawURLEncoding.EncodeToString(atHashDigest[:len(atHashDigest)/2])
+	return
+}
+
 func jwtVerify(jwt string, certificates []string) (payload string, err error) {
 	if len(certificates) == 0 {
 		return payload, errors.New("No Certs found")
