@@ -196,13 +196,13 @@ func Main() {
 	if config.GoEleven.SlotPassword != "" {
 		c := config.GoEleven
 		goeleven.LibraryInit(map[string]string{
-			"GOELEVEN_HSMLIB":       c.Hsmlib,
-			"GOELEVEN_USERTYPE":     c.Usertype,
-			"GOELEVEN_SERIALNUMBER": c.Serialnumber,
-			"GOELEVEN_SLOT":         c.Slot,
-			"GOELEVEN_SLOTPASSWORD": c.SlotPassword,
-			"GOELEVEN_KEYLABEL":     c.KeyLabel,
-			"GOELEVEN_MAXSESSIONS":  c.Maxsessions,
+			"GOELEVEN_HSMLIB":        c.Hsmlib,
+			"GOELEVEN_USERTYPE":      c.Usertype,
+			"GOELEVEN_SERIALNUMBER":  c.Serialnumber,
+			"GOELEVEN_SLOT":          c.Slot,
+			"GOELEVEN_SLOT_PASSWORD": c.SlotPassword,
+			"GOELEVEN_KEY_LABEL":     c.KeyLabel,
+			"GOELEVEN_MAXSESSIONS":   c.Maxsessions,
 		})
 	}
 
