@@ -31,7 +31,7 @@ import (
 	"sync"
 	"time"
 
-	//	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
 )
