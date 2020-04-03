@@ -1091,7 +1091,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 
-			accessToken, atHash, err := gosaml.JwtSign(body, privatekey)
+			accessToken, atHash, err := gosaml.JwtSign(body, privatekey, "RS512")
 			if err != nil {
 				return err
 			}
@@ -1103,7 +1103,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 
-			idToken, _, err := gosaml.JwtSign(body, privatekey)
+			idToken, _, err := gosaml.JwtSign(body, privatekey, "RS512")
 			if err != nil {
 				return err
 			}

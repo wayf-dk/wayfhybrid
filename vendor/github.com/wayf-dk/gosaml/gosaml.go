@@ -1534,7 +1534,7 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			if err != nil {
 				return err
 			}
-			jwt, _, err := JwtSign(json, privatekey)
+			jwt, _, err := JwtSign(json, privatekey, "RS512")
 			if err != nil {
 				return err
 			}
@@ -1621,28 +1621,42 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 }
 
 // JwtSign - sign a json payload, return jwt and at_atHash
-func JwtSign(json []byte, privatekey []byte) (jwt, atHash string, err error) {
-	payload := base64.RawURLEncoding.EncodeToString(json)
-	//header := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9." // sha256
-	//dgst := sha256.Sum256
-	header := "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9." // sha512
-	dgst := sha512.Sum512
-
-	digest := dgst([]byte(header + payload))
-	signature, err := goxml.Sign(digest[:], privatekey, []byte("-"), "sha512") // "sha256"
+func JwtSign(payload []byte, privatekey []byte, alg string) (jwt, atHash string, err error) {
+	hd, _ := json.Marshal(map[string]interface{}{"typ": "JWT", "alg": alg})
+	header := base64.RawURLEncoding.EncodeToString(hd) + "."
+	payload = append([]byte(header), base64.RawURLEncoding.EncodeToString(payload)...)
+	var dgst hash.Hash
+	var signature []byte
+	switch alg {
+	case "RS256":
+		dgst = sha256.New()
+		signature, err = goxml.Sign(dgst.Sum(payload), privatekey, []byte("-"), "sha256")
+	case "RS512":
+		dgst = sha512.New()
+		signature, err = goxml.Sign(dgst.Sum(payload), privatekey, []byte("-"), "sha512")
+	case "HS256":
+		dgst = sha256.New()
+		signature = hmac.New(sha256.New, privatekey).Sum(payload)
+	case "HS512":
+		dgst = sha512.New()
+		signature = hmac.New(sha512.New, privatekey).Sum(payload)
+	default:
+		return jwt, atHash, fmt.Errorf("Unsupported alg: %s", alg)
+	}
 	if err != nil {
 		err = goxml.Wrap(err)
 		return
 	}
-	jwt = header + payload + "." + base64.RawURLEncoding.EncodeToString(signature)
-	atHashDigest := dgst([]byte(jwt))
+
+	jwt = string(payload) + "." + base64.RawURLEncoding.EncodeToString(signature)
+	atHashDigest := dgst.Sum([]byte(jwt))
 	atHash = base64.RawURLEncoding.EncodeToString(atHashDigest[:len(atHashDigest)/2])
 	return
 }
 
-func jwtVerify(jwt string, certificates []string) (payload string, err error) {
-	if len(certificates) == 0 {
-		return payload, errors.New("No Certs found")
+func jwtVerify(jwt string, keys []string) (payload string, err error) {
+	if len(keys) == 0 {
+		return payload, errors.New("No certs/keys found")
 	}
 	hps := strings.SplitN(jwt, ".", 3)
 	hp := []byte(strings.Join(hps[:2], "."))
@@ -1663,20 +1677,34 @@ func jwtVerify(jwt string, certificates []string) (payload string, err error) {
 		dg := sha512.Sum512(hp)
 		digest = dg[:]
 		hh = crypto.SHA512
+	case "HS256", "HS512":
 	default:
 		return payload, fmt.Errorf("Unsupported alg: %s", header.Alg)
 	}
 
-	sign, _ := base64.RawURLEncoding.DecodeString(hps[2])
-	var pub *rsa.PublicKey
-	for _, certificate := range certificates {
-		_, pub, err = PublicKeyInfo(certificate)
-		if err != nil {
-			return
+	signature, _ := base64.RawURLEncoding.DecodeString(hps[2])
+	switch header.Alg {
+	case "RS256", "RS512":
+		var pub *rsa.PublicKey
+		for _, certificate := range keys {
+			_, pub, err = PublicKeyInfo(certificate)
+			if err != nil {
+				return
+			}
+			err = rsa.VerifyPKCS1v15(pub, hh, digest, signature)
+			if err == nil {
+				return hps[1], err
+			}
 		}
-		err = rsa.VerifyPKCS1v15(pub, hh, digest, sign)
-		if err == nil {
-			return hps[1], err
+	case "HS256":
+		checked := hmac.New(sha256.New, []byte(keys[0])).Sum([]byte(hps[1]))
+		if hmac.Equal(checked, signature) {
+			return hps[1], nil
+		}
+	case "HS512":
+		checked := hmac.New(sha512.New, []byte(keys[0])).Sum([]byte(hps[1]))
+		if hmac.Equal(checked, signature) {
+			return hps[1], nil
 		}
 	}
 	return
