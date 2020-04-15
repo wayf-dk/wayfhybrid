@@ -1128,7 +1128,6 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 	nameIDFormats := NameIDList
 
 	if originalRequest != nil { // already checked for supported nameidformat
-		fmt.Println("origreq", originalRequest.PP())
 		if originalRequest.QueryXMLBool(nil, "./@ForceAuthn") {
 			request.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 		}
@@ -1844,7 +1843,6 @@ func (r SamlRequest) Marshal() (msg []byte, n int) {
 	msg = append(msg, str...)
 	msg = append(prefix, msg...)
 	n = len(prefix)
-	PP("marshal", r)
 	return
 }
 
@@ -1860,6 +1858,5 @@ func (r *SamlRequest) Unmarshal(msg []byte) {
 	r.NameIDFormat = msg[i] - 48 // cheap char to int8
 	r.SPIndex = msg[i+1] - 48
 	r.HubBirkIndex = msg[i+2] - 48
-	PP("unmarshal", r)
 	return
 }
