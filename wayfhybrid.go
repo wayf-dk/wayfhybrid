@@ -641,11 +641,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	} else if r.Form.Get("ds") != "" {
 		data := url.Values{}
 		data.Set("return", "https://"+r.Host+r.RequestURI+"?previdplist="+r.Form.Get("scopedidp"))
-		data.Set("returnIDParam", "scopedIDP")
+		data.Set("returnIDParam", "scopedidp")
 		data.Set("entityID", "https://"+r.Host)
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
-		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedIDP")+","+r.Form.Get("previdplist"), " ,")}
+		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedidp")+","+r.Form.Get("previdplist"), " ,")}
 		return tmpl.ExecuteTemplate(w, "testSPForm", data)
 	}
 	return
@@ -896,7 +896,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return
 		}
 
-		realIDP := virtualIDPMd.Query1(nil, xprefix+"map2IDP")
+		realIDP := virtualIDPMd.Query1(nil, xprefix+"map2IdP")
+
 		if realIDP != "" {
 			realIDPMd, err = md.Internal.MDQ(realIDP)
 			if err != nil {
@@ -1051,7 +1052,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		newresponse = gosaml.NewResponse(hubBirkIDPMd, spMd, request, response)
 
 		// add "front-end" IDP if it maps to another IDP
-		if virtualIDPMd.Query1(nil, xprefix+"map2IDP") != "" {
+		if virtualIDPMd.Query1(nil, xprefix+"map2IdP") != "" {
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", virtualIDPMd.Query1(nil, "@entityID"), nil)
 		}
 
