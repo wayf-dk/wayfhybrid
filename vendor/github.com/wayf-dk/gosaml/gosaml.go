@@ -1629,10 +1629,12 @@ func JwtSign(payload []byte, privatekey []byte, alg string) (jwt, atHash string,
 	switch alg {
 	case "RS256":
 		dgst = sha256.New()
-		signature, err = goxml.Sign(dgst.Sum(payload), privatekey, []byte("-"), "sha256")
+		dg := sha256.Sum256(payload)
+		signature, err = goxml.Sign(dg[:], privatekey, []byte("-"), "sha256")
 	case "RS512":
 		dgst = sha512.New()
-		signature, err = goxml.Sign(dgst.Sum(payload), privatekey, []byte("-"), "sha512")
+		dg := sha512.Sum512(payload)
+		signature, err = goxml.Sign(dg[:], privatekey, []byte("-"), "sha512")
 	case "HS256":
 		dgst = sha256.New()
 		signature = hmac.New(sha256.New, privatekey).Sum(payload)
@@ -1648,7 +1650,8 @@ func JwtSign(payload []byte, privatekey []byte, alg string) (jwt, atHash string,
 	}
 
 	jwt = string(payload) + "." + base64.RawURLEncoding.EncodeToString(signature)
-	atHashDigest := dgst.Sum([]byte(jwt))
+	io.WriteString(dgst, jwt)
+	atHashDigest := dgst.Sum(nil)
 	atHash = base64.RawURLEncoding.EncodeToString(atHashDigest[:len(atHashDigest)/2])
 	return
 }
