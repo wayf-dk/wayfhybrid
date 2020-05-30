@@ -220,7 +220,7 @@ func GetPrivateKey(md *goxml.Xp) (privatekey []byte, cert string, err error) {
 
 	privatekey, err = ioutil.ReadFile(Config.CertPath + keyname + ".key")
 	if err != nil {
-		return
+		err = goxml.Wrap(err)
 	}
 	return
 }
