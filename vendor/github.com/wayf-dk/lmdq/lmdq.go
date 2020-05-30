@@ -120,7 +120,7 @@ func (mdq *MDQ) dbget(key string, cache bool) (xp *goxml.Xp, xml []byte, err err
 		hash := sha1.Sum([]byte(key))
 		key = hex.EncodeToString(append(hash[:]))
 	}
-	key = key[:10] // only use the first 10 chars for key
+	//key = key[:10] // only use the first 10 chars for key - why on earth do that???
 	mdq.Lock.RLock()
 	cachedxp := mdq.Cache[key]
 	if cachedxp != nil && cachedxp.Valid(cacheduration) {
