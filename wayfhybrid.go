@@ -64,7 +64,7 @@ type (
 		Maxsessions  string
 	}
 
-	conf struct {
+	Conf struct {
 		DiscoveryService                                                                         string
 		Domain                                                                                   string
 		HubEntityID                                                                              string
@@ -120,10 +120,6 @@ type (
 		mux http.Handler
 	}
 
-	attrName struct {
-		uri, basic, AttributeName string
-	}
-
 	attrValue struct {
 		Name   string
 		Must   bool
@@ -139,13 +135,10 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	config = conf{}
+	config = Conf{}
 
-	bify                                = regexp.MustCompile("^(https?://)(.*)$")
-	debify                              = regexp.MustCompile("^((?:https?://)?)(?:(?:(?:birk|krib)\\.wayf\\.dk/(?:birk\\.php|[a-f0-9]{40})/)|(?:urn:oid:1.3.6.1.4.1.39153:42:))(.+)$")
 	allowedInFeds                       = regexp.MustCompile("[^\\w\\.-]")
-	scoped                              = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])(@aau\.dk)?$`)
-	aauscope                            = regexp.MustCompile(`[@\.]aau\.dk$`)
+	scoped                              = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])$`)
 	dkcprpreg                           = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
 	defaultDigestAndSignatureAlgorithm  = "sha256"
@@ -156,7 +149,6 @@ var (
 
 	sloInfoCookie, authnRequestCookie *gosaml.Hm
 	tmpl                              *template.Template
-	hashKey                           []byte
 	hostName                          string
 
 	hubMd *goxml.Xp
@@ -178,7 +170,7 @@ func Main() {
 
 	bypassMdUpdate := flag.Bool("nomd", false, "bypass MD update at start")
 	flag.Parse()
-	path := env("WAYF_PATH", "/opt/wayf/")
+	path := Env("WAYF_PATH", "/opt/wayf/")
 
 	tomlConfig, err := toml.LoadFile(path + "hybrid-config/hybrid-config.toml")
 
@@ -239,8 +231,6 @@ func Main() {
 	for _, md := range []*lmdq.MDQ{md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP} {
 		m := webMdMap[md.Table]
 		m.revmd = webMdMap[md.Rev].md
-		webMdMap[md.Table] = m
-		webMdMap[md.Short] = m
 	}
 
 	hubMd, err = md.Hub.MDQ(config.HubEntityID)
@@ -297,7 +287,6 @@ func Main() {
 	httpMux.Handle(config.TestSPAcs, appHandler(testSPService))
 	httpMux.Handle(config.TestSP+"/", appHandler(testSPService)) // need a root "/" for routing
 
-	httpMux.Handle(config.TestSP2+"/XXO", appHandler(saml2jwt))
 	httpMux.Handle(config.TestSP2Slo, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2Acs, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
@@ -327,7 +316,7 @@ func Main() {
 	<-finish
 }
 
-func env(name, defaultvalue string) string {
+func Env(name, defaultvalue string) string {
 	if val, ok := os.LookupEnv(name); ok {
 		return val
 	}
@@ -354,7 +343,7 @@ func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domai
 	cookie, err := secCookie.Encode(id, data)
 	// http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge, SameSite: http.SameSiteNoneMode})
 	cc := http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge}
-	v := cc.String() // + "; SameSite=None"
+	v := cc.String() + "; SameSite=None"
 	w.Header().Add("Set-Cookie", v)
 	return
 }
@@ -387,11 +376,6 @@ func (s wayfHybridSession) GetDel(w http.ResponseWriter, r *http.Request, id str
 // Write refers to writing log data
 func (writer logWriter) Write(bytes []byte) (int, error) {
 	return fmt.Fprint(os.Stderr, time.Now().UTC().Format("Jan _2 15:04:05 ")+string(bytes))
-}
-
-func birkify(idp string) (birk string) {
-	birk = idp
-	return
 }
 
 func legacyLog(stat, tag, idp, sp, hash string) {
@@ -712,11 +696,11 @@ func wayfScopeCheck(response, idpMd *goxml.Xp) (err error) {
 	subsecuritydomain := response.Query1(as, "./saml:Attribute[@Name='subsecuritydomain']/saml:AttributeValue")
 	for _, epsa := range response.QueryMulti(as, "./saml:Attribute[@Name='eduPersonScopedAffiliation']/saml:AttributeValue") {
 		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 4 {
+		if len(epsaparts) != 3 {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
-		domain := epsaparts[2] + epsaparts[3]
+		domain := epsaparts[2]
 		if domain != subsecuritydomain && !strings.HasSuffix(domain, "."+subsecuritydomain) {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s has not '%s' as security sub domain", epsa, subsecuritydomain)
 			return
@@ -785,11 +769,11 @@ func wayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeRel
 
 	for _, epsa := range response.QueryMulti(as, "./saml:Attribute[@Name='eduPersonScopedAffiliation']/saml:AttributeValue") {
 		epsaparts := scoped.FindStringSubmatch(epsa)
-		if len(epsaparts) != 4 {
+		if len(epsaparts) != 3 {
 			err = fmt.Errorf("eduPersonScopedAffiliation: %s does not end with a domain", epsa)
 			return
 		}
-		domain := epsaparts[2] + epsaparts[3]
+		domain := epsaparts[2]
 		if idpMd.QueryBool(nil, "count(//shibmd:Scope[.="+strconv.Quote(domain)+"]) = 0") {
 			err = fmt.Errorf("security domain '%s' does not match any scopes", securitydomain)
 			return
@@ -808,7 +792,7 @@ func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-// VeryVeryPoorMansScopingService handles poors man scoping
+// VeryVeryPoorMansScopingService handles poor man's scoping
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
 	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10})
 	w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
@@ -819,8 +803,7 @@ func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err
 }
 
 func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp) (idp string) {
-	defer func() { idp = debify.ReplaceAllString(idp, "$1$2") }()
-	if idp = idpMd.Query1(nil, "@entityID"); idp != config.HubEntityID {
+	if idp = idpMd.Query1(nil, "@entityID"); idp != config.HubEntityID { // no need for wayf if idp is birk entity - ie. not the hub
 		return
 	}
 	sp := spMd.Query1(nil, "@entityID") // real entityID == KRIB entityID
@@ -831,7 +814,14 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 		http.SetCookie(w, &http.Cookie{Name: "vvpmss", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
 	}
 
+	testidp := ""
+	if tmp, _ := r.Cookie("testidp"); tmp != nil {
+		testidp = tmp.Value
+		http.SetCookie(w, &http.Cookie{Name: "testidp", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
+	}
+
 	idpLists := [][]string{
+		{testidp},
 		spMd.QueryMulti(nil, xprefix+"IDPList"),
 		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
 		{r.URL.Query().Get("idpentityid")},
@@ -847,9 +837,6 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 				return idpList[0]
 			}
 		default:
-			for i, idp := range idpList {
-				idpList[i] = birkify(idp)
-			}
 			data.Set("idplist", strings.Join(idpList, ","))
 			break
 		}
@@ -878,6 +865,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
+	VirtualIDPID = virtualIDPMd.Query1(nil, "./@entityID") // wayf might return domain or hash ...
 
 	// check for common feds before remapping!
 	if _, err = RequestHandler(request, virtualIDPMd, spMd); err != nil {
@@ -1066,7 +1054,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
 
 		if sRequest.Protocol == "oauth" {
-			payload := map[string]interface{}{}
+			/* 	payload := map[string]interface{}{}
 			payload["aud"] = newresponse.Query1(nil, "//saml:Audience")
 			payload["iss"] = newresponse.Query1(nil, "./saml:Issuer")
 			payload["iat"] = gosaml.SamlTime2JwtTime(newresponse.Query1(nil, "./@IssueInstant"))
@@ -1091,8 +1079,8 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			if err != nil {
 				return err
 			}
-
-			accessToken, atHash, err := gosaml.JwtSign(body, privatekey, "RS512")
+			privatekey = []byte("8Bw5iJEpH2XaD7Bw2H3iPsRhISBsQ3IipFko8YJ6vIiq4e27SKTDa7MAnrP5PwjT")
+			accessToken, atHash, err := gosaml.JwtSign(body, privatekey, "HS256")
 			if err != nil {
 				return err
 			}
@@ -1104,7 +1092,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 
-			idToken, _, err := gosaml.JwtSign(body, privatekey, "RS512")
+			idToken, _, err := gosaml.JwtSign(body, privatekey, "HS256")
 			if err != nil {
 				return err
 			}
@@ -1112,13 +1100,17 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			u := url.Values{}
 			// do not use a parametername that sorts before access_token !!!
 
-			u.Set("access_token", accessToken)
-			u.Set("id_token", idToken)
+			//u.Set("access_token", accessToken)
+			//u.Set("id_token", idToken) */
+			u := url.Values{}
+
 			u.Set("state", relayState)
-			u.Set("token_type", "bearer")
-			u.Set("expires_in", "3600")
-			u.Set("scope", "openid profile")
-			http.Redirect(w, r, fmt.Sprintf("%s#%s", newresponse.Query1(nil, "@Destination"), u.Encode()), http.StatusFound)
+			//u.Set("token_type", "bearer")
+			//u.Set("expires_in", "3600")
+			u.Set("scope", "openid group")
+			u.Set("code", "ABCDEFHIJKLMNOPQ")
+			//http.Redirect(w, r, fmt.Sprintf("%s#%s", newresponse.Query1(nil, "@Destination"), u.Encode()), http.StatusFound)
+			http.Redirect(w, r, newresponse.Query1(nil, "@Destination")+"?"+u.Encode(), http.StatusFound)
 			return nil
 		}
 
@@ -1202,6 +1194,11 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	return tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
 }
 
+// IDPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
+func IDPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
+	return SLOService(w, r, md.Internal, md.Hub, []gosaml.Md{md.ExternalSP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalIDP}, gosaml.IDPRole, "SLO")
+}
+
 // SPSLOService refers to SP single logout service. Takes request as a parameter and returns an error if any
 func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return SLOService(w, r, md.Internal, md.Hub, []gosaml.Md{md.ExternalIDP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalSP}, gosaml.SPRole, "SLO")
@@ -1223,11 +1220,6 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 	return gosaml.Saml2jwt(w, r, md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP, RequestHandler, config.HubEntityID, allowedDigestAndSignatureAlgorithms, xprefix+"SigningMethod")
-}
-
-// IDPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
-func IDPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.Internal, md.Hub, []gosaml.Md{md.ExternalSP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalIDP}, gosaml.IDPRole, "SLO")
 }
 
 // SLOService refers to single logout service. Takes request and issuer and destination metadata sets, role refers to if it as IDP or SP.
@@ -1352,7 +1344,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			return gosaml.PostForm.ExecuteTemplate(w, "postForm", data)
 		}
 	} else {
-		err = fmt.Errorf("no LogoutRequest/logoutResponse found")
+		err = fmt.Errorf("no LogoutRequest/LogoutResponse found")
 		return err
 	}
 	return
@@ -1411,7 +1403,6 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		session.Del(w, r, oldHashOut, sloInfoCookie)
 		// 2nd create 2 new SLO info recs and save them under the hash of the opposite
 		session.Set(w, r, spIDPHash, config.Domain, []byte(fmt.Sprintf("%s %s", hashIn, hashOut)), sloInfoCookie, sloInfoTTL)
-		fmt.Println(oldHashIn, hashIn, oldHashOut, hashOut)
 
 		slo := gosaml.NewSLOInfo(samlIn, destinationInMd.Query1(nil, "@entityID"))
 		slo.IssuerID = gosaml.IDHash(slo.IssuerID)
