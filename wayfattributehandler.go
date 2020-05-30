@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -153,10 +152,11 @@ var (
 
 		// Modst specials
 		{c14n: "eduPersonPrincipalName", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"},
-		{c14n: "oioCvrNumberIdentifier", name: "https://modst.dk/sso/claims/cvr"},
 		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid"},
-		{c14n: "mail", name: "https://modst.dk/sso/claims/email"},
+//		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid"},
 		{c14n: "entryUUID", name: "https://modst.dk/sso/claims/uniqueid"},
+		{c14n: "oioCvrNumberIdentifier", name: "https://modst.dk/sso/claims/cvr"},
+		{c14n: "mail", name: "https://modst.dk/sso/claims/email"},
 		{c14n: "mobile", name: "https://modst.dk/sso/claims/mobile"},
 		{c14n: "eduPersonAssurance", name: "https://modst.dk/sso/claims/assurancelevel"},
 		{c14n: "modstlogonmethod", name: "https://modst.dk/sso/claims/logonmethod"},
@@ -224,19 +224,17 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
-
 	for basic, vals := range values {
 		attr := response.QueryDashP(c14nAttributes, `saml:Attribute[@Name="`+basic+`"]`, "", nil)
 		seen := map[string]bool{}
 		for _, val := range vals {
 			if seen[val] || val == "" {
-				//				continue
+				continue
 			}
 			response.QueryDashP(attr, "saml:AttributeValue[0]", val, nil)
 			seen[val] = true
 		}
 	}
-
 	goxml.RmElement(attributeStatement)
 }
 
@@ -294,7 +292,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if len(eppns) > 0 {
 				matches := scoped.FindStringSubmatch(eppns[0])
 				if len(matches) > 1 {
-					*v = matches[2] + matches[3]
+					*v = matches[2]
 					subsecuritydomain := *v
 					for _, specialdomain := range strings.Split(opParam[1], ":") {
 						if strings.HasSuffix(*v, "."+specialdomain) {
@@ -312,7 +310,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				if len(epsas) > 0 {
 					matches := scoped.FindStringSubmatch(epsas[0])
 					if len(matches) > 1 {
-						*v = matches[2] + matches[3]
+						*v = matches[2]
 					}
 				}
 			}
@@ -338,6 +336,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 					continue
 				}
 				values[atd.c14n] = append(values[atd.c14n], epa+"@"+values["securitydomain"][0])
+				values[atd.c14n] = unique(values[atd.c14n])
 			}
 		case "persistent":
 			*v = msg.Query1(nil, "./saml:Assertion/saml:Subject/saml:NameID[@Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent']")
@@ -380,12 +379,8 @@ func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
 	}
 
 	matches := scoped.FindStringSubmatch(epid)
-	if len(matches) != 4 {
+	if len(matches) != 3 {
 		return ""
-	}
-
-	if matches[2] == "" && aauscope.MatchString(matches[1]) { // legacy support for old @aau.dk scopes for persistent nameid and eptid
-		epid += "@aau.dk"
 	}
 
 	if idp = idpMd.Query1(nil, xprefix+"persistentEntityID"); idp == "" {
@@ -394,8 +389,6 @@ func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
 	if sp = spMd.Query1(nil, xprefix+"persistentEntityID"); sp == "" {
 		sp = spMd.Query1(nil, "@entityID")
 	}
-
-	idp = debify.ReplaceAllString(idp, "$1$2")
 
 	uidhashbase := "uidhashbase" + config.EptidSalt
 	uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
@@ -452,7 +445,7 @@ func yearfromyearandcifferseven(year, c7 int) int {
 // CopyAttributes copies the attributes
 func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
 	// log eduPersonScopedAffiliation
-	log.Printf("epsa: %s\n", strings.Join(sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonScopedAffiliation"]/saml:AttributeValue`), ","))
+	//log.Printf("epsa: %s\n", strings.Join(sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonScopedAffiliation"]/saml:AttributeValue`), ","))
 
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
@@ -560,4 +553,15 @@ func matchRegexpArray(item string, array []*regexp.Regexp) bool {
 		}
 	}
 	return false
+}
+
+func unique(slice []string) (list []string) {
+    keys := make(map[string]bool)
+    for _, entry := range slice {
+        if _, value := keys[entry]; !value {
+            keys[entry] = true
+            list = append(list, entry)
+        }
+    }
+    return
 }
