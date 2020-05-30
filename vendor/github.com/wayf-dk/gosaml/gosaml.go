@@ -213,7 +213,6 @@ func PublicKeyInfo(cert string) (keyname string, publickey *rsa.PublicKey, err e
 // GetPrivateKey extract the key from Metadata and builds a name and reads the key
 func GetPrivateKey(md *goxml.Xp) (privatekey []byte, cert string, err error) {
 	cert = md.Query1(nil, "./"+SigningCertQuery) // actual signing key is always first
-	PP(cert)
 	keyname, _, err := PublicKeyInfo(cert)
 	if err != nil {
 		return
@@ -1147,7 +1146,7 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 		// 	// need a field in SamlRequest for remembering ...
 		// 	//			ID = string(origID[SRequestPrefixLength+1:]) // one of our own - save what can be saved
 		// }
-		nameIDFormat = originalRequest.Query1(nil, "./samlp:NameIDPolicy/@Format")
+		//nameIDFormat = originalRequest.Query1(nil, "./samlp:NameIDPolicy/@Format")
 		protocol = originalRequest.Query1(nil, "./samlp:Extensions/wayf:protocol")
 		acsIndex = originalRequest.Query1(nil, "./@AssertionConsumerServiceIndex")
 		virtualIDPID = IDHash(virtualIDPID)
