@@ -1103,9 +1103,7 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient" AllowCreate="true" />
 </samlp:AuthnRequest>`
 	issueInstant, msgID, _, _, _ := IDAndTiming()
-	issuer := spMd.Query1(nil, `./@entityID`)
-	ID := ""
-	protocol := ""
+	var ID, issuer, nameIDFormat, protocol string
 
 	request = goxml.NewXpFromString(template)
 	//request.QueryDashP(nil, "./@ID", msgID, nil)
@@ -1117,14 +1115,14 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 	}
 	acsIndex := spMd.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@Binding="`+POST+`" and @Location=`+strconv.Quote(acs)+`]/@index`)
 	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", acs, nil)
+	issuer = spMd.Query1(nil, `./@entityID`) // we save the issueing SP in the sRequest for edge request - will be overwritten later if an originalRequest is given
 	request.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 	for _, providerID := range idPList {
 		if providerID != "" {
 			request.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry[0]/@ProviderID", providerID, nil)
 		}
 	}
-	nameIDFormat := ""
-	nameIDFormats := NameIDList
+	request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", spMd.Query1(nil, `./md:SPSSODescriptor/md:NameIDFormat`), nil)
 
 	if originalRequest != nil { // already checked for supported nameidformat
 		if originalRequest.QueryXMLBool(nil, "./@ForceAuthn") {
@@ -1133,38 +1131,18 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 		if originalRequest.QueryXMLBool(nil, "./@IsPassive") {
 			request.QueryDashP(nil, "./@IsPassive", "true", nil)
 		}
-		//requesterID := originalRequest.Query1(nil, "./saml:Issuer")
-		//request.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID", requesterID, nil)
-		if nameIDPolicy := originalRequest.Query1(nil, "./samlp:NameIDPolicy/@Format"); nameIDPolicy != "" {
-			nameIDFormats = append([]string{nameIDPolicy}, nameIDFormats...) // prioritize what the SP asked for
-		}
-		issuer = originalRequest.Query1(nil, "./saml:Issuer")
 		ID = originalRequest.Query1(nil, "./@ID")
-		// var origID []byte
-		// origID, err = AuthnRequestCookie.SpcDecode("id", ID[1:], SRequestPrefixLength) // skip _
-		// if err == nil {
-		// 	// need a field in SamlRequest for remembering ...
-		// 	//			ID = string(origID[SRequestPrefixLength+1:]) // one of our own - save what can be saved
-		// }
-		//nameIDFormat = originalRequest.Query1(nil, "./samlp:NameIDPolicy/@Format")
+		issuer = originalRequest.Query1(nil, "./saml:Issuer")
+		nameIDFormat = originalRequest.Query1(nil, "./samlp:NameIDPolicy/@Format")
 		protocol = originalRequest.Query1(nil, "./samlp:Extensions/wayf:protocol")
 		acsIndex = originalRequest.Query1(nil, "./@AssertionConsumerServiceIndex")
+		if wantRequesterID {
+			request.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID", issuer, nil)
+			if virtualIDPID != idpMd.Query1(nil, "@entityID") { // add virtual idp to wayf extension if mapped
+				request.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID[0]", virtualIDPID, nil)
+			}
+		}
 		virtualIDPID = IDHash(virtualIDPID)
-	}
-
-	for _, nameIDFormat = range nameIDFormats {
-		if found := spMd.Query1(nil, "./md:SPSSODescriptor/md:NameIDFormat[.="+strconv.Quote(nameIDFormat)+"]") != ""; found {
-			break
-		}
-	}
-
-	request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", nameIDFormat, nil)
-
-	if wantRequesterID {
-		request.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID", request.Query1(nil, "./saml:Issuer"), nil)
-		if virtualIDPID != idpMd.Query1(nil, "@entityID") { // add virtual idp to wayf extension if mapped
-			request.QueryDashP(nil, "./samlp:Scoping/samlp:RequesterID[0]", virtualIDPID, nil)
-		}
 	}
 
 	sRequest := SamlRequest{
