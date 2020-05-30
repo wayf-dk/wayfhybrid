@@ -1377,7 +1377,7 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		if err != nil {
 			return err
 		}
-		json, err := json.MarshalIndent(&req, "  ", "  ")
+		json, err := json.MarshalIndent(&req, "", "  ")
 		if err != nil {
 			return err
 		}
