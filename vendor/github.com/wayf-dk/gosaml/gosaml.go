@@ -110,9 +110,11 @@ type (
 	}
 	// SLOInfo refers to Single Logout information
 	SLOInfo struct {
-		IssuerID, NameID, SPNameQualifier, SessionIndex, DestinationID string
-		NameIDFormat                                                   uint8
+		IDP, SP, NameID, SPNameQualifier, SessionIndex, ID string
+		NameIDFormat, HubRole                                                   uint8
 	}
+
+	SLOInfoList []SLOInfo
 
 	// Formdata for passing parameters to display template
 	Formdata struct {
@@ -963,7 +965,7 @@ func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, role int) (reques
 	request = goxml.NewXpFromString(template)
 	issueInstant, _, _, _, _ := IDAndTiming()
 
-	slo := destination.Query(nil, `./`+Roles[role]+`/md:SingleLogoutService[@Binding="`+REDIRECT+`" or @Binding="`+POST+`"]`)
+	slo := destination.Query(nil, `./`+Roles[(sloinfo.HubRole+1)%2]+`/md:SingleLogoutService[@Binding="`+REDIRECT+`" or @Binding="`+POST+`"]`)
 	if len(slo) == 0 {
 		err = goxml.NewWerror("cause:no SingleLogoutService found", "entityID:"+destination.Query1(nil, "./@entityID"))
 		return
@@ -972,9 +974,13 @@ func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, role int) (reques
 	binding = destination.Query1(slo[0], "./@Binding")
 
 	request.QueryDashP(nil, "./@IssueInstant", issueInstant, nil)
-	request.QueryDashP(nil, "./@ID", ID(), nil)
+	request.QueryDashP(nil, "./@ID", sloinfo.ID, nil)
 	request.QueryDashP(nil, "./@Destination", destination.Query1(slo[0], "./@Location"), nil)
-	request.QueryDashP(nil, "./saml:Issuer", sloinfo.IssuerID, nil)
+	issuer := sloinfo.IDP
+	if sloinfo.HubRole == SPRole {
+	    issuer = sloinfo.SP
+	}
+	request.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 
 	request.QueryDashP(nil, "./saml:NameID/@Format", NameIDList[sloinfo.NameIDFormat], nil)
 	if sloinfo.SPNameQualifier != "" {
@@ -988,7 +994,7 @@ func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, role int) (reques
 }
 
 // NewLogoutResponse creates a Logout Response oon the basis of Logout request
-func NewLogoutResponse(issuer, destination, request *goxml.Xp, role int) (response *goxml.Xp, binding string, err error) {
+func NewLogoutResponse(issuer, destination *goxml.Xp, inResponseTo string, role int) (response *goxml.Xp, binding string, err error) {
 	template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                       xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
                       ID=""
@@ -1015,16 +1021,18 @@ func NewLogoutResponse(issuer, destination, request *goxml.Xp, role int) (respon
 
 	response.QueryDashP(nil, "./@IssueInstant", time.Now().Format(XsDateTime), nil)
 	response.QueryDashP(nil, "./@ID", ID(), nil)
-	response.QueryDashP(nil, "./@InResponseTo", request.Query1(nil, "./@ID"), nil)
+	response.QueryDashP(nil, "./@InResponseTo", inResponseTo,  nil)
 	response.QueryDashP(nil, "./saml:Issuer", issuer.Query1(nil, `/md:EntityDescriptor/@entityID`), nil)
 	return
 }
 
 // SloRequest generates a single logout request
 func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *goxml.Xp, pk string) {
-	sloinfo := NewSLOInfo(response, spMd.Query1(nil, "@entityID"))
-	sloinfo.IssuerID = spMd.Query1(nil, "@entityID")
-	request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, IDPRole)
+    context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
+	sloinfo := NewSLOInfo(response, context, spMd.Query1(nil, "@entityID"), SPRole)
+	sloinfo.SP = spMd.Query1(nil, "@entityID")
+	request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, SPRole)
+	request.QueryDashP(nil, "@ID", ID(), nil)
 	switch binding {
 	case REDIRECT:
 		u, _ := SAMLRequest2URL(request, "", pk, "-", "")
@@ -1037,7 +1045,7 @@ func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *g
 
 // SloResponse generates a single logout reponse
 func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destination *goxml.Xp, pk string) {
-	response, binding, _ := NewLogoutResponse(issuer, destination, request, IDPRole)
+	response, binding, _ := NewLogoutResponse(issuer, destination, request.Query1(nil, "@ID"), IDPRole)
 	switch binding {
 	case REDIRECT:
 		u, _ := SAMLRequest2URL(response, "", pk, "-", "")
@@ -1049,16 +1057,90 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 }
 
 // NewSLOInfo extract necessary Logout information
-func NewSLOInfo(response *goxml.Xp, de string) (slo *SLOInfo) {
+func NewSLOInfo(xp *goxml.Xp, context types.Node, sp string, hubRole uint8) (slo *SLOInfo) {
 	slo = &SLOInfo{
-		IssuerID:        response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Issuer"),
-		NameID:          response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID"),
-		NameIDFormat:    NameIDMap[response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@Format")],
-		SPNameQualifier: response.Query1(nil, "/samlp:Response/saml:Assertion/saml:Subject/saml:NameID/@SPNameQualifier"),
-		SessionIndex:    response.Query1(nil, "/samlp:Response/saml:Assertion/saml:AuthnStatement/@SessionIndex"),
-		DestinationID:   de,
+	    HubRole:         hubRole,
+		IDP:             xp.Query1(context, "saml:Issuer"),
+		SP:              sp,
+		NameID:          xp.Query1(context, "saml:Subject/saml:NameID"),
+		NameIDFormat:    NameIDMap[xp.Query1(context, "saml:Subject/saml:NameID/@Format")],
+		SPNameQualifier: xp.Query1(context, "saml:Subject/saml:NameID/@SPNameQualifier"),
+		SessionIndex:    xp.Query1(context, "saml:AuthnStatement/@SessionIndex")+xp.Query1(context, "samlp:SessionIndex"), // never both at the same time !!!
 	}
 	return
+}
+
+func (sil *SLOInfoList) LogoutRequest(request *goxml.Xp, hub string, hubRole uint8) (slo *SLOInfo) {
+    context := request.Query(nil, "/samlp:LogoutRequest")[0]
+    newSlo := NewSLOInfo(request, context, hub, hubRole)
+    if hubRole == IDPRole { // if from a SP we need to swap roles - the hub is the IDP
+        newSlo.SP, newSlo.IDP = newSlo.IDP, newSlo.SP
+    }
+    // to-do delete if async request
+    for i, sloInfo := range *sil { // find the SLOInfo
+        if newSlo.HubRole == sloInfo.HubRole && newSlo.IDP == sloInfo.IDP && newSlo.SP == sloInfo.SP { // ignoring NameID etc for now
+           (*sil)[i].ID = request.Query1(context, "@ID")  // remember the ID for the response
+           (*sil)[i].NameID = "" // sentinel for initial request
+           break
+        }
+    }
+    slo, _ = sil.Find("")
+    return
+}
+
+func (sil *SLOInfoList) LogoutResponse(response *goxml.Xp) (slo *SLOInfo, sendResponse bool) {
+    return sil.Find(response.Query1(nil, "@InResponseTo"))
+}
+
+
+func (sil *SLOInfoList) Response(response *goxml.Xp, sp string, hubRole uint8) {
+    newSil := SLOInfoList{}
+    context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
+    newSlo := NewSLOInfo(response, context, sp, hubRole)
+    newSil = append(newSil, *newSlo)
+    for _, sloInfo := range *sil {
+        if newSlo.HubRole == sloInfo.HubRole && newSlo.IDP == sloInfo.IDP && newSlo.SP == sloInfo.SP {
+           continue // we only support one active "session" per SP/IDP so skip it if already there
+        }
+        newSil = append(newSil, sloInfo)
+    }
+    *sil = newSil
+    return
+}
+
+func (sil *SLOInfoList) Find(id string) (slo *SLOInfo, sendResponse bool) {
+    if id != "" {
+        newSil := SLOInfoList{}
+        for _, sloInfo := range *sil {
+            if id != sloInfo.ID {
+                newSil = append(newSil, sloInfo)
+            }
+        }
+        if len(newSil) == 1 && newSil[0].NameID == "" {
+            sendResponse = true
+            slo = &newSil[0]
+            *sil = SLOInfoList{}
+            return
+        }
+        *sil = newSil
+    }
+
+    // try first to find an IDP to log out from
+    for i, sloInfo := range *sil { // find the SLOInfo
+        if sloInfo.HubRole == SPRole && sloInfo.ID == "" {
+            (*sil)[i].ID = ID()
+            slo = &(*sil)[i]
+            return
+        }
+    }
+    // If no IDPs find a SP
+    for i, sloInfo := range *sil { // find the SLOInfo
+        if sloInfo.HubRole == IDPRole && sloInfo.ID == "" {
+            (*sil)[i].ID = ID()
+            slo = &(*sil)[i]
+        }
+    }
+    return
 }
 
 // SignResponse signs the response with the given method.
@@ -1541,8 +1623,8 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		if err != nil {
 			return err
 		}
-		sloinfo.IssuerID, sloinfo.DestinationID = sloinfo.DestinationID, sloinfo.IssuerID
-		idpMd, _, err := FindInMetadataSets(MdSets{mdHub, mdExternalIDP}, sloinfo.DestinationID)
+		sloinfo.IDP, sloinfo.SP = sloinfo.SP, sloinfo.IDP
+		idpMd, _, err := FindInMetadataSets(MdSets{mdHub, mdExternalIDP}, sloinfo.IDP)
 		if err != nil {
 			return err
 		}
@@ -1715,11 +1797,12 @@ func CheckDigestAndSignatureAlgorithms(response *goxml.Xp, allowedDigestAndSigna
 
 // Marshal - hand-held marshal for SLOInfo struct
 func (r SLOInfo) Marshal() (msg []byte) {
-	for _, str := range []string{r.IssuerID, r.NameID, r.SPNameQualifier, r.SessionIndex, r.DestinationID} {
+	for _, str := range []string{r.IDP, r.SP, r.NameID, r.SPNameQualifier, r.SessionIndex, r.ID} {
 		msg = append(msg, 0xd9, uint8(len(str)))
 		msg = append(msg, str...)
 	}
 	msg = append(msg, 0xcc, r.NameIDFormat)
+	msg = append(msg, 0xcc, r.HubRole)
 	return
 }
 
@@ -1727,14 +1810,16 @@ func (r SLOInfo) Marshal() (msg []byte) {
 func (r *SLOInfo) Unmarshal(msg []byte) {
 	i := byte(2)
 	l := i + msg[i-1]
-	for _, x := range []*string{&r.IssuerID, &r.NameID, &r.SPNameQualifier, &r.SessionIndex} {
+	for _, x := range []*string{&r.IDP, &r.SP, &r.NameID, &r.SPNameQualifier, &r.SessionIndex} {
 		*x = string(msg[i:l])
 		i = l + 2
 		l = i + msg[i-1]
 	}
-	r.DestinationID = string(msg[i:l])
+	r.ID = string(msg[i:l])
 	i = l + 1
 	r.NameIDFormat = msg[i]
+	i = l + 1
+	r.HubRole = msg[i]
 	return
 }
 
