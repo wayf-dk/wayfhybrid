@@ -1260,7 +1260,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		if err != nil {
 			return err
 		}
-		msg, binding, err = gosaml.NewLogoutRequest(destMD, sloinfo, role)
+		msg, binding, err = gosaml.NewLogoutRequest(destMD, sloinfo, issMD.Query1(nil, "@entityID"))
 		if err != nil {
 			return err
 		}
@@ -1298,7 +1298,8 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationInMd, samlOut, destinationOutMd *goxml.Xp, role int) (sloinfo *gosaml.SLOInfo, sendResponse bool) {
 	sil := gosaml.SLOInfoList{}
 	data, _ := session.Get(w, r, "SLO", sloInfoCookie)
-	_ = json.Unmarshal(data, &sil)
+	//json.Unmarshal(data, &sil)
+	sil.Unmarshal(data)
 
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
@@ -1309,7 +1310,8 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationI
 		sil.Response(samlIn, destinationInMd.Query1(nil, "@entityID"), gosaml.SPRole)
 		sil.Response(samlOut, destinationOutMd.Query1(nil, "@entityID"), gosaml.IDPRole)
 	}
-	bytes, _ := json.Marshal(sil)
+	//bytes, _ := json.Marshal(sil)
+	bytes := sil.Marshal()
 	session.Set(w, r, "SLO", config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 	return
 }

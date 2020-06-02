@@ -111,7 +111,7 @@ type (
 	// SLOInfo refers to Single Logout information
 	SLOInfo struct {
 		IDP, SP, NameID, SPNameQualifier, SessionIndex, ID string
-		NameIDFormat, HubRole                                                   uint8
+		NameIDFormat, HubRole                              uint8
 	}
 
 	SLOInfoList []SLOInfo
@@ -960,7 +960,7 @@ func NewErrorResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (resp
 }
 
 // NewLogoutRequest makes a logout request with issuer destination ... and returns a NewRequest
-func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, role int) (request *goxml.Xp, binding string, err error) {
+func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, issuer string) (request *goxml.Xp, binding string, err error) {
 	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Version="2.0"></samlp:LogoutRequest>`
 	request = goxml.NewXpFromString(template)
 	issueInstant, _, _, _, _ := IDAndTiming()
@@ -976,10 +976,6 @@ func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, role int) (reques
 	request.QueryDashP(nil, "./@IssueInstant", issueInstant, nil)
 	request.QueryDashP(nil, "./@ID", sloinfo.ID, nil)
 	request.QueryDashP(nil, "./@Destination", destination.Query1(slo[0], "./@Location"), nil)
-	issuer := sloinfo.IDP
-	if sloinfo.HubRole == SPRole {
-	    issuer = sloinfo.SP
-	}
 	request.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 
 	request.QueryDashP(nil, "./saml:NameID/@Format", NameIDList[sloinfo.NameIDFormat], nil)
@@ -1021,17 +1017,17 @@ func NewLogoutResponse(issuer, destination *goxml.Xp, inResponseTo string, role 
 
 	response.QueryDashP(nil, "./@IssueInstant", time.Now().Format(XsDateTime), nil)
 	response.QueryDashP(nil, "./@ID", ID(), nil)
-	response.QueryDashP(nil, "./@InResponseTo", inResponseTo,  nil)
+	response.QueryDashP(nil, "./@InResponseTo", inResponseTo, nil)
 	response.QueryDashP(nil, "./saml:Issuer", issuer.Query1(nil, `/md:EntityDescriptor/@entityID`), nil)
 	return
 }
 
 // SloRequest generates a single logout request
 func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *goxml.Xp, pk string) {
-    context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
+	context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
 	sloinfo := NewSLOInfo(response, context, spMd.Query1(nil, "@entityID"), SPRole)
 	sloinfo.SP = spMd.Query1(nil, "@entityID")
-	request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, SPRole)
+	request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, spMd.Query1(nil, "@entityID"))
 	request.QueryDashP(nil, "@ID", ID(), nil)
 	switch binding {
 	case REDIRECT:
@@ -1059,88 +1055,87 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 // NewSLOInfo extract necessary Logout information
 func NewSLOInfo(xp *goxml.Xp, context types.Node, sp string, hubRole uint8) (slo *SLOInfo) {
 	slo = &SLOInfo{
-	    HubRole:         hubRole,
-		IDP:             xp.Query1(context, "saml:Issuer"),
-		SP:              sp,
+		HubRole:         hubRole,
+		IDP:             IDHash(xp.Query1(context, "saml:Issuer")),
+		SP:              IDHash(sp),
 		NameID:          xp.Query1(context, "saml:Subject/saml:NameID"),
 		NameIDFormat:    NameIDMap[xp.Query1(context, "saml:Subject/saml:NameID/@Format")],
-		SPNameQualifier: xp.Query1(context, "saml:Subject/saml:NameID/@SPNameQualifier"),
-		SessionIndex:    xp.Query1(context, "saml:AuthnStatement/@SessionIndex")+xp.Query1(context, "samlp:SessionIndex"), // never both at the same time !!!
+		//SPNameQualifier: xp.Query1(context, "saml:Subject/saml:NameID/@SPNameQualifier"),
+		//SessionIndex:    xp.Query1(context, "saml:AuthnStatement/@SessionIndex") + xp.Query1(context, "samlp:SessionIndex"), // never both at the same time !!!
 	}
 	return
 }
 
 func (sil *SLOInfoList) LogoutRequest(request *goxml.Xp, hub string, hubRole uint8) (slo *SLOInfo) {
-    context := request.Query(nil, "/samlp:LogoutRequest")[0]
-    newSlo := NewSLOInfo(request, context, hub, hubRole)
-    if hubRole == IDPRole { // if from a SP we need to swap roles - the hub is the IDP
-        newSlo.SP, newSlo.IDP = newSlo.IDP, newSlo.SP
-    }
-    // to-do delete if async request
-    for i, sloInfo := range *sil { // find the SLOInfo
-        if newSlo.HubRole == sloInfo.HubRole && newSlo.IDP == sloInfo.IDP && newSlo.SP == sloInfo.SP { // ignoring NameID etc for now
-           (*sil)[i].ID = request.Query1(context, "@ID")  // remember the ID for the response
-           (*sil)[i].NameID = "" // sentinel for initial request
-           break
-        }
-    }
-    slo, _ = sil.Find("")
-    return
+	context := request.Query(nil, "/samlp:LogoutRequest")[0]
+	newSlo := NewSLOInfo(request, context, hub, hubRole)
+	if hubRole == IDPRole { // if from a SP we need to swap roles - the hub is the IDP
+		newSlo.SP, newSlo.IDP = newSlo.IDP, newSlo.SP
+	}
+	// to-do delete if async request
+	for i, sloInfo := range *sil { // find the SLOInfo
+		if newSlo.HubRole == sloInfo.HubRole && newSlo.IDP == sloInfo.IDP && newSlo.SP == sloInfo.SP { // ignoring NameID etc for now
+			(*sil)[i].ID = request.Query1(context, "@ID") // remember the ID for the response
+			(*sil)[i].NameID = ""                         // sentinel for initial request
+			break
+		}
+	}
+	slo, _ = sil.Find("")
+	return
 }
 
 func (sil *SLOInfoList) LogoutResponse(response *goxml.Xp) (slo *SLOInfo, sendResponse bool) {
-    return sil.Find(response.Query1(nil, "@InResponseTo"))
+	return sil.Find(response.Query1(nil, "@InResponseTo"))
 }
 
-
 func (sil *SLOInfoList) Response(response *goxml.Xp, sp string, hubRole uint8) {
-    newSil := SLOInfoList{}
-    context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
-    newSlo := NewSLOInfo(response, context, sp, hubRole)
-    newSil = append(newSil, *newSlo)
-    for _, sloInfo := range *sil {
-        if newSlo.HubRole == sloInfo.HubRole && newSlo.IDP == sloInfo.IDP && newSlo.SP == sloInfo.SP {
-           continue // we only support one active "session" per SP/IDP so skip it if already there
-        }
-        newSil = append(newSil, sloInfo)
-    }
-    *sil = newSil
-    return
+	newSil := SLOInfoList{}
+	context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
+	newSlo := NewSLOInfo(response, context, sp, hubRole)
+	newSil = append(newSil, *newSlo)
+	for _, sloInfo := range *sil {
+		if newSlo.HubRole == sloInfo.HubRole && newSlo.IDP == sloInfo.IDP && newSlo.SP == sloInfo.SP {
+			continue // we only support one active "session" per SP/IDP so skip it if already there
+		}
+		newSil = append(newSil, sloInfo)
+	}
+	*sil = newSil
+	return
 }
 
 func (sil *SLOInfoList) Find(id string) (slo *SLOInfo, sendResponse bool) {
-    if id != "" {
-        newSil := SLOInfoList{}
-        for _, sloInfo := range *sil {
-            if id != sloInfo.ID {
-                newSil = append(newSil, sloInfo)
-            }
-        }
-        if len(newSil) == 1 && newSil[0].NameID == "" {
-            sendResponse = true
-            slo = &newSil[0]
-            *sil = SLOInfoList{}
-            return
-        }
-        *sil = newSil
-    }
+	if id != "" {
+		newSil := SLOInfoList{}
+		for _, sloInfo := range *sil {
+			if id != sloInfo.ID {
+				newSil = append(newSil, sloInfo)
+			}
+		}
+		if len(newSil) == 1 && newSil[0].NameID == "" {
+			sendResponse = true
+			slo = &newSil[0]
+			*sil = SLOInfoList{}
+			return
+		}
+		*sil = newSil
+	}
 
-    // try first to find an IDP to log out from
-    for i, sloInfo := range *sil { // find the SLOInfo
-        if sloInfo.HubRole == SPRole && sloInfo.ID == "" {
-            (*sil)[i].ID = ID()
-            slo = &(*sil)[i]
-            return
-        }
-    }
-    // If no IDPs find a SP
-    for i, sloInfo := range *sil { // find the SLOInfo
-        if sloInfo.HubRole == IDPRole && sloInfo.ID == "" {
-            (*sil)[i].ID = ID()
-            slo = &(*sil)[i]
-        }
-    }
-    return
+	// try first to find an IDP to log out from
+	for i, sloInfo := range *sil { // find the SLOInfo
+		if sloInfo.HubRole == SPRole && sloInfo.ID == "" {
+			(*sil)[i].ID = ID()
+			slo = &(*sil)[i]
+			return
+		}
+	}
+	// If no IDPs find a SP
+	for i, sloInfo := range *sil { // find the SLOInfo
+		if sloInfo.HubRole == IDPRole && sloInfo.ID == "" {
+			(*sil)[i].ID = ID()
+			slo = &(*sil)[i]
+		}
+	}
+	return
 }
 
 // SignResponse signs the response with the given method.
@@ -1628,7 +1623,7 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		if err != nil {
 			return err
 		}
-		request, _, err := NewLogoutRequest(idpMd, sloinfo, IDPRole)
+		request, _, err := NewLogoutRequest(idpMd, sloinfo, entityID)
 		if err != nil {
 			return err
 		}
@@ -1796,30 +1791,39 @@ func CheckDigestAndSignatureAlgorithms(response *goxml.Xp, allowedDigestAndSigna
 }
 
 // Marshal - hand-held marshal for SLOInfo struct
-func (r SLOInfo) Marshal() (msg []byte) {
-	for _, str := range []string{r.IDP, r.SP, r.NameID, r.SPNameQualifier, r.SessionIndex, r.ID} {
-		msg = append(msg, 0xd9, uint8(len(str)))
-		msg = append(msg, str...)
+func (sil SLOInfoList) Marshal() (msg []byte) {
+	for _, r := range sil {
+		for _, str := range []string{r.IDP, r.SP, r.NameID, r.SPNameQualifier, r.SessionIndex, r.ID} {
+			msg = append(msg, uint8(len(str)))
+			msg = append(msg, str...)
+		}
+		msg = append(msg, r.NameIDFormat)
+		msg = append(msg, r.HubRole)
 	}
-	msg = append(msg, 0xcc, r.NameIDFormat)
-	msg = append(msg, 0xcc, r.HubRole)
+
 	return
 }
 
 // Unmarshal - hand-held unmarshal for SLOInfo struct
-func (r *SLOInfo) Unmarshal(msg []byte) {
-	i := byte(2)
-	l := i + msg[i-1]
-	for _, x := range []*string{&r.IDP, &r.SP, &r.NameID, &r.SPNameQualifier, &r.SessionIndex} {
-		*x = string(msg[i:l])
-		i = l + 2
-		l = i + msg[i-1]
+func (sil *SLOInfoList) Unmarshal(msg []byte) {
+	i := 0
+	length := len(msg)
+	for {
+		if i == length {
+			break
+		}
+		r := SLOInfo{}
+		for _, x := range []*string{&r.IDP, &r.SP, &r.NameID, &r.SPNameQualifier, &r.SessionIndex, &r.ID} {
+			l := int(msg[i])
+			*x = string(msg[i+1:l+i+1])
+			i = i + l + 1
+		}
+		r.NameIDFormat = msg[i]
+		i++
+		r.HubRole = msg[i]
+		i++
+		*sil = append(*sil, r)
 	}
-	r.ID = string(msg[i:l])
-	i = l + 1
-	r.NameIDFormat = msg[i]
-	i = l + 1
-	r.HubRole = msg[i]
 	return
 }
 
