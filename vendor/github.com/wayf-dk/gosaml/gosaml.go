@@ -494,19 +494,6 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 	}
 
 	key := location
-	// we only receive responses for requests we have made ourselves - either from an IdP or via SAML2jwt, i.e. we have an encoded SamlRequest in @InResponseTo
-	if protocol == "Response" {
-		var tmpID []byte
-		tmpID, err = AuthnRequestCookie.SpcDecode("id", tmpXp.Query1(nil, "./@InResponseTo")[1:], SRequestPrefixLength) // skip _
-		if err != nil {
-			return
-		}
-		sRequest := SamlRequest{}
-		sRequest.Unmarshal(tmpID)
-		if sRequest.RequestID == "" { // An "edge" request - i.e. not across the hub
-			key = sRequest.SP
-		}
-	}
 
 	destination := tmpXp.Query1(nil, "./@Destination")
 	if destination == "" {
@@ -1170,7 +1157,7 @@ func SignResponse(response *goxml.Xp, elementQuery string, md *goxml.Xp, signing
 //  - The ProtocolBinding is post
 //  - The Issuer is the entityID in the idpmetadata
 //  - The NameID defaults to transient
-func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string, idPList []string, acs string, wantRequesterID bool, spIndex, hubBirkIndex uint8) (request *goxml.Xp, err error) {
+func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string, idPList []string, acs string, wantRequesterID bool, spIndex, hubBirkIndex uint8) (request *goxml.Xp, sRequest SamlRequest, err error) {
 	template := `<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
                     xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
                     Version="2.0"
@@ -1183,7 +1170,7 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 	var ID, issuer, nameIDFormat, protocol string
 
 	request = goxml.NewXpFromString(template)
-	//request.QueryDashP(nil, "./@ID", msgID, nil)
+	request.QueryDashP(nil, "./@ID", msgID, nil)
 	request.QueryDashP(nil, "./@IssueInstant", issueInstant, nil)
 	request.QueryDashP(nil, "./@Destination", idpMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[@Binding="`+REDIRECT+`"]/@Location`), nil)
 	acses := spMd.QueryMulti(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@Binding="`+POST+`"]/@Location`)
@@ -1222,7 +1209,7 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 		virtualIDPID = IDHash(virtualIDPID)
 	}
 
-	sRequest := SamlRequest{
+	sRequest = SamlRequest{
 		Nonce:                  msgID,
 		RequestID:              ID,
 		SP:                     IDHash(issuer),
@@ -1233,17 +1220,6 @@ func NewAuthnRequest(originalRequest, spMd, idpMd *goxml.Xp, virtualIDPID string
 		HubBirkIndex:           hubBirkIndex,
 		Protocol:               protocol,
 	}
-
-	buf, n := sRequest.Marshal()
-
-	// session.Set(w, r, prefix+idHash(id), domain, bytes, authnRequestCookie, authnRequestTTL)
-	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
-	encodedSRequest, err := AuthnRequestCookie.SpcEncode("id", buf, n)
-	if err != nil {
-		return
-	}
-
-	request.QueryDashP(nil, "./@ID", "_"+encodedSRequest, nil)
 	return
 }
 
@@ -1645,7 +1621,7 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			return err
 		}
 
-		request, err := NewAuthnRequest(nil, spMd, idpMd, "", strings.Split(r.Form.Get("idplist"), ","), acs, false, 0, 0)
+		request, _, err := NewAuthnRequest(nil, spMd, idpMd, "", strings.Split(r.Form.Get("idplist"), ","), acs, false, 0, 0)
 		if err != nil {
 			return err
 		}

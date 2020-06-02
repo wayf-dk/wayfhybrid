@@ -540,7 +540,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		newrequest, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scoping, "", false, 0, 0)
+		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scoping, "", false, 0, 0)
 
 		options := []struct{ name, path, value string }{
 			{"isPassive", "./@IsPassive", "true"},
@@ -904,10 +904,22 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd *goxml.Xp, virtualIDPID, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex uint8, idPList []string) (err error) {
 	// why not use orig request?
-	newrequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`), spIndex, hubBirkIndex)
+	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`), spIndex, hubBirkIndex)
 	if err != nil {
 		return
 	}
+
+	buf, _ := sRequest.Marshal()
+	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
+	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
+	/*
+		encodedSRequest, err := AuthnRequestCookie.SpcEncode("id", buf, n)
+		if err != nil {
+			return
+		}
+
+		request.QueryDashP(nil, "./@ID", "_"+encodedSRequest, nil)
+	*/
 
 	var privatekey []byte
 	if realIDPMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || hubKribSPMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
@@ -950,16 +962,13 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, issuerMdSets, destinationMdSets gosaml.MdSets, prefix string) (spMd, hubBirkIDPMd, virtualIDPMd, request *goxml.Xp, sRequest gosaml.SamlRequest, err error) {
 	gosaml.DumpFileIfTracing(r, response)
-	inResponseTo := response.Query1(nil, "./@InResponseTo")[1:]
-	// value, err := session.GetDel(w, r, prefix+gosaml.IDHash(inResponseTo), authnRequestCookie)
-	// extract the original request from @inResponseTo
-	value := []byte{}
-	value, err = authnRequestCookie.SpcDecode("id", inResponseTo, gosaml.SRequestPrefixLength)
+	inResponseTo := response.Query1(nil, "./@InResponseTo")
+	tmpID, err := session.GetDel(w, r, prefix+gosaml.IDHash(inResponseTo), authnRequestCookie)
+	//tmpID, err = AuthnRequestCookie.SpcDecode("id", inResponseTo[1:], SRequestPrefixLength) // skip _
 	if err != nil {
 		return
 	}
-
-	sRequest.Unmarshal(value)
+	sRequest.Unmarshal(tmpID)
 
 	// we need to disable the replay attack mitigation based on the cookie - we are now fully dependent on the ttl on the data - pt. 3 mins
 	//	if inResponseTo != sRequest.Nonce {
@@ -1230,10 +1239,10 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
 	sloinfo, returnResponse := SLOInfoHandler(w, r, request, destination, request, nil, role)
-    iss, dest := sloinfo.IDP, sloinfo.SP
-    if sloinfo.HubRole == gosaml.SPRole {
-        dest, iss = iss, dest
-    }
+	iss, dest := sloinfo.IDP, sloinfo.SP
+	if sloinfo.HubRole == gosaml.SPRole {
+		dest, iss = iss, dest
+	}
 	if returnResponse {
 		//legacyStatLog("saml20-idp-SLO "+res[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), "")
 
