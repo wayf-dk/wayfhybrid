@@ -1047,8 +1047,8 @@ func NewSLOInfo(xp *goxml.Xp, context types.Node, sp string, hubRole uint8) (slo
 		SP:              IDHash(sp),
 		NameID:          xp.Query1(context, "saml:Subject/saml:NameID"),
 		NameIDFormat:    NameIDMap[xp.Query1(context, "saml:Subject/saml:NameID/@Format")],
-		//SPNameQualifier: xp.Query1(context, "saml:Subject/saml:NameID/@SPNameQualifier"),
-		//SessionIndex:    xp.Query1(context, "saml:AuthnStatement/@SessionIndex") + xp.Query1(context, "samlp:SessionIndex"), // never both at the same time !!!
+		SPNameQualifier: xp.Query1(context, "saml:Subject/saml:NameID/@SPNameQualifier"),
+		SessionIndex:    xp.Query1(context, "saml:AuthnStatement/@SessionIndex") + xp.Query1(context, "samlp:SessionIndex"), // never both at the same time !!!
 	}
 	return
 }
