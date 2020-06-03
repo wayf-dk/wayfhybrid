@@ -909,17 +909,15 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		return
 	}
 
-	buf, _ := sRequest.Marshal()
-	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
+	buf, n := sRequest.Marshal()
+	//session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
 	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
-	/*
-		encodedSRequest, err := AuthnRequestCookie.SpcEncode("id", buf, n)
-		if err != nil {
-			return
-		}
+	encodedSRequest, err := authnRequestCookie.SpcEncode("id", buf, n)
+	if err != nil {
+		return
+	}
 
-		request.QueryDashP(nil, "./@ID", "_"+encodedSRequest, nil)
-	*/
+	newrequest.QueryDashP(nil, "./@ID", "_"+encodedSRequest, nil)
 
 	var privatekey []byte
 	if realIDPMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || hubKribSPMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
@@ -963,8 +961,8 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, issuerMdSets, destinationMdSets gosaml.MdSets, prefix string) (spMd, hubBirkIDPMd, virtualIDPMd, request *goxml.Xp, sRequest gosaml.SamlRequest, err error) {
 	gosaml.DumpFileIfTracing(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
-	tmpID, err := session.GetDel(w, r, prefix+gosaml.IDHash(inResponseTo), authnRequestCookie)
-	//tmpID, err = AuthnRequestCookie.SpcDecode("id", inResponseTo[1:], SRequestPrefixLength) // skip _
+	//tmpID, err := session.GetDel(w, r, prefix+gosaml.IDHash(inResponseTo), authnRequestCookie)
+	tmpID, err := authnRequestCookie.SpcDecode("id", inResponseTo[1:], gosaml.SRequestPrefixLength) // skip _
 	if err != nil {
 		return
 	}
