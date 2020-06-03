@@ -909,7 +909,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		return
 	}
 
-	buf, n := sRequest.Marshal()
+	buf, _ := sRequest.Marshal()
 	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
 	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
 /*
