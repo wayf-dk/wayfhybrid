@@ -965,7 +965,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.Xp, issuerMdSets, destinationMdSets gosaml.MdSets, prefix string) (spMd, hubBirkIDPMd, virtualIDPMd, request *goxml.Xp, sRequest gosaml.SamlRequest, err error) {
 	gosaml.DumpFileIfTracing(r, response)
 	inResponseTo := response.Query1(nil, "./@InResponseTo")
-	tmpID, err := session.GetDel(w, r, prefix+gosaml.IDHash(inResponseTo), authnRequestCookie)
+	tmpID, err := session.GetDel(w, r, prefix+gosaml.IDHash(inResponseTo), config.Domain, authnRequestCookie)
 	//tmpID, err := authnRequestCookie.SpcDecode("id", inResponseTo[1:], gosaml.SRequestPrefixLength) // skip _
 	if err != nil {
 		return
