@@ -83,7 +83,7 @@ const (
 	SIMPLESIGN = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST-SimpleSign"
 	// Allowed slack for timingchecks
 	timeskew = 90
-	// SRequestPrefixLength - ardcoded prefix for special space saving encoding of sRequests
+    // SRequestPrefixLength - hardcoded prefix for special space saving encoding of sRequests
 	SRequestPrefixLength = 5
 )
 
