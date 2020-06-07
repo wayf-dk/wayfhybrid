@@ -931,11 +931,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		}
 	}
 
-	algo := realIDPMd.Query1(nil, xprefix+"SigningMethod")
-
-	if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
-		algo = sigAlg
-	}
+	algo := gosaml.DebugSettingWithDefault(r, "idpSigAlg", realIDPMd.Query1(nil, xprefix+"SigningMethod"))
 
 	u, err := gosaml.SAMLRequest2URL(newrequest, relayState, string(privatekey), "-", algo)
 	if err != nil {
@@ -1024,7 +1020,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	signingMethod := spMd.Query1(nil, xprefix+"SigningMethod")
+	signingMethod := gosaml.DebugSettingWithDefault(r, "spSigAlg", spMd.Query1(nil, xprefix+"SigningMethod"))
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
@@ -1131,10 +1127,6 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				newresponse.Rm(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID", value, nil)
 			}
-		}
-
-		if sigAlg := gosaml.DebugSetting(r, "spSigAlg"); sigAlg != "" {
-			signingMethod = sigAlg
 		}
 
 		elementsToSign := config.ElementsToSign
