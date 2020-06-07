@@ -174,6 +174,14 @@ func DebugSetting(r *http.Request, name string) string {
 	return ""
 }
 
+func DebugSettingWithDefault(r *http.Request, name, def string) (res string) {
+    res = DebugSetting(r, name)
+    if res == "" {
+        res = def
+    }
+    return
+}
+
 // DumpFile is for logging requests and responses
 func DumpFile(r *http.Request, xp *goxml.Xp) (logtag string) {
 	msgType := xp.QueryString(nil, "local-name(/*)")
