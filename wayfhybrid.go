@@ -361,15 +361,18 @@ func (s wayfHybridSession) Get(w http.ResponseWriter, r *http.Request, id string
 }
 
 // Del responsible for deleting a cookie values
-func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id string, secCookie *gosaml.Hm) (err error) {
-	http.SetCookie(w, &http.Cookie{Name: id, Domain: config.Domain, Value: "", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1, Expires: time.Unix(0, 0)})
+func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id, domain string, secCookie *gosaml.Hm) (err error) {
+	// http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: "", Path: "/", Secure: true, HttpOnly: true, Expires: time.Unix(0, 0),  SameSite: http.SameSiteNoneMode})
+	cc := http.Cookie{Name: id, Domain: domain, Value: "", Path: "/", Secure: true, HttpOnly: true, Expires: time.Unix(0, 0)}
+	v := cc.String() + "; SameSite=None"
+	w.Header().Add("Set-Cookie", v)
 	return
 }
 
 // GetDel responsible for getting and then deleting cookie values
-func (s wayfHybridSession) GetDel(w http.ResponseWriter, r *http.Request, id string, secCookie *gosaml.Hm) (data []byte, err error) {
+func (s wayfHybridSession) GetDel(w http.ResponseWriter, r *http.Request, id, domain string, secCookie *gosaml.Hm) (data []byte, err error) {
 	data, err = s.Get(w, r, id, secCookie)
-	s.Del(w, r, id, secCookie)
+	s.Del(w, r, id, domain, secCookie)
 	return
 }
 
