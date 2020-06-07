@@ -912,17 +912,17 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		return
 	}
 
-	buf, _ := sRequest.Marshal()
+	buf := sRequest.Marshal()
 	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
 	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
-/*
-	encodedSRequest, err := authnRequestCookie.SpcEncode("id", buf, n)
-	if err != nil {
-		return
-	}
+	/*
+		encodedSRequest, err := authnRequestCookie.SpcEncode("id", buf, n)
+		if err != nil {
+			return
+		}
 
-	newrequest.QueryDashP(nil, "./@ID", "_"+encodedSRequest, nil)
-*/
+		newrequest.QueryDashP(nil, "./@ID", "_"+encodedSRequest, nil)
+	*/
 	var privatekey []byte
 	if realIDPMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || hubKribSPMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) {
 		privatekey, _, err = gosaml.GetPrivateKey(hubKribSPMd)
@@ -1232,46 +1232,40 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
-	sloinfo, returnResponse := SLOInfoHandler(w, r, request, destination, request, nil, role)
+	sil, sloinfo, ok, returnResponse := SLOInfoHandler(w, r, request, destination, request, nil, role)
+	if sloinfo == nil {
+		return fmt.Errorf("No SLO info found")
+	}
+
+	if returnResponse && !ok {
+        return fmt.Errorf("SLO failed")
+	} else if returnResponse && sloinfo.Async {
+        return fmt.Errorf("SLO completed")
+	}
+
 	iss, dest := sloinfo.IDP, sloinfo.SP
 	if sloinfo.HubRole == gosaml.SPRole {
 		dest, iss = iss, dest
 	}
-	if returnResponse {
-		//legacyStatLog("saml20-idp-SLO "+res[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), "")
-
-		issMD, _, err = gosaml.FindInMetadataSets(finalIssuerMdSets, iss)
-		if err != nil {
-			return err
-		}
-		destMD, _, err = gosaml.FindInMetadataSets(finalDestinationMdSets, dest)
-		if err != nil {
-			return err
-		}
-
-		msg, binding, err = gosaml.NewLogoutResponse(issMD, destMD, sloinfo.ID, int((sloinfo.HubRole+1)%2))
-		if err != nil {
-			return err
-		}
-		msg.QueryDashP(nil, "@InResponseTo", sloinfo.ID, nil)
-	} else {
-		issMD, _, err = gosaml.FindInMetadataSets(finalIssuerMdSets, iss)
-		if err != nil {
-			return err
-		}
-		destMD, _, err = gosaml.FindInMetadataSets(finalDestinationMdSets, dest)
-		if err != nil {
-			return err
-		}
-		msg, binding, err = gosaml.NewLogoutRequest(destMD, sloinfo, issMD.Query1(nil, "@entityID"))
-		if err != nil {
-			return err
-		}
-		//async := request.QueryBool(nil, "boolean(./samlp:Extensions/aslo:Asynchronous)")
-
-		//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
-
+	issMD, _, err = gosaml.FindInMetadataSets(finalIssuerMdSets, iss)
+	if err != nil {
+		return err
 	}
+	destMD, _, err = gosaml.FindInMetadataSets(finalDestinationMdSets, dest)
+	if err != nil {
+		return err
+	}
+
+	if returnResponse {
+		msg, binding, err = gosaml.NewLogoutResponse(issMD, destMD, sloinfo.ID, int((sloinfo.HubRole+1)%2))
+	} else {
+		msg, binding, err = gosaml.NewLogoutRequest(destMD, sloinfo, issMD.Query1(nil, "@entityID"), false)
+	}
+	if err != nil {
+		return err
+	}
+
+	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
 
 	privatekey, _, err := gosaml.GetPrivateKey(issMD)
 
@@ -1279,43 +1273,49 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		return err
 	}
 
-	algo := destMD.Query1(nil, xprefix+"SigningMethod")
+	algo := gosaml.DebugSettingWithDefault(r, "idpSigAlg", destMD.Query1(nil, xprefix+"SigningMethod"))
 
-	if sigAlg := gosaml.DebugSetting(r, "idpSigAlg"); sigAlg != "" {
-		algo = sigAlg
-	}
 	switch binding {
 	case gosaml.REDIRECT:
 		u, _ := gosaml.SAMLRequest2URL(msg, relayState, string(privatekey), "-", algo)
-		http.Redirect(w, r, u.String(), http.StatusFound)
+		//http.Redirect(w, r, u.String(), http.StatusFound)
+		s, _ := json.MarshalIndent(sil, "", "    ")
+		data := gosaml.Formdata{Acs: u.String(), SLOStatus: string(s), Initial: true}
+		return gosaml.PostForm.ExecuteTemplate(w, "SLOForm", data)
 	case gosaml.POST:
+        err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign)
+        if err != nil {
+            return err
+        }
 		data := gosaml.Formdata{Acs: msg.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(msg.Dump())}
 		return gosaml.PostForm.ExecuteTemplate(w, "postForm", data)
-
 	}
 	return
 }
 
 // SLOInfoHandler Saves or retrieves the SLO info relevant to the contents of the samlMessage
 // For now uses cookies to keep the SLOInfo
-func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationInMd, samlOut, destinationOutMd *goxml.Xp, role int) (sloinfo *gosaml.SLOInfo, sendResponse bool) {
-	sil := gosaml.SLOInfoList{}
+func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, destinationInMd, samlOut, destinationOutMd *goxml.Xp, role int) (sil *gosaml.SLOInfoList, sloinfo *gosaml.SLOInfo, ok, sendResponse bool) {
+	sil = &gosaml.SLOInfoList{}
 	data, _ := session.Get(w, r, "SLO", sloInfoCookie)
-	//json.Unmarshal(data, &sil)
 	sil.Unmarshal(data)
 
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
 		sloinfo = sil.LogoutRequest(samlIn, destinationInMd.Query1(nil, "@entityID"), uint8(role))
 	case "LogoutResponse":
-		sloinfo, sendResponse = sil.LogoutResponse(samlIn)
+		sloinfo, ok = sil.LogoutResponse(samlIn)
+		sendResponse = sloinfo.NameID == ""
 	case "Response":
-		sil.Response(samlIn, destinationInMd.Query1(nil, "@entityID"), gosaml.SPRole)
-		sil.Response(samlOut, destinationOutMd.Query1(nil, "@entityID"), gosaml.IDPRole)
+		sil.Response(samlIn, destinationInMd.Query1(nil, "@entityID"), destinationInMd.Query1(nil, "./md:IDPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.SPRole)
+		sil.Response(samlOut, destinationOutMd.Query1(nil, "@entityID"), destinationOutMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole)
 	}
-	//bytes, _ := json.Marshal(sil)
-	bytes := sil.Marshal()
-	session.Set(w, r, "SLO", config.Domain, bytes, sloInfoCookie, sloInfoTTL)
+	if sendResponse { // ready to send response - clear cookie
+		session.Del(w, r, "SLO", config.Domain, sloInfoCookie)
+	} else {
+        	bytes := sil.Marshal()
+		session.Set(w, r, "SLO", config.Domain, bytes, sloInfoCookie, sloInfoTTL)
+	}
 	return
 }
 
