@@ -958,7 +958,7 @@ func NewErrorResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (resp
 }
 
 // NewLogoutRequest makes a logout request with issuer destination ... and returns a NewRequest
-func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, issuer string) (request *goxml.Xp, binding string, err error) {
+func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, issuer string, async bool) (request *goxml.Xp, binding string, err error) {
 	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Version="2.0"></samlp:LogoutRequest>`
 	request = goxml.NewXpFromString(template)
 	issueInstant, _, _, _, _ := IDAndTiming()
@@ -975,7 +975,9 @@ func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, issuer string) (r
 	request.QueryDashP(nil, "./@ID", sloinfo.ID, nil)
 	request.QueryDashP(nil, "./@Destination", destination.Query1(slo[0], "./@Location"), nil)
 	request.QueryDashP(nil, "./saml:Issuer", issuer, nil)
-
+    if async {
+        request.QueryDashP(nil, "./samlp:Extensions/aslo:Asynchronous", "", nil)
+    }
 	request.QueryDashP(nil, "./saml:NameID/@Format", NameIDList[sloinfo.NameIDFormat], nil)
 	if sloinfo.SPNameQualifier != "" {
 		request.QueryDashP(nil, "./saml:NameID/@SPNameQualifier", sloinfo.SPNameQualifier, nil)
@@ -1023,9 +1025,9 @@ func NewLogoutResponse(issuer, destination *goxml.Xp, inResponseTo string, role 
 // SloRequest generates a single logout request
 func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *goxml.Xp, pk string) {
 	context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
-	sloinfo := NewSLOInfo(response, context, spMd.Query1(nil, "@entityID"), SPRole)
+    sloinfo := NewSLOInfo(response, context, spMd.Query1(nil, "@entityID"), false, SPRole)
 	sloinfo.SP = spMd.Query1(nil, "@entityID")
-	request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, spMd.Query1(nil, "@entityID"))
+    request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, spMd.Query1(nil, "@entityID"), false)
 	request.QueryDashP(nil, "@ID", ID(), nil)
 	switch binding {
 	case REDIRECT:
@@ -1610,7 +1612,7 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		if err != nil {
 			return err
 		}
-		request, _, err := NewLogoutRequest(idpMd, sloinfo, entityID)
+        request, _, err := NewLogoutRequest(idpMd, sloinfo, entityID, false)
 		if err != nil {
 			return err
 		}
