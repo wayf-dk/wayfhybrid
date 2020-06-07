@@ -160,6 +160,8 @@ var (
 	PostForm *template.Template
 	// AuthnRequestCookie - shortlived hmaced timelimited data
 	AuthnRequestCookie *Hm
+    // B2I map for marshalling bool to uint
+    B2I = map[bool]byte{false: 0, true: 1}
 )
 
 // DebugSetting for debugging cookies
