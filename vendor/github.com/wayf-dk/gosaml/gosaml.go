@@ -109,18 +109,21 @@ type (
 	// SLOInfo refers to Single Logout information
 	SLOInfo struct {
 		IDP, SP, NameID, SPNameQualifier, SessionIndex, ID string
-		NameIDFormat, HubRole                              uint8
+        NameIDFormat, HubRole, SLOStatus                   uint8
+        SLOSupport, Async                                  bool
 	}
 
 	SLOInfoList []SLOInfo
 
 	// Formdata for passing parameters to display template
 	Formdata struct {
-		Acs                       string
-		Samlresponse, Samlrequest string
+        AcsURL                         template.URL
+        Acs, Samlresponse, Samlrequest string
 		RelayState                string
 		WsFed                     bool
+        SLOStatus                      string
 		Ard                       template.JS
+        Initial                        bool
 	}
 
 	xmapElement struct {
