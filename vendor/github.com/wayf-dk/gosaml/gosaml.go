@@ -31,6 +31,7 @@ import (
     "sort"
     "strconv"
     "strings"
+    "sync"
     "time"
 
     "github.com/wayf-dk/go-libxml2/types"
@@ -162,6 +163,8 @@ var (
     AuthnRequestCookie *Hm
     // B2I map for marshalling bool to uint
     B2I = map[bool]byte{false: 0, true: 1}
+	privatekeyLock sync.RWMutex
+    privatekeyCache = map[string][]byte{}
 )
 
 // DebugSetting for debugging cookies
@@ -231,10 +234,20 @@ func GetPrivateKey(md *goxml.Xp) (privatekey []byte, cert string, err error) {
         return
     }
 
+    	privatekeyLock.RLock()
+	privatekey = privatekeyCache[keyname]
+    privatekeyLock.RUnlock()
+	if len(privatekey) != 0 {
+        return
+	}
+
     privatekey, err = ioutil.ReadFile(Config.CertPath + keyname + ".key")
     if err != nil {
         err = goxml.Wrap(err)
     }
+    privatekeyLock.Lock()
+    privatekeyCache[keyname] = privatekey
+    privatekeyLock.Unlock()
     return
 }
 
