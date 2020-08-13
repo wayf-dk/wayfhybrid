@@ -1232,9 +1232,9 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 
 	if sendResponse && !ok {
-        return fmt.Errorf("SLO failed")
+		return fmt.Errorf("SLO failed")
 	} else if sendResponse && sloinfo.Async {
-        return fmt.Errorf("SLO completed")
+		return fmt.Errorf("SLO completed")
 	}
 	iss, dest := sloinfo.IDP, sloinfo.SP
 	if sloinfo.HubRole == gosaml.SPRole {
@@ -1273,10 +1273,10 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		u, _ := gosaml.SAMLRequest2URL(msg, relayState, string(privatekey), "-", algo)
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case gosaml.POST:
-        err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign)
-        if err != nil {
-            return err
-        }
+		err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign)
+		if err != nil {
+			return err
+		}
 		data := gosaml.Formdata{Acs: msg.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(msg.Dump())}
 		return gosaml.PostForm.ExecuteTemplate(w, "postForm", data)
 	}
@@ -1303,7 +1303,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 	if sendResponse { // ready to send response - clear cookie
 		session.Del(w, r, "SLO", config.Domain, sloInfoCookie)
 	} else {
-        	bytes := sil.Marshal()
+		bytes := sil.Marshal()
 		session.Set(w, r, "SLO", config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 	}
 	return
