@@ -601,6 +601,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			if err := gosaml.CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, issuerMd.QueryMulti(nil, xprefix+"SigningMethod")); err != nil {
 				return err
 			}
+			hubMd, _ := md.Hub.MDQ(config.HubEntityID)
 			vals = attributeValues(response, destinationMd, hubMd)
 			Attributesc14n(response, response, issuerMd, destinationMd)
 			err = wayfScopeCheck(response, issuerMd)
@@ -996,6 +997,8 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 // ACSService handles all the stuff related to receiving response and attribute handling
 func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
+	hubMd, _ := md.Hub.MDQ(config.HubEntityID)
+	hubIdpCerts := hubMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
 	response, idpMd, hubKribSpMd, relayState, _, hubKribSpIndex, err := gosaml.ReceiveSAMLResponse(r, intExtIDP, hubExtSP, "https://"+r.Host+r.URL.Path, hubIdpCerts)
 	if err != nil {
 		return
@@ -1204,6 +1207,7 @@ func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
+	hubMd, _ := md.Hub.MDQ(config.HubEntityID)
 	return gosaml.Jwt2saml(w, r, md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP, RequestHandler, hubMd)
 }
 
