@@ -151,13 +151,9 @@ var (
 	tmpl                              *template.Template
 	hostName                          string
 
-	hubMd *goxml.Xp
-
 	md mdSets
 
 	intExtSP, intExtIDP, hubExtIDP, hubExtSP gosaml.MdSets
-
-	hubIdpCerts []string
 
 	webMdMap map[string]webMd
 )
@@ -232,13 +228,6 @@ func Main() {
 		m := webMdMap[md.Table]
 		m.revmd = webMdMap[md.Rev].md
 	}
-
-	hubMd, err = md.Hub.MDQ(config.HubEntityID)
-	if err != nil {
-		panic(err)
-	}
-
-	hubIdpCerts = hubMd.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery) //
 
 	godiscoveryservice.Config = godiscoveryservice.Conf{
 		DiscoMetaData: config.Discometadata,
