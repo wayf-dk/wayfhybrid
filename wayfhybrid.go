@@ -1226,7 +1226,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
-	sil, sloinfo, ok, returnResponse := SLOInfoHandler(w, r, request, nil, destination, request, nil, role)
+	_, sloinfo, ok, sendResponse := SLOInfoHandler(w, r, request, nil, destination, request, nil, role)
 	if sloinfo == nil {
 		return fmt.Errorf("No SLO info found")
 	}
