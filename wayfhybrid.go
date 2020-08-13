@@ -1231,12 +1231,11 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		return fmt.Errorf("No SLO info found")
 	}
 
-	if returnResponse && !ok {
+	if sendResponse && !ok {
         return fmt.Errorf("SLO failed")
-	} else if returnResponse && sloinfo.Async {
+	} else if sendResponse && sloinfo.Async {
         return fmt.Errorf("SLO completed")
 	}
-
 	iss, dest := sloinfo.IDP, sloinfo.SP
 	if sloinfo.HubRole == gosaml.SPRole {
 		dest, iss = iss, dest
@@ -1250,8 +1249,8 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		return err
 	}
 
-	if returnResponse {
-		msg, binding, err = gosaml.NewLogoutResponse(issMD, destMD, sloinfo.ID, int((sloinfo.HubRole+1)%2))
+	if sendResponse {
+		msg, binding, err = gosaml.NewLogoutResponse(issMD.Query1(nil, `./@entityID`), destMD, sloinfo.ID, int((sloinfo.HubRole+1)%2))
 	} else {
 		msg, binding, err = gosaml.NewLogoutRequest(destMD, sloinfo, issMD.Query1(nil, "@entityID"), false)
 	}
