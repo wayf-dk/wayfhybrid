@@ -1562,7 +1562,7 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
             attrs["saml:AuthenticatingAuthority"] = response.QueryMulti(assertion, "./saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority")
             //attrs["saml:AuthenticatingAuthority"] = append(attrs["saml:AuthenticatingAuthority"].([]string), attrs["iss"].(string))
 
-            //sloinfoJson, _ := json.Marshal(NewSLOInfo(response, spMd.Query1(nil, "@entityID")))
+			//sloinfoJson, _ := json.Marshal(NewSLOInfo(response, response.Query(nil, "/samlp:Response/saml:Assertion")[0], spMd.Query1(nil, "@entityID"), spMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", IDPRole))
             //attrs["sloinfo"] = sloinfoJson
 
             json, err := json.Marshal(&attrs)
