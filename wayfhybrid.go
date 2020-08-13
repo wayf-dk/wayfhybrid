@@ -1271,10 +1271,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	switch binding {
 	case gosaml.REDIRECT:
 		u, _ := gosaml.SAMLRequest2URL(msg, relayState, string(privatekey), "-", algo)
-		//http.Redirect(w, r, u.String(), http.StatusFound)
-		s, _ := json.MarshalIndent(sil, "", "    ")
-		data := gosaml.Formdata{Acs: u.String(), SLOStatus: string(s), Initial: true}
-		return gosaml.PostForm.ExecuteTemplate(w, "SLOForm", data)
+		http.Redirect(w, r, u.String(), http.StatusFound)
 	case gosaml.POST:
         err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign)
         if err != nil {
