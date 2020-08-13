@@ -897,7 +897,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd *goxml.Xp, virtualIDPID, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex uint8, idPList []string) (err error) {
 	// why not use orig request?
-	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`), spIndex, hubBirkIndex)
+	wantRequesterID := realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) || gosaml.DebugSetting(r, "wantRequesterID") != ""
+	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, wantRequesterID, spIndex, hubBirkIndex)
 	if err != nil {
 		return
 	}
