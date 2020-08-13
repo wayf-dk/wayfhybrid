@@ -1493,7 +1493,7 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
         }
     }
 
-    err = SignResponse(response, "/samlp:Response/saml:Assertion", signerMd, "sha256", SAMLSign)
+	err = SignResponse(response, "/samlp:Response/saml:Assertion", signerMd, "", SAMLSign)
     if err != nil {
         return err
     }
