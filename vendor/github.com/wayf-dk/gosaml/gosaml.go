@@ -281,9 +281,11 @@ func Inflate(deflated []byte) []byte {
 func HTML2SAMLResponse(html []byte) (samlresponse *goxml.Xp, relayState string) {
     response := goxml.NewHTMLXp(html)
     samlbase64 := response.Query1(nil, `//input[@name="SAMLResponse"]/@value`)
+	if samlbase64 != "" {
     relayState = response.Query1(nil, `//input[@name="RelayState"]/@value`)
     samlxml, _ := base64.StdEncoding.DecodeString(samlbase64)
     samlresponse = goxml.NewXp(samlxml)
+	}
     return
 }
 
