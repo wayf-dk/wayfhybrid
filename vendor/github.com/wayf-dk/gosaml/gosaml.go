@@ -127,10 +127,6 @@ type (
         Initial                        bool
     }
 
-    xmapElement struct {
-        key, xpath string
-    }
-
     // Hm - HMac struct
     Hm struct {
         TTL  int64
