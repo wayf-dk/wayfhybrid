@@ -390,8 +390,7 @@ func ReceiveAuthnRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets
         return
     }
 
-    if nameIDFormat == Transient {
-    } else if nameIDFormat == Unspecified || nameIDFormat == "" {
+	if nameIDFormat == Unspecified || nameIDFormat == "" {
         nameIDFormat = issuerMd.Query1(nil, "./md:SPSSODescriptor/md:NameIDFormat") // none ends up being Transient
     } else if inArray(nameIDFormat, issuerMd.QueryMulti(nil, "./md:SPSSODescriptor/md:NameIDFormat")) {
     } else {
