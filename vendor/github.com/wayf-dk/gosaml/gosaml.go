@@ -1000,20 +1000,9 @@ func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, issuer string, as
 }
 
 // NewLogoutResponse creates a Logout Response oon the basis of Logout request
-func NewLogoutResponse(issuer, destination *goxml.Xp, inResponseTo string, role int) (response *goxml.Xp, binding string, err error) {
-    template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-                      xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-                      ID=""
-                      Version="2.0"
-                      IssueInstant=""
-                      Destination=""
-                      InResponseTo="">
-    <saml:Issuer>
-     https://wayf.wayf.dk
-    </saml:Issuer>
-    <samlp:Status>
-        <samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
-    </samlp:Status>
+func NewLogoutResponse(issuer string, destination *goxml.Xp, inResponseTo string, role int) (response *goxml.Xp, binding string, err error) {
+	template := `<samlp:LogoutResponse xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Version="2.0">
+<samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>
 </samlp:LogoutResponse>
 `
     response = goxml.NewXpFromString(template)
@@ -1024,11 +1013,10 @@ func NewLogoutResponse(issuer, destination *goxml.Xp, inResponseTo string, role 
     }
     binding = destination.Query1(slo[0], "./@Binding")
     response.QueryDashP(nil, "./@Destination", destination.Query1(slo[0], "./@Location"), nil)
-
     response.QueryDashP(nil, "./@IssueInstant", time.Now().Format(XsDateTime), nil)
     response.QueryDashP(nil, "./@ID", ID(), nil)
     response.QueryDashP(nil, "./@InResponseTo", inResponseTo, nil)
-    response.QueryDashP(nil, "./saml:Issuer", issuer.Query1(nil, `/md:EntityDescriptor/@entityID`), nil)
+	response.QueryDashP(nil, "./saml:Issuer", issuer, nil)
     return
 }
 
@@ -1036,7 +1024,6 @@ func NewLogoutResponse(issuer, destination *goxml.Xp, inResponseTo string, role 
 func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *goxml.Xp, pk string) {
     context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
     sloinfo := NewSLOInfo(response, context, spMd.Query1(nil, "@entityID"), false, SPRole)
-    sloinfo.SP = spMd.Query1(nil, "@entityID")
     request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, spMd.Query1(nil, "@entityID"), false)
     request.QueryDashP(nil, "@ID", ID(), nil)
     switch binding {
@@ -1051,7 +1038,7 @@ func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *g
 
 // SloResponse generates a single logout reponse
 func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destination *goxml.Xp, pk string) {
-    response, binding, _ := NewLogoutResponse(issuer, destination, request.Query1(nil, "@ID"), IDPRole)
+	response, binding, _ := NewLogoutResponse(issuer.Query1(nil, `./@entityID`), destination, request.Query1(nil, "@ID"), IDPRole)
     switch binding {
     case REDIRECT:
         u, _ := SAMLRequest2URL(response, "", pk, "-", "")
