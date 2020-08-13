@@ -1503,7 +1503,9 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
         ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
         assertion := response.Query(nil, "saml:Assertion[1]")[0]
         err = response.Encrypt(assertion, publicKey, ea)
-        fmt.Println("err", err)
+		if err != nil {
+			return
+		}
     }
 
     data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: r.Form.Get("RelayState")}
