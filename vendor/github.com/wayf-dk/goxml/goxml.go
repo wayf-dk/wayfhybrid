@@ -62,7 +62,7 @@ type (
 		Algo                     crypto.Hash
 		derprefix                string
 	}
-	// Werror - error with context
+	// Werror holds info for contextual aware error messages
 	Werror struct {
 		P     []string // err msgs for public consumption
 		C     []string
@@ -84,7 +84,7 @@ var (
 		//"ecdsa-sha256" : algo{"http://www.w3.org/2001/04/xmlenc#sha256", "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256", crypto.SHA256, ""},
 	}
 
-	// m map of prefix to uri for namespaces
+	// Namespaces - map of prefix to uri for namespaces
 	Namespaces = map[string]string{
 		"algsupport": "urn:oasis:names:tc:SAML:metadata:algsupport",
 		"corto":      "http://corto.wayf.dk",
@@ -148,7 +148,7 @@ func NewWerror(ctx ...string) Werror {
 	return x
 }
 
-// Wrap - an error in a Werror
+// Wrap a std error in a Werror
 func Wrap(err error, ctx ...string) Werror {
 	switch x := err.(type) {
 	case Werror:
@@ -161,14 +161,14 @@ func Wrap(err error, ctx ...string) Werror {
 	}
 }
 
-// WrapWithXp - an error in a Werror, with a *Xp
+// WrapWithXp - keep the Xp to be able to debug
 func WrapWithXp(err error, xp *Xp, ctx ...string) error {
 	werr := Wrap(err, ctx...)
 	werr.Xp = xp
 	return werr
 }
 
-// PublicError - add contextual text to a Werror
+// PublicError - append messages to a Werror
 func PublicError(e Werror, ctx ...string) error {
 	e.P = append(e.P, ctx...)
 	return e
@@ -244,7 +244,7 @@ func NewXp(xml []byte) (xp *Xp) {
 	return
 }
 
-// NewXpFromString - NewXp from string
+// NewXpFromString Parse SAML xml to Xp object with doc and xpath with relevant namespaces registered
 func NewXpFromString(xml string) (xp *Xp) {
 	libxml2Lock.Lock()
 	defer libxml2Lock.Unlock()
@@ -262,7 +262,7 @@ func NewXpFromString(xml string) (xp *Xp) {
 	return
 }
 
-// NewXpFromFile  Creates a NewXP from File. Used for testing purposes
+// NewXpFromFile Creates a NewXP from File. Used for testing purposes
 func NewXpFromFile(file string) *Xp {
 	xml, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -271,17 +271,17 @@ func NewXpFromFile(file string) *Xp {
 	return NewXp(xml)
 }
 
-// CpXp - Make a copy of the Xp object - shares the document with the source, but allocates a new xmlXPathContext because
+// CpXp Make a copy of the Xp object - shares the document with the source, but allocates a new xmlXPathContext because
 // They are not thread/gorutine safe as the context is set for each query call
 // Only the document "owning" Xp releases the C level document and it needs be around as long as any copies - ie. do
 // not let the original document be garbage collected or havoc will be wreaked
-func (xp *Xp) CpXp() (newXp *Xp) {
-	newXp = new(Xp)
-	newXp.Doc = xp.Doc
-	newXp.master = xp
-	newXp.addXPathContext()
-	runtime.SetFinalizer(newXp, freeXp)
-	//q.Q("cpXp", newXp, NewWerror("cpXp").Stack(2))
+func (src *Xp) CpXp() (xp *Xp) {
+	xp = new(Xp)
+	xp.Doc = src.Doc
+	xp.master = src
+	xp.addXPathContext()
+	runtime.SetFinalizer(xp, freeXp)
+	//q.Q("cpXp", xp, NewWerror("cpXp").Stack(2))
 	return
 }
 
