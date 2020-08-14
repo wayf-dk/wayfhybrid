@@ -28,11 +28,6 @@ import (
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lmdq"
-	"github.com/y0ssar1an/q"
-)
-
-var (
-	_ = q.Q
 )
 
 const (
