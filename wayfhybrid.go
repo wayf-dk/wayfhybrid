@@ -1250,7 +1250,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 
 	if sendResponse {
-		msg, binding, err = gosaml.NewLogoutResponse(issMD.Query1(nil, `./@entityID`), destMD, sloinfo.ID, int((sloinfo.HubRole+1)%2))
+		msg, binding, err = gosaml.NewLogoutResponse(issMD.Query1(nil, `./@entityID`), destMD, sloinfo.ID, uint8((sloinfo.HubRole+1)%2))
 	} else {
 		msg, binding, err = gosaml.NewLogoutRequest(destMD, sloinfo, issMD.Query1(nil, "@entityID"), false)
 	}
