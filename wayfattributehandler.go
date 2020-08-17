@@ -32,7 +32,6 @@ type (
 )
 
 var (
-	_ = q.Q
 
 	internalAttributesBase = []attributeDescription{
 		{c14n: "Issuer", op: "xp:msg:./saml:Issuer"},

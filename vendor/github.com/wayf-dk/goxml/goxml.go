@@ -36,12 +36,10 @@ import (
 	"github.com/wayf-dk/go-libxml2/xpath"
 	"github.com/wayf-dk/go-libxml2/xsd"
 	"github.com/wayf-dk/goeleven/src/goeleven"
-	"github.com/y0ssar1an/q"
 )
 
 var (
 	_ = log.Printf // For debugging; delete when done.
-	_ = q.Q
 )
 
 type (
