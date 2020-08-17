@@ -261,7 +261,15 @@ func Main() {
 	httpMux.Handle(config.Krib, appHandler(ACSService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
-	httpMux.Handle(config.Public, http.FileServer(http.Dir(config.Discopublicpath)))
+
+
+    fs := http.FileServer(http.Dir(config.Discopublicpath))
+    f := func (w http.ResponseWriter, r *http.Request) (err error) {
+        fs.ServeHTTP(w, r)
+        return
+    }
+
+	httpMux.Handle(config.Public, appHandler(f))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
 	httpMux.Handle(config.Jwt2saml, appHandler(jwt2saml))
