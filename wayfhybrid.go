@@ -908,15 +908,6 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 
 	buf := sRequest.Marshal()
 	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
-	// Experimental use of @ID for saving info on the original request - we will get it back as @inResponseTo
-	/*
-		encodedSRequest, err := authnRequestCookie.SpcEncode("id", buf, n)
-		if err != nil {
-			return
-		}
-
-		newrequest.QueryDashP(nil, "./@ID", "_"+encodedSRequest, nil)
-	*/
 	var privatekey []byte
 	if realIDPMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || hubKribSPMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) || gosaml.DebugSetting(r, "idpSigAlg") != "" {
 		privatekey, _, err = gosaml.GetPrivateKey(hubKribSPMd)
