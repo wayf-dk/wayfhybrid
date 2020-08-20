@@ -250,6 +250,7 @@ func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string,
 }
 
 func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp) {
+    contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg}
 	for _, atd := range atds {
 		opParam := strings.SplitN(atd.op, ":", 2)
 		if len(values[atd.c14n]) == 0 {
@@ -287,7 +288,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			*v = idpMd.Query1(nil, xprefix+opParam[1])
 		case "xp":
 			opParam = strings.SplitN(opParam[1], ":", 2)
-			values[atd.c14n] = map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg}[opParam[0]].QueryMulti(nil, opParam[1])
+			values[atd.c14n] = contextMap[opParam[0]].QueryMulti(nil, opParam[1])
 		case "securitydomain":
 			eppns := values["eduPersonPrincipalName"]
 			if len(eppns) > 0 {
