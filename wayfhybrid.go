@@ -1287,6 +1287,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
 		sloinfo = sil.LogoutRequest(samlIn, inMd.Query1(nil, "@entityID"), uint8(role))
+		sendResponse = sloinfo.NameID == ""
 	case "LogoutResponse":
 		sloinfo, ok = sil.LogoutResponse(samlIn)
 		sendResponse = sloinfo.NameID == ""
