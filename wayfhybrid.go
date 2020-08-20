@@ -585,7 +585,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if r.Form.Get("logout") == "1" {
 			gosaml.SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, string(pk))
 		} else {
-			gosaml.SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, string(pk))
+			gosaml.SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, string(pk), gosaml.IDPRole)
 		}
 	} else if r.Form.Get("SAMLRequest") != "" || r.Form.Get("SAMLResponse") != "" {
 		// try to decode SAML message to ourselves or just another SP
