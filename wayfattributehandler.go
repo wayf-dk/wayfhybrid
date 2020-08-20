@@ -77,8 +77,11 @@ var (
 		{c14n: "Issuer", op: "xp:msg:./saml:Issuer"},
 		{c14n: "hub", op: "eq:Issuer:https://wayf.wayf.dk"},
 		{c14n: "AssertionConsumerServiceURL", op: "xp:msg:./@AssertionConsumerServiceURL"},
+		{c14n: "IsPassive", op: "xp:msg:./@IsPassive"},
+		{c14n: "ForceAuthn", op: "xp:msg:./@ForceAuthn"},
 		{c14n: "RequesterID", op: "xp:msg:./samlp:Scoping/samlp:RequesterID"},
 		{c14n: "commonfederations", op: "commonfederations:"},
+		{c14n: "protocol", op: "xp:msg:local-name()"},
 	}
 
 	attributesBase = []attributeDescription{
