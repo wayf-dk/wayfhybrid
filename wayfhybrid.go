@@ -549,7 +549,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", "") // not signed so blank key, pw and algo
+		u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", "")
 		if err != nil {
 			return err
 		}
