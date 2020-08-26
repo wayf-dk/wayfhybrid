@@ -1121,6 +1121,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
+        // record SLO info before converting SAML2 response to other formats
+		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole)
+
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
 		signingType := gosaml.SAMLSign
 		if sRequest.Protocol == "wsfed" {
@@ -1137,7 +1140,6 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				return err
 			}
 		}
-		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole)
 
 		if gosaml.DebugSetting(r, "signingError") == "1" {
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
@@ -1293,7 +1295,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 		sendResponse = sloinfo.NameID == ""
 	case "Response":
 		sil.Response(samlIn, inMd.Query1(nil, "@entityID"), idpMd.Query1(nil, "./md:IDPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.SPRole)
-		sil.Response(samlOut, outMd.Query1(nil, "@entityID"), outMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole)
+ 		sil.Response(samlOut, outMd.Query1(nil, "@entityID"), outMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole)
 	}
 	if sendResponse { // ready to send response - clear cookie
 		session.Del(w, r, "SLO", config.Domain, sloInfoCookie)
