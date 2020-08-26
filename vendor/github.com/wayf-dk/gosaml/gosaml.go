@@ -254,7 +254,6 @@ func ID() (id string) {
 
 // IDHash to create hash of the id
 func IDHash(data string) string {
-	return data
 	return fmt.Sprintf("%.5x", sha1.Sum([]byte(data)))
 }
 
@@ -277,13 +276,21 @@ func Inflate(deflated []byte) []byte {
 }
 
 // HTML2SAMLResponse extracts the SAMLResponse from a HTML document
-func HTML2SAMLResponse(html []byte) (samlresponse *goxml.Xp, relayState string) {
+func HTML2SAMLResponse(html []byte) (samlresponse *goxml.Xp, relayState string, action *url.URL) {
 	response := goxml.NewHTMLXp(html)
+	action, _ = url.Parse(response.Query1(nil, `//form/@action`))
 	samlbase64 := response.Query1(nil, `//input[@name="SAMLResponse"]/@value`)
 	if samlbase64 != "" {
 		relayState = response.Query1(nil, `//input[@name="RelayState"]/@value`)
 		samlxml, _ := base64.StdEncoding.DecodeString(samlbase64)
 		samlresponse = goxml.NewXp(samlxml)
+		return
+	}
+	samlxml := response.Query1(nil, `//input[@name="wresult"]/@value`)
+	if samlxml != "" {
+		samlresponse = goxml.NewXp([]byte(samlxml))
+		relayState = response.Query1(nil, `//input[@name="wctx"]/@value`)
+		return
 	}
 	return
 }
@@ -337,15 +344,15 @@ func SAMLRequest2URL(samlrequest *goxml.Xp, relayState, privatekey, pw, algo str
 func AttributeCanonicalDump(w io.Writer, xp *goxml.Xp) {
 	attrsmap := map[string][]string{}
 	keys := []string{}
-	attrs := xp.Query(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute")
+	attrs := xp.Query(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute | ./t:RequestedSecurityToken/saml1:Assertion/saml1:AttributeStatement/saml1:Attribute")
 	for _, attr := range attrs {
 		values := []string{}
-		for _, value := range xp.QueryMulti(attr, "saml:AttributeValue") {
+		for _, value := range xp.QueryMulti(attr, "saml:AttributeValue | saml1:AttributeValue") {
 			values = append(values, value)
 		}
-		name := xp.Query1(attr, "@Name") + " "
+		name := xp.Query1(attr, "@Name | @AttributeName") + " "
 		friendlyName := xp.Query1(attr, "@FriendlyName") + " "
-		nameFormat := xp.Query1(attr, "@NameFormat")
+		nameFormat := xp.Query1(attr, "@NameFormat | @AttributeNamespace")
 		if name == friendlyName {
 			friendlyName = ""
 		}
@@ -898,12 +905,12 @@ func VerifyTiming(xp *goxml.Xp) (verifiedXp *goxml.Xp, err error) {
 	case "Response":
 		checks = map[string]timing{
 			"/samlp:Response[1]/@IssueInstant":                   {true, true, true},
-			"/samlp:Response[1]/saml:Assertion[1]/@IssueInstant": timing{true, true, true},
+			"/samlp:Response[1]/saml:Assertion[1]/@IssueInstant": {true, true, true},
 			"/samlp:Response[1]/saml:Assertion[1]/saml:Subject/saml:SubjectConfirmation/saml:SubjectConfirmationData/@NotOnOrAfter": {false, true, false},
 			"/samlp:Response[1]/saml:Assertion[1]/saml:Conditions/@NotBefore":                                                       {false, false, true},
 			"/samlp:Response[1]/saml:Assertion[1]/saml:Conditions/@NotOnOrAfter":                                                    {false, true, false},
-			"/samlp:Response[1]/saml:Assertion[1]/saml:AuthnStatement/@AuthnInstant":                                                timing{true, true, true},
-			"/samlp:Response[1]/saml:Assertion[1]/saml:AuthnStatement/@SessionNotOnOrAfter":                                         timing{false, true, false},
+//			"/samlp:Response[1]/saml:Assertion[1]/saml:AuthnStatement/@AuthnInstant":                                                {true, true, true},
+//			"/samlp:Response[1]/saml:Assertion[1]/saml:AuthnStatement/@SessionNotOnOrAfter":                                         {false, true, false},
 		}
 	}
 
@@ -1016,7 +1023,6 @@ func NewLogoutResponse(issuer string, destination *goxml.Xp, inResponseTo string
 	response.QueryDashP(nil, "./@InResponseTo", inResponseTo, nil)
 	response.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 	response.QueryDashP(nil, "./samlp:Status/samlp:StatusCode/@Value", "urn:oasis:names:tc:SAML:2.0:status:Success", nil)
-	PP("NewLogoutResponse", response, binding, err)
 	return
 }
 
@@ -1313,16 +1319,17 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 	response.QueryDashP(authstatement, "@AuthnInstant", assertionIssueInstant, nil)
 	response.QueryDashP(authstatement, "@SessionIndex", ID(), nil)
 	response.QueryDashP(authstatement, "@SessionNotOnOrAfter", sessionNotOnOrAfter, nil)
-	//response.QueryDashP(authstatement, "@SessionIndex", "missing", nil)
 
 	if sourceResponse != nil {
-		for _, aa := range sourceResponse.QueryMulti(nil, "//saml:AuthnContext/saml:AuthenticatingAuthority") {
+	    srcAssertion := sourceResponse.Query(nil, "saml:Assertion")[0]
+		for _, aa := range sourceResponse.QueryMulti(srcAssertion, "saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority") {
 			response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa, nil)
 		}
-		response.QueryDashP(nameid, "@Format", sourceResponse.Query1(nil, "//saml:NameID/@Format"), nil)
-		response.QueryDashP(nameid, ".", sourceResponse.Query1(nil, "//saml:NameID"), nil)
-		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", sourceResponse.Query1(nil, "./saml:Issuer"), nil)
-		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(nil, "//saml:AuthnContextClassRef"), nil)
+		response.QueryDashP(nameid, "@Format", sourceResponse.Query1(srcAssertion, "saml:Subject/saml:NameID/@Format"), nil)
+		response.QueryDashP(nameid, ".", sourceResponse.Query1(srcAssertion, "saml:Subject/saml:NameID"), nil)
+		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", sourceResponse.Query1(srcAssertion, "saml:Issuer"), nil)
+		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(srcAssertion, "saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef"), nil)
+		response.QueryDashP(authstatement, "@AuthnInstant", sourceResponse.Query1(srcAssertion, "saml:AuthnStatement/@AuthnInstant"), nil)
 	}
 	return
 }
