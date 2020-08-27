@@ -56,7 +56,7 @@ var (
 		{c14n: "pairwise-id", name: "pairwise-id", op: "pairwise-id:"},
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
-		{c14n: "securitydomain", op: "securitydomain:ku.dk:aau.dk@aau.dk"},
+		{c14n: "securitydomain", op: "securitydomain:"},
 		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "eduPersonScopedAffiliation", op: "epsa:"},
 		{c14n: "AuthnContextClassRef", op: "xp:msg://saml:AuthnContextClassRef"},
@@ -466,6 +466,12 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 	}
 
 	destinationAttributes := response.QueryDashP(assertionList[0], saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
+
+    if spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
+ 	    destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
+	    goxml.RmElement(destinationAttributes)
+        return nil, ""
+    }
 
 	h := sha1.New()
 	for _, requestedAttribute := range requestedAttributes {
