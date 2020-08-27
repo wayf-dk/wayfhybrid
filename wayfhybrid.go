@@ -998,6 +998,13 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
+
+    iiXml := response.Query1(nil, "saml:Assertion/@IssueInstant")
+    aiXml := response.Query1(nil, "saml:Assertion/saml:AuthnStatement/@AuthnInstant")
+    	ii, _ := time.Parse(gosaml.XsDateTime, iiXml)
+    	ai, _ := time.Parse(gosaml.XsDateTime, aiXml)
+    log.Printf("AuthnInstant: %s %v \n", response.Query1(nil, "saml:Issuer"), ii.Sub(ai))
+
 	spMd, hubBirkIDPMd, virtualIDPMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIDP, "SSO-")
 	if err != nil {
 		return
