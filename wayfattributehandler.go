@@ -296,12 +296,6 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				if len(matches) > 1 {
 					*v = matches[2]
 					subsecuritydomain := *v
-					for _, specialdomain := range strings.Split(opParam[1], ":") {
-						if strings.HasSuffix(*v, "."+specialdomain) {
-							subsecuritydomain = specialdomain
-							break
-						}
-					}
 					values["subsecuritydomain"] = []string{subsecuritydomain}
 					values["uid"] = []string{matches[1]}
 				}
