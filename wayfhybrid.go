@@ -262,7 +262,6 @@ func Main() {
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 
-
     fs := http.FileServer(http.Dir(config.Discopublicpath))
     f := func (w http.ResponseWriter, r *http.Request) (err error) {
         fs.ServeHTTP(w, r)
@@ -270,6 +269,7 @@ func Main() {
     }
 
 	httpMux.Handle(config.Public, appHandler(f))
+	httpMux.Handle(config.TestSP+"/ds/", appHandler(f))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
 	httpMux.Handle(config.Jwt2saml, appHandler(jwt2saml))
@@ -1315,6 +1315,8 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 
 // MDQWeb - thin MDQ web layer on top of lmdq
 func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+
 	var rawPath string
 	if rawPath = r.URL.RawPath; rawPath == "" {
 		rawPath = r.URL.Path
