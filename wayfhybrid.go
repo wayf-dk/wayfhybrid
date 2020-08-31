@@ -497,7 +497,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	spMd, err := md.Internal.MDQ("https://" + r.Host)
 	pk, _, _ := gosaml.GetPrivateKey(spMd)
-	idp := r.Form.Get("idpentityid")
+	idp := r.Form.Get("idpentityid") + r.Form.Get("entityID")
 	idpList := r.Form.Get("idplist")
 	login := r.Form.Get("login") == "1"
 
