@@ -1315,7 +1315,9 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 
 // MDQWeb - thin MDQ web layer on top of lmdq
 func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
-	w.Header().Add("Access-Control-Allow-Origin", "*")
+	if origin, ok := r.Header["origin"]; ok {
+	    w.Header().Add("Access-Control-Allow-Origin", origin[0])
+	}
 
 	var rawPath string
 	if rawPath = r.URL.RawPath; rawPath == "" {
