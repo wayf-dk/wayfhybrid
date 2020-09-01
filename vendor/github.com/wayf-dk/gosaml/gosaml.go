@@ -1813,8 +1813,7 @@ func (h *Hm) Encode(id string, msg []byte) (str string, err error) {
 
 // Decode - the whole message
 func (h *Hm) Decode(id, in string) ([]byte, error) {
-	signedMsg, _ := base64.RawURLEncoding.DecodeString(in)
-	return h.innerValidate(id, signedMsg)
+	return h.innerValidate(id, in)
 }
 
 func (h *Hm) innerSign(id string, msg []byte, ts int64) (signedMsg []byte, err error) {
@@ -1833,7 +1832,8 @@ func (h *Hm) innerSign(id string, msg []byte, ts int64) (signedMsg []byte, err e
 	return signedMsg, nil
 }
 
-func (h *Hm) innerValidate(id string, signedMsg []byte) (msg []byte, err error) {
+func (h *Hm) innerValidate(id, in string) (msg []byte, err error) {
+	signedMsg, _ := base64.RawURLEncoding.DecodeString(in)
 	ts := int64(binary.BigEndian.Uint32(signedMsg[20:24]))
 	msg = signedMsg[24:]
 	computed, err := h.innerSign(id, msg, ts)
@@ -1841,8 +1841,8 @@ func (h *Hm) innerValidate(id string, signedMsg []byte) (msg []byte, err error) 
 		return
 	}
 	if hmac.Equal(signedMsg[:24], []byte(computed)[:24]) {
-		now := time.Now().Unix()
-		if now-ts < h.TTL {
+		diff := time.Now().Unix() - ts
+		if diff >= 0 && diff < h.TTL {
 			return msg, nil
 		}
 	}
@@ -1864,6 +1864,7 @@ func (r SamlRequest) Marshal() (msg []byte) {
 
 // Unmarshal - hand held unmarshal for SamlRequest
 func (r *SamlRequest) Unmarshal(msg []byte) {
+    PP(msg)
 	i := int((msg[0]-97)*(msg[1]-97)) + 2 // num records and number of b64 encoded string lengths
 	for j, x := range []*string{&r.Nonce, &r.RequestID, &r.SP, &r.VirtualIDPID, &r.AssertionConsumerIndex, &r.Protocol} {
 		l := int(msg[j+2])
@@ -1932,7 +1933,7 @@ func (sil *SLOInfoList) Unmarshal(msg []byte) {
 func PP(i ...interface{}) {
 	for _, e := range i {
 		s, _ := json.MarshalIndent(e, "", "    ")
-		fmt.Println(string(s))
+		fmt.Println(e, string(s))
 	}
 	return
 }
