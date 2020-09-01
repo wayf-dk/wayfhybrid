@@ -894,7 +894,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 
-	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, VirtualIDPID, relayState, "SSO-", "", config.Domain, spIndex, hubBirkIndex, nil)
+	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, VirtualIDPID, relayState, "SSO2-", "", config.Domain, spIndex, hubBirkIndex, nil)
 	return
 }
 
@@ -1005,7 +1005,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
     	ai, _ := time.Parse(gosaml.XsDateTime, aiXml)
     log.Printf("AuthnInstant: %s %v \n", response.Query1(nil, "saml:Issuer"), ii.Sub(ai))
 
-	spMd, hubBirkIDPMd, virtualIDPMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIDP, "SSO-")
+	spMd, hubBirkIDPMd, virtualIDPMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIDP, "SSO2-")
 	if err != nil {
 		return
 	}
