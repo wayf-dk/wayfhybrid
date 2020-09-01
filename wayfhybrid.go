@@ -789,7 +789,9 @@ func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 
 // VeryVeryPoorMansScopingService handles poor man's scoping
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
-	http.SetCookie(w, &http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10})
+	cc := http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10}
+	v := cc.String() + "; SameSite=None"
+	w.Header().Add("Set-Cookie", v)
 	w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Content-Type", "text/plain")
