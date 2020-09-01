@@ -1317,6 +1317,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	if origin, ok := r.Header["Origin"]; ok {
 	    w.Header().Add("Access-Control-Allow-Origin", origin[0])
+	    w.Header().Add("Access-Control-Allow-Credentials", "true")
 	}
 
 	var rawPath string
