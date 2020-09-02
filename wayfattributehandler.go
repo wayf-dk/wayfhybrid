@@ -56,7 +56,7 @@ var (
 		{c14n: "pairwise-id", name: "pairwise-id", op: "pairwise-id:"},
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
-		{c14n: "securitydomain", op: "securitydomain:"},
+		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
 		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "eduPersonScopedAffiliation", op: "epsa:"},
 		{c14n: "AuthnContextClassRef", op: "xp:msg://saml:AuthnContextClassRef"},
@@ -296,6 +296,12 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				if len(matches) > 1 {
 					*v = matches[2]
 					subsecuritydomain := *v
+					for _, specialdomain := range strings.Split(opParam[1], ":") {
+						if strings.HasSuffix(*v, "."+specialdomain) {
+							subsecuritydomain = specialdomain
+							break
+						}
+					}
 					values["subsecuritydomain"] = []string{subsecuritydomain}
 					values["uid"] = []string{matches[1]}
 				}
