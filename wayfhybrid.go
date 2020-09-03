@@ -262,11 +262,11 @@ func Main() {
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 
-    fs := http.FileServer(http.Dir(config.Discopublicpath))
-    f := func (w http.ResponseWriter, r *http.Request) (err error) {
-        fs.ServeHTTP(w, r)
-        return
-    }
+	fs := http.FileServer(http.Dir(config.Discopublicpath))
+	f := func(w http.ResponseWriter, r *http.Request) (err error) {
+		fs.ServeHTTP(w, r)
+		return
+	}
 
 	httpMux.Handle(config.Public, appHandler(f))
 	httpMux.Handle(config.TestSP+"/ds/", appHandler(f))
@@ -496,7 +496,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	spMd, err := md.Internal.MDQ("https://" + r.Host)
-	pk, _, _ := gosaml.GetPrivateKey(spMd)
+	pk, _, _ := gosaml.GetPrivateKey(spMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery)
 	idp := r.Form.Get("idpentityid") + r.Form.Get("entityID")
 	idpList := r.Form.Get("idplist")
 	login := r.Form.Get("login") == "1"
@@ -912,7 +912,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
 	var privatekey []byte
 	if realIDPMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || hubKribSPMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) || gosaml.DebugSetting(r, "idpSigAlg") != "" {
-		privatekey, _, err = gosaml.GetPrivateKey(hubKribSPMd)
+		privatekey, _, err = gosaml.GetPrivateKey(hubKribSPMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery)
 		if err != nil {
 			return
 		}
@@ -1001,11 +1001,11 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    iiXml := response.Query1(nil, "saml:Assertion/@IssueInstant")
-    aiXml := response.Query1(nil, "saml:Assertion/saml:AuthnStatement/@AuthnInstant")
-    	ii, _ := time.Parse(gosaml.XsDateTime, iiXml)
-    	ai, _ := time.Parse(gosaml.XsDateTime, aiXml)
-    log.Printf("AuthnInstant: %s %v \n", response.Query1(nil, "saml:Issuer"), ii.Sub(ai))
+	iiXml := response.Query1(nil, "saml:Assertion/@IssueInstant")
+	aiXml := response.Query1(nil, "saml:Assertion/saml:AuthnStatement/@AuthnInstant")
+	ii, _ := time.Parse(gosaml.XsDateTime, iiXml)
+	ai, _ := time.Parse(gosaml.XsDateTime, aiXml)
+	log.Printf("AuthnInstant: %s %v \n", response.Query1(nil, "saml:Issuer"), ii.Sub(ai))
 
 	spMd, hubBirkIDPMd, virtualIDPMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIDP, "SSO2-")
 	if err != nil {
@@ -1072,7 +1072,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 				payload[newresponse.Query1(attr, "@Name")] = newresponse.QueryMulti(attr, "./saml:AttributeValue")
 			}
 
-			privatekey, _, err := gosaml.GetPrivateKey(virtualIDPMd)
+			privatekey, _, err := gosaml.GetPrivateKey(virtualIDPMd, "md:IDPSSODescriptor"+SigningCertQuery)
 			if err != nil {
 				return err
 			}
@@ -1130,7 +1130,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
-        // record SLO info before converting SAML2 response to other formats
+		// record SLO info before converting SAML2 response to other formats
 		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole)
 
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
@@ -1265,7 +1265,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
 
-	privatekey, _, err := gosaml.GetPrivateKey(issMD)
+	privatekey, _, err := gosaml.GetPrivateKey(issMD, gosaml.Roles[(role+1)%2]+gosaml.SigningCertQuery)
 
 	if err != nil {
 		return err
@@ -1304,7 +1304,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 		sendResponse = sloinfo.NameID == ""
 	case "Response":
 		sil.Response(samlIn, inMd.Query1(nil, "@entityID"), idpMd.Query1(nil, "./md:IDPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.SPRole)
- 		sil.Response(samlOut, outMd.Query1(nil, "@entityID"), outMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole)
+		sil.Response(samlOut, outMd.Query1(nil, "@entityID"), outMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole)
 	}
 	if sendResponse { // ready to send response - clear cookie
 		session.Del(w, r, "SLO", config.Domain, sloInfoCookie)
@@ -1318,8 +1318,8 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 // MDQWeb - thin MDQ web layer on top of lmdq
 func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	if origin, ok := r.Header["Origin"]; ok {
-	    w.Header().Add("Access-Control-Allow-Origin", origin[0])
-	    w.Header().Add("Access-Control-Allow-Credentials", "true")
+		w.Header().Add("Access-Control-Allow-Origin", origin[0])
+		w.Header().Add("Access-Control-Allow-Credentials", "true")
 	}
 
 	var rawPath string
