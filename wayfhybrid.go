@@ -1263,6 +1263,19 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		return err
 	}
 
+	if sloinfo.Protocol == "wsfed" {
+		wa := "wsignout1.0"
+		if sendResponse {
+			wa = "wsignoutcleanup1.0"
+		}
+		q := url.Values{
+			"wtrealm": {issMD.Query1(nil, `./@entityID`)},
+			"wa":      {wa},
+		}
+		http.Redirect(w, r, msg.Query1(nil, "@Destination")+"?"+q.Encode(), http.StatusFound)
+        return
+	}
+
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
 
 	privatekey, _, err := gosaml.GetPrivateKey(issMD, gosaml.Roles[(role+1)%2]+gosaml.SigningCertQuery)
