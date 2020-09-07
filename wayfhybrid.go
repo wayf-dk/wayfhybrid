@@ -34,6 +34,8 @@ const (
 	authnRequestTTL = 180
 	sloInfoTTL      = 8 * 3600
 	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
+    ssoCookieName   = "SSO2-"
+	sloCookieName   = "SLO2"
 )
 
 const (
@@ -896,7 +898,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 
-	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, VirtualIDPID, relayState, "SSO2-", "", config.Domain, spIndex, hubBirkIndex, nil)
+	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, VirtualIDPID, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, nil)
 	return
 }
 
@@ -1007,7 +1009,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	ai, _ := time.Parse(gosaml.XsDateTime, aiXml)
 	log.Printf("AuthnInstant: %s %v \n", response.Query1(nil, "saml:Issuer"), ii.Sub(ai))
 
-	spMd, hubBirkIDPMd, virtualIDPMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIDP, "SSO2-")
+	spMd, hubBirkIDPMd, virtualIDPMd, request, sRequest, err := getOriginalRequest(w, r, response, intExtSP, hubExtIDP, ssoCookieName)
 	if err != nil {
 		return
 	}
@@ -1305,7 +1307,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 // For now uses cookies to keep the SLOInfo
 func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd, samlOut, outMd *goxml.Xp, role int, protocol string) (sil *gosaml.SLOInfoList, sloinfo *gosaml.SLOInfo, ok, sendResponse bool) {
 	sil = &gosaml.SLOInfoList{}
-	data, _ := session.Get(w, r, "SLO", sloInfoCookie)
+	data, _ := session.Get(w, r, sloCookieName, sloInfoCookie)
 	sil.Unmarshal(data)
 
 	switch samlIn.QueryString(nil, "local-name(/*)") {
@@ -1320,10 +1322,10 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 		sil.Response(samlOut, outMd.Query1(nil, "@entityID"), outMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole, protocol)
 	}
 	if sendResponse { // ready to send response - clear cookie
-		session.Del(w, r, "SLO", config.Domain, sloInfoCookie)
+		session.Del(w, r, sloCookieName, config.Domain, sloInfoCookie)
 	} else {
 		bytes := sil.Marshal()
-		session.Set(w, r, "SLO", config.Domain, bytes, sloInfoCookie, sloInfoTTL)
+		session.Set(w, r, sloCookieName, config.Domain, bytes, sloInfoCookie, sloInfoTTL)
 	}
 	return
 }
