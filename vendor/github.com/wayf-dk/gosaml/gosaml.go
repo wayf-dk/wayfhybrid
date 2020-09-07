@@ -107,9 +107,9 @@ type (
 	}
 	// SLOInfo refers to Single Logout information
 	SLOInfo struct {
-		IDP, SP, NameID, SPNameQualifier, SessionIndex, ID string
-		NameIDFormat, HubRole, SLOStatus                   uint8
-		SLOSupport, Async                                  bool
+		IDP, SP, NameID, SPNameQualifier, SessionIndex, ID, Protocol string
+		NameIDFormat, HubRole, SLOStatus                             uint8
+		SLOSupport, Async                                            bool
 	}
 
 	SLOInfoList []SLOInfo
@@ -223,7 +223,7 @@ func PublicKeyInfo(cert string) (keyname string, publickey *rsa.PublicKey, err e
 
 // GetPrivateKey extract the key from Metadata and builds a name and reads the key
 func GetPrivateKey(md *goxml.Xp, path string) (privatekey []byte, cert string, err error) {
-    cert = md.Query1(nil, path)
+	cert = md.Query1(nil, path)
 	keyname, _, err := PublicKeyInfo(cert)
 	if err != nil {
 		return
@@ -469,26 +469,24 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 
 	relayState = r.Form.Get("RelayState")
 
-	msg := r.Form.Get("SAMLRequest")
-	if msg == "" {
-		msg = r.Form.Get("SAMLResponse")
-		if msg == "" {
-			msg, relayState, err = request2samlRequest(r, issuerMdSets, destinationMdSets)
-			if err != nil {
-				return
-			}
+	var bmsg []byte
+	var tmpXp *goxml.Xp
+	msg := r.Form.Get("SAMLRequest") + r.Form.Get("SAMLResponse") // never both at the same time
+	if msg != "" {
+		bmsg, err = base64.StdEncoding.DecodeString(msg)
+		if err != nil {
+			return
+		}
+		if method == "GET" {
+			bmsg = Inflate(bmsg)
+		}
+		tmpXp = goxml.NewXp(bmsg)
+	} else {
+		tmpXp, relayState, err = request2samlRequest(r, issuerMdSets, destinationMdSets)
+		if err != nil {
+			return
 		}
 	}
-
-	bmsg, err := base64.StdEncoding.DecodeString(msg)
-	if err != nil {
-		return
-	}
-	if method == "GET" {
-		bmsg = Inflate(bmsg)
-	}
-
-	tmpXp := goxml.NewXp(bmsg)
 
 	DumpFileIfTracing(r, tmpXp)
 	//log.Println("stack", goxml.New().Stack(1))
@@ -725,18 +723,20 @@ findbinding:
 				if err = VerifySign(xp, certificates, signatures[0]); err != nil {
 					return nil, goxml.Wrap(err, "err:unable to validate signature")
 				}
-				//validatedMessage = xp
+				validatedMessage = xp
 				// we trust the whole message if the first signature was validated
 
-				if validatedMessage == nil {
-					// replace with the validated assertion
-					validatedMessage = goxml.NewXp(nil)
-					shallowresponse := validatedMessage.CopyNode(xp.Query(nil, "/samlp:Response[1]")[0], 2)
-					validatedMessage.Doc.SetDocumentElement(shallowresponse)
-					validatedMessage.QueryDashP(nil, "./saml:Issuer", xp.Query1(nil, "/samlp:Response/saml:Issuer"), nil)
-					validatedMessage.QueryDashP(nil, "./samlp:Status/samlp:StatusCode/@Value", xp.Query1(nil, "/samlp:Response/samlp:Status/samlp:StatusCode/@Value"), nil)
-					shallowresponse.AddChild(validatedMessage.CopyNode(xp.Query(nil, "/samlp:Response[1]/saml:Assertion[1]")[0], 1))
-				}
+				/*
+					if validatedMessage == nil {
+						// replace with the validated assertion
+						validatedMessage = goxml.NewXp(nil)
+						shallowresponse := validatedMessage.CopyNode(xp.Query(nil, "/samlp:Response[1]")[0], 2)
+						validatedMessage.Doc.SetDocumentElement(shallowresponse)
+						validatedMessage.QueryDashP(nil, "./saml:Issuer", xp.Query1(nil, "/samlp:Response/saml:Issuer"), nil)
+						validatedMessage.QueryDashP(nil, "./samlp:Status/samlp:StatusCode/@Value", xp.Query1(nil, "/samlp:Response/samlp:Status/samlp:StatusCode/@Value"), nil)
+						shallowresponse.AddChild(validatedMessage.CopyNode(xp.Query(nil, "/samlp:Response[1]/saml:Assertion[1]")[0], 1))
+					}
+				*/
 			}
 		}
 	}
@@ -968,22 +968,24 @@ func NewErrorResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (resp
 
 // NewLogoutRequest makes a logout request with issuer destination ... and returns a NewRequest
 func NewLogoutRequest(destination *goxml.Xp, sloinfo *SLOInfo, issuer string, async bool) (request *goxml.Xp, binding string, err error) {
-	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Version="2.0"></samlp:LogoutRequest>`
-	request = goxml.NewXpFromString(template)
-	issueInstant, _, _, _, _ := IDAndTiming()
-
 	role := (sloinfo.HubRole + 1) % 2 // the request is going out from the hub so look for the reverse role in destination metadata
 	slo := destination.Query(nil, `./`+Roles[role]+`/md:SingleLogoutService[@Binding="`+REDIRECT+`" or @Binding="`+POST+`"]`)
 	if len(slo) == 0 {
 		err = goxml.NewWerror("cause:no SingleLogoutService found", "entityID:"+destination.Query1(nil, "./@entityID"))
 		return
 	}
-
 	binding = destination.Query1(slo[0], "./@Binding")
+	request = logoutRequest(sloinfo, issuer, destination.Query1(slo[0], "./@Location"), async)
+	return
+}
 
+func logoutRequest(sloinfo *SLOInfo, issuer, destination string, async bool) (request *goxml.Xp) {
+	template := `<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" Version="2.0"></samlp:LogoutRequest>`
+	request = goxml.NewXpFromString(template)
+	issueInstant, _, _, _, _ := IDAndTiming()
 	request.QueryDashP(nil, "./@IssueInstant", issueInstant, nil)
 	request.QueryDashP(nil, "./@ID", sloinfo.ID, nil)
-	request.QueryDashP(nil, "./@Destination", destination.Query1(slo[0], "./@Location"), nil)
+	request.QueryDashP(nil, "./@Destination", destination, nil)
 	request.QueryDashP(nil, "./saml:Issuer", issuer, nil)
 	if async {
 		request.QueryDashP(nil, "./samlp:Extensions/aslo:Asynchronous", "", nil)
@@ -1020,9 +1022,9 @@ func NewLogoutResponse(issuer string, destination *goxml.Xp, inResponseTo string
 }
 
 // SloRequest generates a single logout request
-func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *goxml.Xp, pk string) {
+func SloRequest(w http.ResponseWriter, r *http.Request, response, spMd, IdpMd *goxml.Xp, pk string, protocol string) {
 	context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
-	sloinfo := NewSLOInfo(response, context, spMd.Query1(nil, "@entityID"), false, SPRole)
+	sloinfo := NewSLOInfo(response, context, spMd.Query1(nil, "@entityID"), false, SPRole, protocol)
 	request, binding, _ := NewLogoutRequest(IdpMd, sloinfo, spMd.Query1(nil, "@entityID"), false)
 	request.QueryDashP(nil, "@ID", ID(), nil)
 	switch binding {
@@ -1054,7 +1056,7 @@ func SloResponse(w http.ResponseWriter, r *http.Request, request, issuer, destin
 }
 
 // NewSLOInfo extract necessary Logout information - xp is expectd to be a Response
-func NewSLOInfo(xp *goxml.Xp, context types.Node, sp string, sloSupport bool, hubRole uint8) (slo *SLOInfo) {
+func NewSLOInfo(xp *goxml.Xp, context types.Node, sp string, sloSupport bool, hubRole uint8, protocol string) (slo *SLOInfo) {
 	slo = &SLOInfo{
 		HubRole:         hubRole,
 		IDP:             IDHash(xp.Query1(context, "saml:Issuer")),
@@ -1064,13 +1066,14 @@ func NewSLOInfo(xp *goxml.Xp, context types.Node, sp string, sloSupport bool, hu
 		SPNameQualifier: xp.Query1(context, "saml:Subject/saml:NameID/@SPNameQualifier"),
 		SessionIndex:    xp.Query1(context, "saml:AuthnStatement/@SessionIndex") + xp.Query1(context, "samlp:SessionIndex"), // never both at the same time !!!
 		SLOSupport:      sloSupport,
+		Protocol:        protocol,
 	}
 	return
 }
 
-func (sil *SLOInfoList) LogoutRequest(request *goxml.Xp, hub string, hubRole uint8) (slo *SLOInfo) {
+func (sil *SLOInfoList) LogoutRequest(request *goxml.Xp, hub string, hubRole uint8, protocol string) (slo *SLOInfo) {
 	context := request.Query(nil, "/samlp:LogoutRequest")[0]
-	newSlo := NewSLOInfo(request, context, hub, true, hubRole)
+	newSlo := NewSLOInfo(request, context, hub, true, hubRole, protocol)
 	if hubRole == IDPRole { // if from a SP we need to swap roles - the hub is the IDP
 		newSlo.SP, newSlo.IDP = newSlo.IDP, newSlo.SP
 	}
@@ -1082,7 +1085,8 @@ func (sil *SLOInfoList) LogoutRequest(request *goxml.Xp, hub string, hubRole uin
 			(*sil)[i].SPNameQualifier = ""
 			(*sil)[i].SessionIndex = ""
 			(*sil)[i].SLOStatus = 1
-			(*sil)[i].Async = request.QueryBool(context, "boolean(./samlp:Extensions/aslo:Asynchronous)")
+			(*sil)[i].Async = request.QueryBool(context, "boolean(samlp:Extensions/aslo:Asynchronous)")
+			(*sil)[i].Protocol = request.Query1(context, "samlp:Extensions/wayf:protocol")
 			break
 		}
 	}
@@ -1094,10 +1098,10 @@ func (sil *SLOInfoList) LogoutResponse(response *goxml.Xp) (slo *SLOInfo, sendRe
 	return sil.Find(response)
 }
 
-func (sil *SLOInfoList) Response(response *goxml.Xp, sp string, sloSupport bool, hubRole uint8) {
+func (sil *SLOInfoList) Response(response *goxml.Xp, sp string, sloSupport bool, hubRole uint8, protocol string) {
 	newSil := SLOInfoList{}
 	context := response.Query(nil, "/samlp:Response/saml:Assertion")[0]
-	newSlo := NewSLOInfo(response, context, sp, sloSupport, hubRole)
+	newSlo := NewSLOInfo(response, context, sp, sloSupport, hubRole, protocol)
 	newSil = append(newSil, *newSlo)
 	for _, sloInfo := range *sil {
 		if newSlo.HubRole == sloInfo.HubRole && newSlo.IDP == sloInfo.IDP && newSlo.SP == sloInfo.SP {
@@ -1329,14 +1333,13 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 }
 
 // request2samlRequest does the protocol translation from ws-fed to saml
-func request2samlRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets) (msg, relayState string, err error) {
-	if r.Form.Get("wa") == "wsignin1.0" || r.Form.Get("response_type") != "" {
-		relayState = r.Form.Get("wctx") + r.Form.Get("state")
-		issuer := r.Form.Get("wtrealm") + r.Form.Get("client_id")
-		acs := r.Form.Get("wreply") + r.Form.Get("redirect_uri")
+func request2samlRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets) (samlrequest *goxml.Xp, relayState string, err error) {
+	relayState = r.Form.Get("wctx") + r.Form.Get("state")
+	issuer := r.Form.Get("wtrealm") + r.Form.Get("client_id")
+	acs := r.Form.Get("wreply") + r.Form.Get("redirect_uri")
 
-		samlrequest := goxml.NewXpFromString(`<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" Version="2.0"
-                                                      ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"/>`)
+	if r.Form.Get("wa") == "wsignin1.0" || r.Form.Get("response_type") != "" {
+		samlrequest = goxml.NewXpFromString(`<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" Version="2.0"/>`)
 		issueInstant, msgID, _, _, _ := IDAndTiming()
 		samlrequest.QueryDashP(nil, "./@ID", msgID, nil)
 		samlrequest.QueryDashP(nil, "./@IssueInstant", issueInstant, nil)
@@ -1351,16 +1354,16 @@ func request2samlRequest(r *http.Request, issuerMdSets, destinationMdSets MdSets
 			samlrequest.QueryDashP(nil, "./@ID", r.Form.Get("nonce"), nil)
 			relayState = r.Form.Get("state")
 		}
-
-		DumpFileIfTracing(r, samlrequest)
-		msg = base64.StdEncoding.EncodeToString(Deflate(samlrequest.Dump()))
 		return
 	} else if r.Form.Get("wa") == "wsignout1.0" {
+		samlrequest = logoutRequest(&SLOInfo{ID: "dummy", NameID: "dummy"}, issuer, "https://"+r.Host+r.URL.Path, false)
+		samlrequest.QueryDashP(nil, "./samlp:Extensions/wayf:protocol", "wsfed", samlrequest.Query(nil, "saml:NameID")[0])
+		return
+	} else if r.Form.Get("wa") == "wsignoutcleanup1.0" {
 
 	}
 	err = fmt.Errorf("no SAMLRequest/SAMLResponse found")
 	return
-
 }
 
 // NewWsFedResponse generates a Ws-fed response
@@ -1874,7 +1877,7 @@ func (sil SLOInfoList) Marshal() (msg []byte) {
 	n := 0
 	prefix := []byte{}
 	for _, r := range sil {
-		fields := []string{r.IDP, r.SP, r.NameID, r.SPNameQualifier, r.SessionIndex, r.ID}
+		fields := []string{r.IDP, r.SP, r.NameID, r.SPNameQualifier, r.SessionIndex, r.ID, r.Protocol}
 		n = len(fields)
 		for _, str := range fields {
 			prefix = append(prefix, uint8(len(str)))
@@ -1900,7 +1903,7 @@ func (sil *SLOInfoList) Unmarshal(msg []byte) {
 			break
 		}
 		r := SLOInfo{}
-		for _, x := range []*string{&r.IDP, &r.SP, &r.NameID, &r.SPNameQualifier, &r.SessionIndex, &r.ID} {
+		for _, x := range []*string{&r.IDP, &r.SP, &r.NameID, &r.SPNameQualifier, &r.SessionIndex, &r.ID, &r.Protocol} {
 			l := int(msg[j])
 			*x = string(msg[i : i+l])
 			i = i + l

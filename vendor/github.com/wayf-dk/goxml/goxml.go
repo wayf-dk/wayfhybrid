@@ -274,6 +274,8 @@ func NewXpFromFile(file string) *Xp {
 // Only the document "owning" Xp releases the C level document and it needs be around as long as any copies - ie. do
 // not let the original document be garbage collected or havoc will be wreaked
 func (src *Xp) CpXp() (xp *Xp) {
+	libxml2Lock.Lock()
+	defer libxml2Lock.Unlock()
 	xp = new(Xp)
 	xp.Doc = src.Doc
 	xp.master = src
@@ -327,8 +329,8 @@ func (xp *Xp) DocGetRootElement() types.Node {
 
 // Rm deletes the node
 func (xp *Xp) Rm(context types.Node, path string) {
-	//	libxml2Lock.Lock()
-	//	defer libxml2Lock.Unlock()
+	libxml2Lock.Lock()
+	defer libxml2Lock.Unlock()
 	for _, node := range xp.Query(context, path) {
 		parent, _ := node.ParentNode()
 		switch x := node.(type) {
@@ -336,8 +338,8 @@ func (xp *Xp) Rm(context types.Node, path string) {
 			parent.(types.Element).RemoveAttribute(x.NodeName())
 		case types.Element:
 			parent.RemoveChild(x)
-			x.Free()
 		}
+		node.Free()
 	}
 }
 
@@ -347,15 +349,6 @@ func RmElement(element types.Node) {
 	defer libxml2Lock.Unlock()
 	parent, _ := element.ParentNode()
 	parent.RemoveChild(element)
-	element.Free()
-}
-
-/*
-  freeElement refers to freeing the memory
-*/
-func freeElement(element types.Node) {
-	libxml2Lock.Lock()
-	defer libxml2Lock.Unlock()
 	element.Free()
 }
 
@@ -460,8 +453,6 @@ func (xp *Xp) QueryXMLBool(context types.Node, path string) bool {
 }
 
 func (xp *Xp) find(context types.Node, path string) (res types.XPathResult) {
-	libxml2Lock.Lock()
-	defer libxml2Lock.Unlock()
 	if context == nil {
 		context, _ = xp.Doc.DocumentElement()
 	}
@@ -473,17 +464,20 @@ func (xp *Xp) find(context types.Node, path string) (res types.XPathResult) {
 // QueryMulti function to get the content of the nodes from a xpath query
 // as a slice of strings
 func (xp *Xp) QueryMulti(context types.Node, path string) (res []string) {
+	libxml2Lock.Lock()
+	defer libxml2Lock.Unlock()
 	x := xp.find(context, path)
 	switch x.Type() {
 	case xpath.NodeSetType:
-        for _, node := range x.NodeList() {
-            res = append(res, strings.TrimSpace(node.NodeValue()))
-        }
+		for _, node := range x.NodeList() {
+			res = append(res, strings.TrimSpace(node.NodeValue()))
+		}
 	case xpath.StringType:
 		res = []string{clib.XMLXPathObjectString(x)}
 	default:
-	    res = []string{fmt.Sprintf("%v", x)}
+		res = []string{fmt.Sprintf("%v", x)}
 	}
+	x.Free()
 	return
 }
 
@@ -593,6 +587,8 @@ func (xp *Xp) createElementNS(prefix, element string, context types.Node, before
 
 // SchemaValidate validate the document against the the schema file given in url
 func (xp *Xp) SchemaValidate(url string) (errs []error, err error) {
+	libxml2Lock.Lock()
+	defer libxml2Lock.Unlock()
 	//    xsdsrc, _ := ioutil.ReadFile(url)
 	var schema *xsd.Schema
 	if schema = schemaCache[url]; schema == nil {
@@ -671,9 +667,9 @@ func (xp *Xp) VerifySignature(context types.Node, publicKeys []*rsa.PublicKey) (
 	contextDigest := Hash(Algos[digestMethod].Algo, xp.C14n(context, nsPrefix))
 
 	if nextsibling != nil {
-        	nextsibling.AddPrevSibling(signature)
+		nextsibling.AddPrevSibling(signature)
 	} else {
-        context.AddChild(signature)
+		context.AddChild(signature)
 	}
 
 	contextDigestValueComputed := base64.StdEncoding.EncodeToString(contextDigest)
