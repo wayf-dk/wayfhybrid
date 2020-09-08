@@ -1323,7 +1323,7 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 		}
 		response.QueryDashP(nameid, "@Format", sourceResponse.Query1(srcAssertion, "saml:Subject/saml:NameID/@Format"), nil)
 		response.QueryDashP(nameid, ".", sourceResponse.Query1(srcAssertion, "saml:Subject/saml:NameID"), nil)
-		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(srcAssertion, `saml:AttributeStatement/saml:Attribute[@Name="AuthnContextClassRef"]/saml:AttributeValue`), nil)
+		response.QueryDashPOptional(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(srcAssertion, `saml:AttributeStatement/saml:Attribute[@Name="AuthnContextClassRef"]/saml:AttributeValue`), nil)
 		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", sourceResponse.Query1(srcAssertion, "saml:Issuer"), nil)
 		response.QueryDashP(authstatement, "@AuthnInstant", sourceResponse.Query1(srcAssertion, "saml:AuthnStatement/@AuthnInstant"), nil)
 		response.QueryDashP(authstatement, "@SessionNotOnOrAfter", sourceResponse.Query1(srcAssertion, "saml:AuthnStatement/@SessionNotOnOrAfter"), nil)
@@ -1897,12 +1897,16 @@ func (sil *SLOInfoList) Unmarshal(msg []byte) {
 	}
 	i := int((msg[0]-97)*(msg[1]-97)) + 2 // num records and number of b64 encoded string lengths
 	j := 2
+	n := int(msg[1]-97)
 	for {
 		if i == length {
 			break
 		}
 		r := SLOInfo{}
-		for _, x := range []*string{&r.IDP, &r.SP, &r.NameID, &r.SPNameQualifier, &r.SessionIndex, &r.ID, &r.Protocol} {
+		for nn, x := range []*string{&r.IDP, &r.SP, &r.NameID, &r.SPNameQualifier, &r.SessionIndex, &r.ID, &r.Protocol} {
+		    if nn >= n { // needed to be backwards compatible with old SLOInfo recs with no protocol field
+        		    break
+        		 }
 			l := int(msg[j])
 			*x = string(msg[i : i+l])
 			i = i + l
