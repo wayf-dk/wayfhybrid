@@ -35,7 +35,7 @@ const (
 	sloInfoTTL      = 8 * 3600
 	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
     ssoCookieName   = "SSO2-"
-	sloCookieName   = "SLO2"
+	sloCookieName   = "SLO"
 )
 
 const (
