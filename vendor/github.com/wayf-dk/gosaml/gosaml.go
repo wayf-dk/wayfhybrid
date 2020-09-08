@@ -1323,7 +1323,7 @@ func NewResponse(idpMd, spMd, authnrequest, sourceResponse *goxml.Xp) (response 
 		}
 		response.QueryDashP(nameid, "@Format", sourceResponse.Query1(srcAssertion, "saml:Subject/saml:NameID/@Format"), nil)
 		response.QueryDashP(nameid, ".", sourceResponse.Query1(srcAssertion, "saml:Subject/saml:NameID"), nil)
-		response.QueryDashPOptional(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(srcAssertion, `saml:AttributeStatement/saml:Attribute[@Name="AuthnContextClassRef"]/saml:AttributeValue`), nil)
+		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthnContextClassRef", sourceResponse.Query1(srcAssertion, `saml:AttributeStatement/saml:Attribute[@Name="AuthnContextClassRef"]/saml:AttributeValue`), nil)
 		response.QueryDashP(authstatement, "saml:AuthnContext/saml:AuthenticatingAuthority[0]", sourceResponse.Query1(srcAssertion, "saml:Issuer"), nil)
 		response.QueryDashP(authstatement, "@AuthnInstant", sourceResponse.Query1(srcAssertion, "saml:AuthnStatement/@AuthnInstant"), nil)
 		response.QueryDashP(authstatement, "@SessionNotOnOrAfter", sourceResponse.Query1(srcAssertion, "saml:AuthnStatement/@SessionNotOnOrAfter"), nil)
@@ -1479,14 +1479,24 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 			return err
 		}
 
+		requiredFields := []string{"iat", "saml:AuthnContextClassRef"}
+        for _, f := range requiredFields {
+            if _, ok := attrs[f]; !ok {
+                return fmt.Errorf("missing required field: %s", f)
+            }
+        }
+
 		response := NewResponse(idpMd, spMd, msg, nil)
 
-		if iat, ok := attrs["iat"]; ok {
-			delete(attrs, "iat")
-			if math.Abs(float64(time.Now().Unix())-iat.(float64)) > timeskew {
-				return fmt.Errorf("jwt timed out")
-			}
-		}
+		iat := attrs["iat"]
+		delete(attrs, "iat")
+        if math.Abs(float64(time.Now().Unix())-iat.(float64)) > timeskew {
+            return fmt.Errorf("jwt timed out")
+        }
+
+        response.QueryDashP(nil, "saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef", attrs["saml:AuthnContextClassRef"].(string), nil)
+        delete(attrs, "saml:AuthnContextClassRef")
+
 		if aas := attrs["saml:AuthenticatingAuthority"]; aas != nil {
 			for _, aa := range aas.([]interface{}) {
 				response.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", aa.(string), nil)
