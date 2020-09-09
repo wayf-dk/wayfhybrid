@@ -1480,7 +1480,7 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		if err != nil {
 			return err
 		}
-
+PP(attrs)
 		requiredFields := []string{"iat", "saml:AuthnContextClassRef"}
         for _, f := range requiredFields {
             if _, ok := attrs[f]; !ok {
