@@ -330,9 +330,8 @@ func (xp *Xp) DocGetRootElement() types.Node {
 
 // Rm deletes the node
 func (xp *Xp) Rm(context types.Node, path string) {
-	libxml2Lock.Lock()
-	defer libxml2Lock.Unlock()
 	for _, node := range xp.Query(context, path) {
+	    libxml2Lock.Lock()
 		parent, _ := node.ParentNode()
 		switch x := node.(type) {
 		case types.Attribute:
@@ -341,6 +340,7 @@ func (xp *Xp) Rm(context types.Node, path string) {
 			parent.RemoveChild(x)
 		}
 		node.Free()
+        libxml2Lock.Unlock()
 	}
 }
 
@@ -474,8 +474,8 @@ func (xp *Xp) QueryMulti(context types.Node, path string) (res []string) {
 			res = append(res, strings.TrimSpace(node.NodeValue()))
 		}
 	case xpath.StringType:
-		res = []string{clib.XMLXPathObjectString(x)}
-	default:
+        res = []string{clib.XMLXPathObjectString(x)}
+    	default:
 		res = []string{fmt.Sprintf("%v", x)}
 	}
 	x.Free()
@@ -730,15 +730,12 @@ func signGoEleven(digest, privatekey, pw []byte, algo string) ([]byte, error) {
 // Encrypt the context with the given publickey
 // Hardcoded to aes256-cbc for the symetric part and
 // rsa-oaep-mgf1p and sha1 for the rsa part
-func (xp *Xp) Encrypt(context types.Node, publickey *rsa.PublicKey, ee *Xp) (err error) {
-	ects := ee.QueryDashP(nil, `/xenc:EncryptedData`, "", nil)
-	ects.(types.Element).SetAttribute("Type", "http://www.w3.org/2001/04/xmlenc#Element")
-	ee.QueryDashP(ects, `xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2009/xmlenc11#aes256-gcm"]`, "", nil)
-	//ee.QueryDashP(ects, `xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2001/04/xmlenc#aes256-cbc"]`, "", nil)
-	ee.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"]/ds:DigestMethod[@Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"]`, "", nil)
+func (xp *Xp) Encrypt(context types.Node, publickey *rsa.PublicKey) (err error) {
+    ects := xp.QueryDashP(nil, "saml:EncryptedAssertion/xenc:EncryptedData/@Type", "http://www.w3.org/2001/04/xmlenc#Element", context)
+	xp.QueryDashP(ects, `xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2009/xmlenc11#aes256-gcm"]`, "", nil)
+	xp.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"]/ds:DigestMethod[@Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"]`, "", nil)
 
 	sessionkey, ciphertext, err := encryptAESGCM([]byte(context.ToString(1, true)))
-	//sessionkey, ciphertext, err := encryptAESCBC([]byte(context.ToString(1, true)))
 	if err != nil {
 		return
 	}
@@ -747,19 +744,16 @@ func (xp *Xp) Encrypt(context types.Node, publickey *rsa.PublicKey, ee *Xp) (err
 		return
 	}
 
-	ee.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(encryptedSessionkey), nil)
-	ee.QueryDashP(ects, `xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(ciphertext), nil)
-
-	ec, _ := ee.Doc.DocumentElement()
-	ec = xp.CopyNode(ec, 1)
-	context.AddPrevSibling(ec)
+	xp.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(encryptedSessionkey), nil)
+	xp.QueryDashP(ects, `xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(ciphertext), nil)
 	RmElement(context)
 	return
 }
 
 // Decrypt decrypts the context using the given privatekey .
 // The context element is removed
-func (xp *Xp) Decrypt(context types.Node, privatekey, pw []byte) (x *Xp, err error) {
+func (xp *Xp) Decrypt(encryptedAssertion types.Node, privatekey, pw []byte) (err error) {
+	context := xp.Query(encryptedAssertion, "xenc:EncryptedData")[0]
 	encryptionMethod := xp.Query1(context, "./xenc:EncryptionMethod/@Algorithm")
 	keyEncryptionMethod := xp.Query1(context, "./ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod/@Algorithm")
 	digestMethod := xp.Query1(context, "./ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod/ds:DigestMethod/@Algorithm")
@@ -781,10 +775,10 @@ func (xp *Xp) Decrypt(context types.Node, privatekey, pw []byte) (x *Xp, err err
 		case "http://www.w3.org/2009/xmlenc11#mgf1sha256":
 			mgfAlgorithm = crypto.SHA256
 		default:
-			return nil, NewWerror("unsupported MGF", "MGF: "+MGF)
+			return NewWerror("unsupported MGF", "MGF: "+MGF)
 		}
 	default:
-		return nil, NewWerror("unsupported keyEncryptionMethod", "keyEncryptionMethod: "+keyEncryptionMethod)
+		return NewWerror("unsupported keyEncryptionMethod", "keyEncryptionMethod: "+keyEncryptionMethod)
 	}
 
 	switch digestMethod {
@@ -799,7 +793,7 @@ func (xp *Xp) Decrypt(context types.Node, privatekey, pw []byte) (x *Xp, err err
 	case "":
 		digestAlgorithm = crypto.SHA1
 	default:
-		return nil, NewWerror("unsupported digestMethod", "digestMethod: "+digestMethod)
+		return NewWerror("unsupported digestMethod", "digestMethod: "+digestMethod)
 	}
 
 	switch encryptionMethod {
@@ -808,21 +802,21 @@ func (xp *Xp) Decrypt(context types.Node, privatekey, pw []byte) (x *Xp, err err
 	case "http://www.w3.org/2009/xmlenc11#aes128-gcm", "http://www.w3.org/2009/xmlenc11#aes192-gcm", "http://www.w3.org/2009/xmlenc11#aes256-gcm":
 		decrypt = decryptGCM
 	default:
-		return nil, NewWerror("unsupported encryptionMethod", "encryptionMethod: "+encryptionMethod)
+		return NewWerror("unsupported encryptionMethod", "encryptionMethod: "+encryptionMethod)
 	}
 
 	encryptedKeybyte, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encryptedKey))
 	if err != nil {
-		return nil, Wrap(err)
+		return Wrap(err)
 	}
 
 	OAEPparamsbyte, err := base64.StdEncoding.DecodeString(strings.TrimSpace(OAEPparams))
 	if err != nil {
-		return nil, Wrap(err)
+		return Wrap(err)
 	}
 
 	if digestAlgorithm != mgfAlgorithm {
-		return nil, errors.New("digestMethod != keyEncryptionMethod not supported")
+		return errors.New("digestMethod != keyEncryptionMethod not supported")
 	}
 
 	var sessionkey []byte
@@ -832,36 +826,45 @@ func (xp *Xp) Decrypt(context types.Node, privatekey, pw []byte) (x *Xp, err err
 	case false:
 		priv, err := Pem2PrivateKey(privatekey, pw)
 		if err != nil {
-			return nil, Wrap(err)
+			return Wrap(err)
 		}
 		sessionkey, err = rsa.DecryptOAEP(digestAlgorithm.New(), rand.Reader, priv, encryptedKeybyte, OAEPparamsbyte)
 		if err != nil {
-			return nil, Wrap(err)
+			return Wrap(err)
 		}
 	}
 
 	if err != nil {
-		return nil, Wrap(err)
+		return Wrap(err)
 	}
 
 	switch len(sessionkey) {
 	case 16, 24, 32:
 	default:
-		return nil, fmt.Errorf("Unsupported keylength for AES %d", len(sessionkey))
+		return fmt.Errorf("Unsupported keylength for AES %d", len(sessionkey))
 	}
 
 	ciphertext := xp.Query1(context, "./xenc:CipherData/xenc:CipherValue")
 	ciphertextbyte, err := base64.StdEncoding.DecodeString(strings.TrimSpace(ciphertext))
 	if err != nil {
-		return nil, Wrap(err)
+		return Wrap(err)
 	}
 
 	plaintext, err := decrypt([]byte(sessionkey), ciphertextbyte)
 	if err != nil {
-		return nil, WrapWithXp(err, xp)
+		return WrapWithXp(err, xp)
 	}
 
-	return NewXp(plaintext), nil
+    response, _ := encryptedAssertion.ParentNode()
+    decryptedAssertionElement, err := response.ParseInContext(string(plaintext), 0)
+	if err != nil {
+		return WrapWithXp(err, xp)
+	}
+
+	_ = encryptedAssertion.AddPrevSibling(decryptedAssertionElement)
+	RmElement(encryptedAssertion)
+
+    return err
 }
 
 // Pem2PrivateKey converts a PEM encoded private key with an optional password to a *rsa.PrivateKey
