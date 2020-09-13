@@ -120,6 +120,7 @@ var (
 	// persistent cache of compiled schemas
 	schemaCache = make(map[string]*xsd.Schema)
 	libxml2Lock sync.Mutex
+	qdpLock     sync.Mutex
 
 	re  = regexp.MustCompile(`\/?([^\/"]*("[^"]*")?[^\/"]*)`) // slashes inside " is the problem
 	re2 = regexp.MustCompile(`^(?:(\w+):?)?([^\[@]*)(?:\[(\d+)\])?(?:\[?@([^=]+)(?:="([^"]*)"])?)?()$`)
@@ -329,9 +330,8 @@ func (xp *Xp) DocGetRootElement() types.Node {
 
 // Rm deletes the node
 func (xp *Xp) Rm(context types.Node, path string) {
-	libxml2Lock.Lock()
-	defer libxml2Lock.Unlock()
 	for _, node := range xp.Query(context, path) {
+//	    libxml2Lock.Lock()
 		parent, _ := node.ParentNode()
 		switch x := node.(type) {
 		case types.Attribute:
@@ -340,6 +340,7 @@ func (xp *Xp) Rm(context types.Node, path string) {
 			parent.RemoveChild(x)
 		}
 		node.Free()
+//        libxml2Lock.Unlock()
 	}
 }
 
@@ -473,9 +474,9 @@ func (xp *Xp) QueryMulti(context types.Node, path string) (res []string) {
 			res = append(res, strings.TrimSpace(node.NodeValue()))
 		}
 	case xpath.StringType:
-		res = []string{clib.XMLXPathObjectString(x)}
-	default:
-		res = []string{fmt.Sprintf("%v", x)}
+        res = []string{clib.XMLXPathObjectString(x)}
+    	default:
+		res = []string{fmt.Sprintf("%T", x)}
 	}
 	x.Free()
 	return
@@ -494,6 +495,9 @@ func (xp *Xp) Query1(context types.Node, path string) string {
 // QueryDashP generative xpath query - ie. mkdir -p for xpath ...
 // Understands simple xpath expressions including indexes and attribute values
 func (xp *Xp) QueryDashP(context types.Node, query string, data string, before types.Node) types.Node {
+	qdpLock.Lock()
+	defer qdpLock.Unlock()
+
 	// split in path elements, an element might include an attribute expression incl. value eg.
 	// /md:EntitiesDescriptor/md:EntityDescriptor[@entityID="https://wayf.wayf.dk"]/md:SPSSODescriptor
 	var attrContext types.Node
@@ -726,15 +730,12 @@ func signGoEleven(digest, privatekey, pw []byte, algo string) ([]byte, error) {
 // Encrypt the context with the given publickey
 // Hardcoded to aes256-cbc for the symetric part and
 // rsa-oaep-mgf1p and sha1 for the rsa part
-func (xp *Xp) Encrypt(context types.Node, publickey *rsa.PublicKey, ee *Xp) (err error) {
-	ects := ee.QueryDashP(nil, `/xenc:EncryptedData`, "", nil)
-	ects.(types.Element).SetAttribute("Type", "http://www.w3.org/2001/04/xmlenc#Element")
-	ee.QueryDashP(ects, `xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2009/xmlenc11#aes256-gcm"]`, "", nil)
-	//ee.QueryDashP(ects, `xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2001/04/xmlenc#aes256-cbc"]`, "", nil)
-	ee.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"]/ds:DigestMethod[@Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"]`, "", nil)
+func (xp *Xp) Encrypt(context types.Node, publickey *rsa.PublicKey) (err error) {
+    ects := xp.QueryDashP(nil, "saml:EncryptedAssertion/xenc:EncryptedData/@Type", "http://www.w3.org/2001/04/xmlenc#Element", context)
+	xp.QueryDashP(ects, `xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2009/xmlenc11#aes256-gcm"]`, "", nil)
+	xp.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod[@Algorithm="http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p"]/ds:DigestMethod[@Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"]`, "", nil)
 
 	sessionkey, ciphertext, err := encryptAESGCM([]byte(context.ToString(1, true)))
-	//sessionkey, ciphertext, err := encryptAESCBC([]byte(context.ToString(1, true)))
 	if err != nil {
 		return
 	}
@@ -743,19 +744,16 @@ func (xp *Xp) Encrypt(context types.Node, publickey *rsa.PublicKey, ee *Xp) (err
 		return
 	}
 
-	ee.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(encryptedSessionkey), nil)
-	ee.QueryDashP(ects, `xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(ciphertext), nil)
-
-	ec, _ := ee.Doc.DocumentElement()
-	ec = xp.CopyNode(ec, 1)
-	context.AddPrevSibling(ec)
+	xp.QueryDashP(ects, `ds:KeyInfo/xenc:EncryptedKey/xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(encryptedSessionkey), nil)
+	xp.QueryDashP(ects, `xenc:CipherData/xenc:CipherValue`, base64.StdEncoding.EncodeToString(ciphertext), nil)
 	RmElement(context)
 	return
 }
 
 // Decrypt decrypts the context using the given privatekey .
 // The context element is removed
-func (xp *Xp) Decrypt(context types.Node, privatekey, pw []byte) (x *Xp, err error) {
+func (xp *Xp) Decrypt(encryptedAssertion types.Node, privatekey, pw []byte) (zz *Xp, err error) {
+	context := xp.Query(encryptedAssertion, "xenc:EncryptedData")[0]
 	encryptionMethod := xp.Query1(context, "./xenc:EncryptionMethod/@Algorithm")
 	keyEncryptionMethod := xp.Query1(context, "./ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod/@Algorithm")
 	digestMethod := xp.Query1(context, "./ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod/ds:DigestMethod/@Algorithm")
@@ -857,7 +855,17 @@ func (xp *Xp) Decrypt(context types.Node, privatekey, pw []byte) (x *Xp, err err
 		return nil, WrapWithXp(err, xp)
 	}
 
-	return NewXp(plaintext), nil
+    response, _ := encryptedAssertion.ParentNode()
+    decryptedAssertionElement, err := response.ParseInContext(string(plaintext), 0)
+	if err != nil {
+		return nil, WrapWithXp(err, xp)
+	}
+
+	_ = encryptedAssertion.AddPrevSibling(decryptedAssertionElement)
+	RmElement(encryptedAssertion)
+
+    return nil, err
+//	return NewXp(plaintext), nil
 }
 
 // Pem2PrivateKey converts a PEM encoded private key with an optional password to a *rsa.PrivateKey
