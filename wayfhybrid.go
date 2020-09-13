@@ -18,6 +18,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+    "runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -248,6 +249,7 @@ func Main() {
 	}
 
 	httpMux.Handle("/production", appHandler(OkService))
+	//httpMux.Handle("/pprof", appHandler(PProf))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
 	httpMux.Handle(config.Oauth, appHandler(SSOService))
@@ -421,6 +423,12 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.Print(x.FullError())
 		log.Print(x.Stack(5))
 	}
+}
+
+func PProf(w http.ResponseWriter, r *http.Request) (err error) {
+    f, _ := os.Create("heap.pprof")
+    pprof.WriteHeapProfile(f)
+    return
 }
 
 // updateMetadataService is service for updating metadata feed
