@@ -1160,9 +1160,8 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			gosaml.DumpFileIfTracing(r, newresponse)
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
-			ea := goxml.NewXpFromString(`<saml:EncryptedAssertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"></saml:EncryptedAssertion>`)
 			assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-			newresponse.Encrypt(assertion, publicKey, ea)
+			newresponse.Encrypt(assertion, publicKey)
 		}
 	} else {
 		newresponse = gosaml.NewErrorResponse(hubBirkIDPMd, spMd, request, response)
