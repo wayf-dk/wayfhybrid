@@ -408,11 +408,11 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			status = 401
 		}
 		http.Error(w, err.Error(), status)
-		log.Printf("%s: %s", err, r.Header.Get("User-Agent"))
 	} else {
 		err = fmt.Errorf("OK")
 	}
 
+    log.Printf("%s: %s", err, r.Header.Get("User-Agent"))
 	log.Printf("%s %s %s %+v %1.3f %d %s", remoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
 
 	switch x := err.(type) {
