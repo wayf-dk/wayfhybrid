@@ -138,6 +138,7 @@ var (
 	allowedInFeds                       = regexp.MustCompile("[^\\w\\.-]")
 	scoped                              = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])$`)
 	dkcprpreg                           = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
+	oldSafari                           = regexp.MustCompile("iPhone.*Version/12.*Safari")
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
 	defaultDigestAndSignatureAlgorithm  = "sha256"
 
@@ -339,7 +340,10 @@ func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domai
 	cookie, err := secCookie.Encode(id, data)
 	// http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge, SameSite: http.SameSiteNoneMode})
 	cc := http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge}
-	v := cc.String() + "; SameSite=None"
+	v := cc.String()
+	if !oldSafari.MatchString(r.Header.Get("User-Agent")) {
+	    v = v + "; SameSite=None"
+	}
 	w.Header().Add("Set-Cookie", v)
 	return
 }
@@ -360,9 +364,12 @@ func (s wayfHybridSession) Get(w http.ResponseWriter, r *http.Request, id string
 func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id, domain string, secCookie *gosaml.Hm) (err error) {
 	// http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: "", Path: "/", Secure: true, HttpOnly: true, Expires: time.Unix(0, 0),  SameSite: http.SameSiteNoneMode})
 	cc := http.Cookie{Name: id, Domain: domain, Value: "", Path: "/", Secure: true, HttpOnly: true, Expires: time.Unix(0, 0)}
-	v := cc.String() + "; SameSite=None"
-	w.Header().Add("Set-Cookie", v)
-	return
+	v := cc.String()
+	if !oldSafari.MatchString(r.Header.Get("User-Agent")) {
+	    v = v + "; SameSite=None"
+	}
+    w.Header().Add("Set-Cookie", v)
+    return
 }
 
 // GetDel responsible for getting and then deleting cookie values
