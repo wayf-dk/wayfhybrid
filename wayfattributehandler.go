@@ -32,7 +32,6 @@ type (
 )
 
 var (
-
 	internalAttributesBase = []attributeDescription{
 		{c14n: "Issuer", op: "xp:msg:./saml:Issuer"},
 
@@ -116,8 +115,7 @@ var (
 		{c14n: "isMemberOf", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"},
 		{c14n: "isMemberOf", name: "isMemberOf"},
 		{c14n: "isMemberOf", name: "urn:oid:1.3.6.1.4.1.5923.1.5.1.1"},
-		{c14n: "isMemberOf", name: "role"},
-		{c14n: "mail", name: "emailaddress"},
+        {c14n: "mail", name: "emailaddress"},
 		{c14n: "mail", name: "mail"},
 		{c14n: "mail", name: "urn:oid:0.9.2342.19200300.100.1.3"},
 		{c14n: "mobile", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"},
@@ -153,7 +151,7 @@ var (
 		// Modst specials
 		{c14n: "eduPersonPrincipalName", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"},
 		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid"},
-//		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid"},
+		//		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid"},
 		{c14n: "entryUUID", name: "https://modst.dk/sso/claims/uniqueid"},
 		{c14n: "oioCvrNumberIdentifier", name: "https://modst.dk/sso/claims/cvr"},
 		{c14n: "mail", name: "https://modst.dk/sso/claims/email"},
@@ -172,6 +170,11 @@ var (
 		"internal":    "internal",
 		"unspecified": "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified",
 		"modst":       "https://modst.dk/sso/claims",
+	}
+
+	filtered = map[string]bool{
+		//	"eduPersonEntitlement": true,
+		"isMemberOf": true,
 	}
 
 	internalAttributeDescriptions       = attributeDescriptionsMap{}
@@ -220,7 +223,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 		}
 	}
 
-	//	attributeOpsHandler(values, atds, request, response, idpMd, spMd)
 	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
@@ -249,7 +251,7 @@ func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string,
 }
 
 func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp) {
-    contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg}
+	contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg}
 	for _, atd := range atds {
 		opParam := strings.SplitN(atd.op, ":", 2)
 		if len(values[atd.c14n]) == 0 {
@@ -444,10 +446,7 @@ func yearfromyearandcifferseven(year, c7 int) int {
 }
 
 // CopyAttributes copies the attributes
-func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
-	// log eduPersonScopedAffiliation
-	//log.Printf("epsa: %s\n", strings.Join(sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonScopedAffiliation"]/saml:AttributeValue`), ","))
-
+func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 
@@ -466,11 +465,20 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 
 	destinationAttributes := response.QueryDashP(assertionList[0], saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
 
-    if spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
- 	    destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
-	    goxml.RmElement(destinationAttributes)
-        return nil, ""
-    }
+	if spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
+		destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
+		goxml.RmElement(destinationAttributes)
+		return nil, ""
+	}
+
+	spID := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
+	var spValues, idpValues types.Node
+	if nl := spMd.Query(nil, xprefix+`ValueFilter`); len(nl) > 0 {
+		spValues = nl[0]
+	}
+	if nl := idpMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 {
+		idpValues = nl[0]
+	}
 
 	h := sha1.New()
 	for _, requestedAttribute := range requestedAttributes {
@@ -486,8 +494,27 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 			continue
 		}
 
+		filters := []*regexp.Regexp{}
+		filters = append(filters, makeFilters(spMd.Query(requestedAttribute, `saml:AttributeValue`))...)
+		filters = append(filters, makeFilters(spMd.Query(spValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
+		filters = append(filters, makeFilters(idpMd.Query(idpValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
+
+		// if filter is required, but none is specified
+		if filtered[atd.c14n] && len(filters) == 0 {
+			continue
+		}
+
 		values := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="`+atd.c14n+`"]/saml:AttributeValue`)
-		values = filterValues(values, spMd.Query(requestedAttribute, `saml:AttributeValue`))
+
+		if len(filters) > 0 {
+			filteredValues := []string{}
+			for _, value := range values {
+				if matchRegexpArray(value, filters) {
+					filteredValues = append(filteredValues, value)
+				}
+			}
+			values = filteredValues
+		}
 
 		if len(values) == 0 {
 			continue
@@ -520,15 +547,15 @@ func CopyAttributes(sourceResponse, response, spMd *goxml.Xp) (ardValues map[str
 	return
 }
 
-func filterValues(values []string, allowedValues types.NodeList) (filteredValues []string) {
-	regexps := []*regexp.Regexp{}
+func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
+	regexps = []*regexp.Regexp{}
 	for _, attr := range allowedValues {
 		tp := ""
 		tpAttribute, _ := attr.(types.Element).GetAttribute("type")
 		if tpAttribute != nil {
 			tp = tpAttribute.Value()
 		}
-		val := attr.NodeValue()
+		val := strings.TrimSpace(attr.NodeValue())
 		var reg string
 		switch tp {
 		case "prefix":
@@ -540,15 +567,15 @@ func filterValues(values []string, allowedValues types.NodeList) (filteredValues
 		case "regexp":
 			reg = val
 		default:
-			reg = "^" + regexp.QuoteMeta(val) + "$"
+			if strings.HasPrefix(val, "*") {
+				reg = regexp.QuoteMeta(val[1:]) + "$"
+			} else if strings.HasSuffix(val, "*") {
+				reg = "^" + regexp.QuoteMeta(val[:len(val)-1])
+			} else {
+				reg = "^" + regexp.QuoteMeta(val) + "$"
+			}
 		}
 		regexps = append(regexps, regexp.MustCompile(reg))
-	}
-
-	for _, value := range values {
-		if len(allowedValues) == 0 || matchRegexpArray(value, regexps) {
-			filteredValues = append(filteredValues, value)
-		}
 	}
 	return
 }
@@ -563,12 +590,12 @@ func matchRegexpArray(item string, array []*regexp.Regexp) bool {
 }
 
 func unique(slice []string) (list []string) {
-    keys := make(map[string]bool)
-    for _, entry := range slice {
-        if _, value := keys[entry]; !value {
-            keys[entry] = true
-            list = append(list, entry)
-        }
-    }
-    return
+	keys := make(map[string]bool)
+	for _, entry := range slice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return
 }
