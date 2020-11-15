@@ -223,7 +223,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 		}
 	}
 
-	//	attributeOpsHandler(values, atds, request, response, idpMd, spMd)
 	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
@@ -448,9 +447,6 @@ func yearfromyearandcifferseven(year, c7 int) int {
 
 // CopyAttributes copies the attributes
 func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
-	// log eduPersonScopedAffiliation
-	//log.Printf("epsa: %s\n", strings.Join(sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonScopedAffiliation"]/saml:AttributeValue`), ","))
-
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 
