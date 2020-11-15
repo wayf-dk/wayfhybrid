@@ -115,7 +115,7 @@ var (
 		{c14n: "isMemberOf", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"},
 		{c14n: "isMemberOf", name: "isMemberOf"},
 		{c14n: "isMemberOf", name: "urn:oid:1.3.6.1.4.1.5923.1.5.1.1"},
-		{c14n: "mail", name: "emailaddress"},
+        {c14n: "mail", name: "emailaddress"},
 		{c14n: "mail", name: "mail"},
 		{c14n: "mail", name: "urn:oid:0.9.2342.19200300.100.1.3"},
 		{c14n: "mobile", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"},
@@ -173,7 +173,7 @@ var (
 	}
 
 	filtered = map[string]bool{
-		//		"eduPersonEntitlement": true,
+		//	"eduPersonEntitlement": true,
 		"isMemberOf": true,
 	}
 
@@ -497,7 +497,7 @@ func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues 
 		filters := []*regexp.Regexp{}
 		filters = append(filters, makeFilters(spMd.Query(requestedAttribute, `saml:AttributeValue`))...)
 		filters = append(filters, makeFilters(spMd.Query(spValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
-		filters = append(filters, makeFilters(spMd.Query(idpValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
+		filters = append(filters, makeFilters(idpMd.Query(idpValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
 
 		// if filter is required, but none is specified
 		if filtered[atd.c14n] && len(filters) == 0 {
