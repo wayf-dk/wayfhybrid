@@ -473,7 +473,7 @@ func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues 
 
 	spID := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
 	var spValues, idpValues types.Node
-	if nl := spMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 {
+	if nl := spMd.Query(nil, xprefix+`ValueFilter`); len(nl) > 0 {
 		spValues = nl[0]
 	}
 	if nl := idpMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 {
