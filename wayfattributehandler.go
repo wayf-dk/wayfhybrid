@@ -128,8 +128,6 @@ var (
 		{c14n: "pairwise-id", name: "urn:oasis:names:tc:SAML:attribute:pairwise-id"},
 		{c14n: "preferredLanguage", name: "preferredLanguage"},
 		{c14n: "preferredLanguage", name: "urn:oid:2.16.840.1.113730.3.1.39"},
-		{c14n: "role", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"},
-		{c14n: "role", name: "role"},
 		{c14n: "schacCountryOfCitizenship", name: "schacCountryOfCitizenship"},
 		{c14n: "schacCountryOfCitizenship", name: "urn:oid:1.3.6.1.4.1.25178.1.2.5"},
 		{c14n: "schacDateOfBirth", name: "schacDateOfBirth"},
