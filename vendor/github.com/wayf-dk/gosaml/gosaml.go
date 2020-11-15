@@ -997,15 +997,6 @@ func logoutRequest(sloinfo *SLOInfo, issuer, destination string, async bool) (re
 
 // NewLogoutResponse creates a Logout Response oon the basis of Logout request
 func NewLogoutResponse(issuer string, destination *goxml.Xp, inResponseTo string, role uint8) (response *goxml.Xp, binding string, err error) {
-<<<<<<< HEAD
-    for _, binding = range []string{REDIRECT, POST} {
-        response, err = NewLogoutResponseWithBinding(issuer, destination, inResponseTo, role, binding)
-        if err == nil {
-            return
-        }
-    }
-    return
-=======
 	for _, binding = range []string{REDIRECT, POST} {
 		response, err = NewLogoutResponseWithBinding(issuer, destination, inResponseTo, role, binding)
 		if err == nil {
@@ -1013,7 +1004,6 @@ func NewLogoutResponse(issuer string, destination *goxml.Xp, inResponseTo string
 		}
 	}
 	return
->>>>>>> FindNoCookie
 }
 
 func NewLogoutResponseWithBinding(issuer string, destination *goxml.Xp, inResponseTo string, role uint8, binding string) (response *goxml.Xp, err error) {
@@ -1552,21 +1542,12 @@ func Jwt2saml(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump()), RelayState: relayState}
 		return PostForm.ExecuteTemplate(w, "postForm", data)
 	case "LogoutRequest":
-<<<<<<< HEAD
-        response, err := NewLogoutResponseWithBinding(idpMd.Query1(nil, `./@entityID`), spMd, msg.Query1(nil, "@ID"), SPRole, POST)
-        if err != nil {
-            return err
-        }
-        data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump())}
-        return PostForm.ExecuteTemplate(w, "postForm", data)
-=======
 		response, err := NewLogoutResponseWithBinding(idpMd.Query1(nil, `./@entityID`), spMd, msg.Query1(nil, "@ID"), SPRole, POST)
 		if err != nil {
 			return err
 		}
 		data := Formdata{Acs: response.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(response.Dump())}
 		return PostForm.ExecuteTemplate(w, "postForm", data)
->>>>>>> FindNoCookie
 	case "LogoutResponse":
 	}
 	return
