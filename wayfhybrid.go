@@ -1143,6 +1143,13 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
+        // Fix up timings if the SP has asked for it
+		ad, err := time.ParseDuration(spMd.Query1(nil, xprefix+"assertionDuration"))
+		if err == nil {
+			issueInstant, _ := time.Parse(gosaml.XsDateTime, newresponse.Query1(nil, "./saml:Assertion/@IssueInstant"))
+			newresponse.QueryDashP(nil, "./saml:Assertion/saml:Conditions/@NotOnOrAfter", issueInstant.Add(ad).Format(gosaml.XsDateTime), nil)
+		}
+
 		elementsToSign := config.ElementsToSign
 		if spMd.QueryXMLBool(nil, xprefix+"saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
