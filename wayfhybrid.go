@@ -18,7 +18,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
-    "runtime/pprof"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +35,7 @@ const (
 	authnRequestTTL = 180
 	sloInfoTTL      = 8 * 3600
 	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
-    ssoCookieName   = "SSO2-"
+	ssoCookieName   = "SSO2-"
 	sloCookieName   = "SLO"
 )
 
@@ -138,6 +138,7 @@ var (
 	allowedInFeds                       = regexp.MustCompile("[^\\w\\.-]")
 	scoped                              = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])$`)
 	dkcprpreg                           = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
+	oldSafari                           = regexp.MustCompile("iPhone.*Version/12.*Safari")
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
 	defaultDigestAndSignatureAlgorithm  = "sha256"
 
@@ -339,7 +340,10 @@ func (s wayfHybridSession) Set(w http.ResponseWriter, r *http.Request, id, domai
 	cookie, err := secCookie.Encode(id, data)
 	// http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge, SameSite: http.SameSiteNoneMode})
 	cc := http.Cookie{Name: id, Domain: domain, Value: cookie, Path: "/", Secure: true, HttpOnly: true, MaxAge: maxAge}
-	v := cc.String() + "; SameSite=None"
+	v := cc.String()
+	if !oldSafari.MatchString(r.Header.Get("User-Agent")) {
+		v = v + "; SameSite=None"
+	}
 	w.Header().Add("Set-Cookie", v)
 	return
 }
@@ -360,7 +364,10 @@ func (s wayfHybridSession) Get(w http.ResponseWriter, r *http.Request, id string
 func (s wayfHybridSession) Del(w http.ResponseWriter, r *http.Request, id, domain string, secCookie *gosaml.Hm) (err error) {
 	// http.SetCookie(w, &http.Cookie{Name: id, Domain: domain, Value: "", Path: "/", Secure: true, HttpOnly: true, Expires: time.Unix(0, 0),  SameSite: http.SameSiteNoneMode})
 	cc := http.Cookie{Name: id, Domain: domain, Value: "", Path: "/", Secure: true, HttpOnly: true, Expires: time.Unix(0, 0)}
-	v := cc.String() + "; SameSite=None"
+	v := cc.String()
+	if !oldSafari.MatchString(r.Header.Get("User-Agent")) {
+		v = v + "; SameSite=None"
+	}
 	w.Header().Add("Set-Cookie", v)
 	return
 }
@@ -412,6 +419,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = fmt.Errorf("OK")
 	}
 
+	log.Printf("%s: %s", err, r.Header.Get("User-Agent"))
 	log.Printf("%s %s %s %+v %1.3f %d %s", remoteAddr, r.Method, r.Host, r.URL, time.Since(starttime).Seconds(), status, err)
 
 	switch x := err.(type) {
@@ -426,9 +434,9 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func PProf(w http.ResponseWriter, r *http.Request) (err error) {
-    f, _ := os.Create("heap.pprof")
-    pprof.WriteHeapProfile(f)
-    return
+	f, _ := os.Create("heap.pprof")
+	pprof.WriteHeapProfile(f)
+	return
 }
 
 // updateMetadataService is service for updating metadata feed
@@ -501,7 +509,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	type testSPFormData struct {
 		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP string
-		Messages                                                                   string
+		Messages                                                      string
 		AttrValues, DebugValues                                                    []attrValue
 	}
 
@@ -513,10 +521,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	if login || idp != "" || idpList != "" {
 
-		if err != nil {
-			return err
-		}
-		idpMd, err := md.Hub.MDQ(config.HubEntityID)
+        idpMd, err := md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
 			return err
 		}
@@ -545,7 +550,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scoping, "", false, 0, 0)
+	    newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scoping, "", false, 0, 0)
 
 		options := []struct{ name, path, value string }{
 			{"isPassive", "./@IsPassive", "true"},
@@ -559,10 +564,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", "")
-		if err != nil {
-			return err
-		}
+	    u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", "")
+        if err != nil {
+            return err
+        }
 
 		q := u.Query()
 
@@ -826,13 +831,13 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 		testidp = tmp.Value
 		http.SetCookie(w, &http.Cookie{Name: "testidp", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
 	}
-
+	r.ParseForm()
 	idpLists := [][]string{
 		{testidp},
 		spMd.QueryMulti(nil, xprefix+"IDPList"),
 		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
-		{r.URL.Query().Get("idpentityid")},
-		strings.Split(r.URL.Query().Get("idplist"), ","),
+		{r.Form.Get("idpentityid")},
+		strings.Split(r.Form.Get("idplist"), ","),
 		strings.Split(vvpmss, ",")}
 
 	for _, idpList := range idpLists {
@@ -1056,7 +1061,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", virtualIDPMd.Query1(nil, "@entityID"), nil)
 		}
 
-		ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
+		ard.Values, ard.Hash = CopyAttributes(response, newresponse, idpMd, spMd)
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
@@ -1135,6 +1140,13 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
+        // Fix up timings if the SP has asked for it
+		ad, err := time.ParseDuration(spMd.Query1(nil, xprefix+"assertionDuration"))
+		if err == nil {
+			issueInstant, _ := time.Parse(gosaml.XsDateTime, newresponse.Query1(nil, "./saml:Assertion/@IssueInstant"))
+			newresponse.QueryDashP(nil, "./saml:Assertion/saml:Conditions/@NotOnOrAfter", issueInstant.Add(ad).Format(gosaml.XsDateTime), nil)
+		}
+
 		elementsToSign := config.ElementsToSign
 		if spMd.QueryXMLBool(nil, xprefix+"saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
@@ -1147,7 +1159,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		signingType := gosaml.SAMLSign
 		if sRequest.Protocol == "wsfed" {
 			newresponse = gosaml.NewWsFedResponse(hubBirkIDPMd, spMd, newresponse)
-			ard.Values, ard.Hash = CopyAttributes(response, newresponse, spMd)
+			ard.Values, ard.Hash = CopyAttributes(response, newresponse, idpMd, spMd)
 
 			signingType = gosaml.WSFedSign
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
@@ -1282,7 +1294,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			"wa":      {wa},
 		}
 		http.Redirect(w, r, msg.Query1(nil, "@Destination")+"?"+q.Encode(), http.StatusFound)
-        return
+		return
 	}
 
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
