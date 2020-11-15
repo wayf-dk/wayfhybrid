@@ -32,7 +32,6 @@ type (
 )
 
 var (
-
 	internalAttributesBase = []attributeDescription{
 		{c14n: "Issuer", op: "xp:msg:./saml:Issuer"},
 
@@ -173,6 +172,11 @@ var (
 		"internal":    "internal",
 		"unspecified": "urn:oasis:names:tc:SAML:2.0:attrname-format:unspecified",
 		"modst":       "https://modst.dk/sso/claims",
+	}
+
+	filtered = map[string]bool{
+		//		"eduPersonEntitlement": true,
+		"isMemberOf": true,
 	}
 
 	internalAttributeDescriptions       = attributeDescriptionsMap{}
