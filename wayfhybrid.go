@@ -834,13 +834,13 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 		testidp = tmp.Value
 		http.SetCookie(w, &http.Cookie{Name: "testidp", Path: "/", Secure: true, HttpOnly: true, MaxAge: -1})
 	}
-
+	r.ParseForm()
 	idpLists := [][]string{
 		{testidp},
 		spMd.QueryMulti(nil, xprefix+"IDPList"),
 		request.QueryMulti(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID"),
-		{r.URL.Query().Get("idpentityid")},
-		strings.Split(r.URL.Query().Get("idplist"), ","),
+		{r.Form.Get("idpentityid")},
+		strings.Split(r.Form.Get("idplist"), ","),
 		strings.Split(vvpmss, ",")}
 
 	for _, idpList := range idpLists {
