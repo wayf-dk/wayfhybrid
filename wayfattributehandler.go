@@ -575,7 +575,6 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 				reg = "^" + regexp.QuoteMeta(val) + "$"
 			}
 		}
-		fmt.Println("filter", reg)
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
 	return
