@@ -67,6 +67,7 @@ var (
 		{c14n: "oioCvrNumberIdentifier", op: "xp:idp://wayf:wayf/wayf:oioCvrNumberIdentifier"},
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "val:username-password-protected-transport"},
+		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
 	}
 
 	requestAttributesBase = []attributeDescription{
@@ -138,6 +139,7 @@ var (
 		{c14n: "schacHomeOrganizationType", name: "urn:oid:1.3.6.1.4.1.25178.1.2.10"},
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID"},
 		{c14n: "schacPersonalUniqueID", name: "urn:oid:1.3.6.1.4.1.25178.1.2.15"},
+		{c14n: "norEduPersonNIN", name: "norEduPersonNIN"},
 		{c14n: "schacYearOfBirth", name: "schacYearOfBirth"},
 		{c14n: "schacYearOfBirth", name: "urn:oid:1.3.6.1.4.1.25178.1.0.2.3"},
 		{c14n: "sn", name: "sn"},
@@ -367,6 +369,10 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			default:
 				*v = values[attr][0]
 			}
+		case "norEduPersonNIN":
+		    if *v == "" {
+				*v = values["schacPersonalUniqueID"][0]
+		    }
 		}
 	}
 }
