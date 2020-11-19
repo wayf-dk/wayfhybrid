@@ -579,13 +579,8 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 		case "regexp":
 			reg = val
 		default:
-			if strings.HasPrefix(val, "*") {
-				reg = regexp.QuoteMeta(val[1:]) + "$"
-			} else if strings.HasSuffix(val, "*") {
-				reg = "^" + regexp.QuoteMeta(val[:len(val)-1])
-			} else {
-				reg = "^" + regexp.QuoteMeta(val) + "$"
-			}
+		    reg = "^"+strings.ReplaceAll(regexp.QuoteMeta(val), "\\*", ".*")+"$"
+		    fmt.Println("reg", reg)
 		}
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
