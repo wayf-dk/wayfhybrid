@@ -119,9 +119,9 @@ type (
 	}
 
 	attrValue struct {
-		Name   string
-		Must   bool
-		Values []string
+		Name, FriendlyName string
+		Must               bool
+		Values             []string
 	}
 
 	webMd struct {
@@ -509,7 +509,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	type testSPFormData struct {
 		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP string
-		Messages                                                      string
+		Messages                                                                   string
 		AttrValues, DebugValues                                                    []attrValue
 	}
 
@@ -521,7 +521,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	if login || idp != "" || idpList != "" {
 
-        idpMd, err := md.Hub.MDQ(config.HubEntityID)
+		idpMd, err := md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
 			return err
 		}
@@ -550,7 +550,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-	    newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scoping, "", false, 0, 0)
+		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scoping, "", false, 0, 0)
 
 		options := []struct{ name, path, value string }{
 			{"isPassive", "./@IsPassive", "true"},
@@ -564,10 +564,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-	    u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", "")
-        if err != nil {
-            return err
-        }
+		u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", "")
+		if err != nil {
+			return err
+		}
 
 		q := u.Query()
 
@@ -654,24 +654,31 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 		friendlyName := destinationMd.Query1(requestedAttribute, "@FriendlyName")
 		seen[name] = true
 		seen[friendlyName] = true
+		if name == friendlyName {
+			friendlyName = ""
+		}
 
 		must := hubMd.Query1(nil, `.//md:RequestedAttribute[@Name=`+strconv.Quote(name)+`]/@must`) == "true"
 
 		// accept attributes in both uri and basic format
-		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+` or @Name=`+strconv.Quote(friendlyName)+`]/saml:AttributeValue`)
-		values = append(values, attrValue{Name: friendlyName, Must: must, Values: attrValues})
+		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/saml:AttributeValue`)
+		values = append(values, attrValue{Name: name, FriendlyName: friendlyName, Must: must, Values: attrValues})
 	}
+
+    // Add a delimiter
+    values = append(values, attrValue{Name: "---"})
 
 	for _, name := range response.QueryMulti(nil, ".//saml:Attribute/@Name") {
 		if seen[name] {
 			continue
 		}
-		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/saml:AttributeValue`)
 		friendlyName := response.Query1(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/@FriendlyName`)
-		if friendlyName != "" {
-			name = friendlyName
+		attrValues := response.QueryMulti(nil, `.//saml:Attribute[@Name=`+strconv.Quote(name)+`]/saml:AttributeValue`)
+		if name == friendlyName {
+			friendlyName = ""
 		}
-		values = append(values, attrValue{Name: name, Must: false, Values: attrValues})
+
+		values = append(values, attrValue{Name: name, FriendlyName: friendlyName, Must: false, Values: attrValues})
 	}
 	return
 }
@@ -1140,7 +1147,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-        // Fix up timings if the SP has asked for it
+		// Fix up timings if the SP has asked for it
 		ad, err := time.ParseDuration(spMd.Query1(nil, xprefix+"assertionDuration"))
 		if err == nil {
 			issueInstant, _ := time.Parse(gosaml.XsDateTime, newresponse.Query1(nil, "./saml:Assertion/@IssueInstant"))
