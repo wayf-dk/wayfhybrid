@@ -371,7 +371,13 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			}
 		case "norEduPersonNIN":
 		    if *v == "" {
-				*v = values["schacPersonalUniqueID"][0]
+		        spuid := values["schacPersonalUniqueID"][0]
+                const prefix = "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"
+	            i := strings.LastIndex(spuid, prefix)
+                if i == 0 {
+                    *v = spuid[len(prefix):]
+                }
+	            fmt.Println("i", *v, i, spuid, spuid[len(prefix):])
 		    }
 		}
 	}
