@@ -579,8 +579,7 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 		case "regexp":
 			reg = val
 		default:
-		    reg = "^"+strings.ReplaceAll(regexp.QuoteMeta(val), "\\*", ".*")+"$"
-		    fmt.Println("reg", reg)
+		    reg = "^"+strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1)+"$"
 		}
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
