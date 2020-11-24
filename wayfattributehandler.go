@@ -377,7 +377,6 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
                 if i == 0 {
                     *v = spuid[len(prefix):]
                 }
-	            fmt.Println("i", *v, i, spuid, spuid[len(prefix):])
 		    }
 		}
 	}
