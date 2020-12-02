@@ -275,6 +275,7 @@ func Main() {
 
 	httpMux.Handle(config.Public, appHandler(f))
 	httpMux.Handle(config.TestSP+"/ds/", appHandler(f))
+	httpMux.Handle(config.TestSP2+"/ds/", appHandler(f))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
 	httpMux.Handle(config.Jwt2saml, appHandler(jwt2saml))
