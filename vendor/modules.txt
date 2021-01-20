@@ -12,7 +12,7 @@ github.com/pelletier/go-toml
 github.com/pkg/errors
 # github.com/stretchr/testify v1.6.1
 ## explicit
-# github.com/wayf-dk/go-libxml2 v0.0.0-20190219221342-73e9d89f5add => ../go-libxml2
+# github.com/wayf-dk/go-libxml2 v0.0.0-20200913202138-5af62eb8566b => ../go-libxml2
 ## explicit
 github.com/wayf-dk/go-libxml2
 github.com/wayf-dk/go-libxml2/clib
@@ -25,13 +25,13 @@ github.com/wayf-dk/go-libxml2/xsd
 # github.com/wayf-dk/godiscoveryservice v0.0.0-20200814223804-6155ba4f0849 => ../godiscoveryservice
 ## explicit
 github.com/wayf-dk/godiscoveryservice
-# github.com/wayf-dk/goeleven v0.0.0-20200814225736-c05bb61e7cb0 => ../goeleven
+# github.com/wayf-dk/goeleven v0.0.0-20200817121619-2e6a9bee65e8 => ../goeleven
 ## explicit
 github.com/wayf-dk/goeleven/src/goeleven
 # github.com/wayf-dk/gosaml v0.0.0-20200814223902-c82a90a196e3 => ../gosaml
 ## explicit
 github.com/wayf-dk/gosaml
-# github.com/wayf-dk/goxml v0.0.0-20200814223832-adc46d6f7b13 => ../goxml
+# github.com/wayf-dk/goxml v0.0.0-20201218125345-b1a8c71da4f0 => ../goxml
 ## explicit
 github.com/wayf-dk/goxml
 # github.com/wayf-dk/lmdq v0.0.0-20200814231607-c2ca41543d75 => ../lmdq
