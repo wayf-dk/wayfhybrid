@@ -954,8 +954,10 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 	request.QueryDashP(nil, "/samlp:AuthnRequest/@ID", sRequest.RequestID, nil)
 	//request.QueryDashP(nil, "./@Destination", sRequest.De, nil)
 
-	acs := spMd.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@Binding="`+gosaml.POST+`" and @index=`+strconv.Quote(sRequest.AssertionConsumerIndex)+`]/@Location`)
+	acs := spMd.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@index=`+strconv.Quote(sRequest.AssertionConsumerIndex)+`]/@Location`)
+	binding := spMd.Query1(nil, `./md:SPSSODescriptor/md:AssertionConsumerService[@index=`+strconv.Quote(sRequest.AssertionConsumerIndex)+`]/@Binding`)
 	request.QueryDashP(nil, "./@AssertionConsumerServiceURL", acs, nil)
+	request.QueryDashP(nil, "./@ProtocolBinding", binding, nil)
 	request.QueryDashP(nil, "./saml:Issuer", sRequest.SP, nil)
 	request.QueryDashP(nil, "./samlp:NameIDPolicy/@Format", gosaml.NameIDList[sRequest.NameIDFormat], nil)
 	return
@@ -987,6 +989,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	signingMethod := gosaml.DebugSettingWithDefault(r, "spSigAlg", spMd.Query1(nil, xprefix+"SigningMethod"))
+	protocolBinding := request.Query1(nil, "@ProtocolBinding")
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
@@ -1041,13 +1044,13 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:Conditions/@NotOnOrAfter", issueInstant.Add(ad).Format(gosaml.XsDateTime), nil)
 		}
 
+		// record SLO info before converting SAML2 response to other formats
+		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole, sRequest.Protocol)
+
 		elementsToSign := config.ElementsToSign
 		if spMd.QueryXMLBool(nil, xprefix+"saml20.sign.response") {
 			elementsToSign = []string{"/samlp:Response"}
 		}
-
-		// record SLO info before converting SAML2 response to other formats
-		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole, sRequest.Protocol)
 
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
 		signingType := gosaml.SAMLSign
@@ -1059,10 +1062,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
 		}
 
-		for _, q := range elementsToSign {
-			err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
-			if err != nil {
-				return err
+		if protocolBinding != gosaml.SIMPLESIGN { // always sign - unless SIMPLESIGN is explicit chosen
+			for _, q := range elementsToSign {
+				err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -1098,12 +1103,37 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	gosaml.DumpFileIfTracing(r, newresponse)
 
 	var samlResponse string
+	sigAlg := goxml.Algos[signingMethod].Signature
+	var signature []byte
+	responseXML := newresponse.Dump()
+
+	if protocolBinding == gosaml.SIMPLESIGN {
+		signed := "SAMLResponse=" + string(responseXML)
+		if relayState != "" {
+			signed += "&RelayState=" + relayState
+		}
+		signed += "&SigAlg=" + sigAlg
+		privatekey, _, err := gosaml.GetPrivateKey(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
+		if err != nil {
+			return err
+		}
+		signature, err = goxml.Sign(goxml.Hash(goxml.Algos[signingMethod].Algo, signed), privatekey, []byte("-"), signingMethod)
+		if err != nil {
+			return err
+		}
+		if gosaml.DebugSetting(r, "signingError") == "1" {
+			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
+		}
+	}
+
 	if sRequest.Protocol == "wsfed" {
 		samlResponse = string(newresponse.Dump())
 	} else {
 		samlResponse = base64.StdEncoding.EncodeToString(newresponse.Dump())
 	}
-	data := gosaml.Formdata{WsFed: sRequest.Protocol == "wsfed", Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"), Samlresponse: samlResponse, RelayState: relayState, Ard: template.JS(ardjson)}
+
+	data := gosaml.Formdata{WsFed: sRequest.Protocol == "wsfed", Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"),
+		Samlresponse: samlResponse, RelayState: relayState, Signature: base64.RawURLEncoding.EncodeToString(signature), SigAlg: sigAlg, Ard: template.JS(ardjson)}
 	return tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
 }
 
