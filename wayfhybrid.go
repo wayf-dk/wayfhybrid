@@ -429,7 +429,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	type testSPFormData struct {
 		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP string
-		Messages                                                                   string
+		Messages, Marshalled                                                       string
 		AttrValues, DebugValues                                                    []attrValue
 	}
 
@@ -438,6 +438,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	idp := r.Form.Get("idpentityid") + r.Form.Get("entityID")
 	idpList := r.Form.Get("idplist")
 	login := r.Form.Get("login") == "1"
+	scoping := r.Form.Get("scoping")
 
 	if login || idp != "" || idpList != "" {
 
@@ -446,7 +447,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		if idp == "" {
+		if scoping == "" {
 			data := url.Values{}
 			data.Set("return", "https://"+r.Host+r.RequestURI)
 			data.Set("returnIDParam", "idpentityid")
@@ -458,19 +459,19 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
 
 		scopedIDP := r.Form.Get("scopedidp") + r.Form.Get("entityID")
-		scoping := []string{}
-		if r.Form.Get("scoping") == "scoping" {
-			scoping = strings.Split(scopedIDP, ",")
+		scopes := []string{}
+		if scoping == "scoping" {
+			scopes = strings.Split(scopedIDP, ",")
 		}
 
-		if r.Form.Get("scoping") == "birk" {
+		if scoping == "birk" {
 			idpMd, err = md.ExternalIDP.MDQ(scopedIDP)
 			if err != nil {
 				return err
 			}
 		}
 
-		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scoping, "", false, 0, 0)
+		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scopes, "", false, 0, 0)
 
 		options := []struct{ name, path, value string }{
 			{"isPassive", "./@IsPassive", "true"},
@@ -509,11 +510,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return nil
 	} else if r.Form.Get("logout") == "1" || r.Form.Get("logoutresponse") == "1" {
-		spMd, _, err := gosaml.FindInMetadataSets(gosaml.MdSets{md.Internal, md.ExternalSP}, r.Form.Get("destination"))
+		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, r.Form.Get("destination"))
 		if err != nil {
 			return err
 		}
-		idpMd, _, err := gosaml.FindInMetadataSets(gosaml.MdSets{md.Hub, md.ExternalIDP}, r.Form.Get("issuer"))
+		idpMd, _, err := gosaml.FindInMetadataSets(hubExtIDP, r.Form.Get("issuer"))
 		if err != nil {
 			return err
 		}
