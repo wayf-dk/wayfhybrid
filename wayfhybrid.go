@@ -16,16 +16,15 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"reflect"
 	"regexp"
 	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
 
-	toml "github.com/pelletier/go-toml"
+	"x.config"
 	"github.com/wayf-dk/godiscoveryservice"
-	"github.com/wayf-dk/goeleven/src/goeleven"
+	"github.com/wayf-dk/goeleven"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lmdq"
@@ -52,37 +51,9 @@ type (
 		db, table string
 	}
 
-	goElevenConfig struct {
-		Hsmlib       string
-		Usertype     string
-		Serialnumber string
-		Slot         string
-		SlotPassword string
-		KeyLabel     string
-		Maxsessions  string
-	}
-
-	Conf struct {
-		DiscoveryService                                                                         string
-		Domain                                                                                   string
-		HubEntityID                                                                              string
-		EptidSalt                                                                                string
-		SecureCookieHashKey                                                                      string
-		Intf, SsoService, HTTPSKey, HTTPSCert, Acs, Vvpmss                                       string
-		Birk, Krib, Dsbackend, Dstiming, Public, Discopublicpath, Discometadata, Discospmetadata string
-		TestSP, TestSPAcs, TestSPSlo, TestSP2, TestSP2Acs, TestSP2Slo, MDQ                       string
-		NemloginAcs, CertPath, SamlSchema, ConsentAsAService                                     string
-		Idpslo, Birkslo, Spslo, Kribslo, Nemloginslo, Saml2jwt, Jwt2saml, SaltForHashedEppn      string
-		Oauth                                                                                    string
-		ElementsToSign                                                                           []string
-		NotFoundRoutes                                                                           []string
-		Hub, Internal, ExternalIDP, ExternalSP                                                   struct{ Path, Table string }
-		MetadataFeeds                                                                            []struct{ Path, URL string }
-		GoEleven                                                                                 goElevenConfig
-	}
-
 	logWriter struct {
 	}
+
 	// AttributeReleaseData - for the attributerelease template
 	AttributeReleaseData struct {
 		Values             map[string][]string
@@ -99,6 +70,7 @@ type (
 		ForceConfirmation  bool
 		ConsentAsAService  string
 	}
+
 	// HybridSession - for session handling - pt. only cookies
 	HybridSession interface {
 		Set(http.ResponseWriter, *http.Request, string, []byte) error
@@ -106,6 +78,7 @@ type (
 		Del(http.ResponseWriter, *http.Request, string) error
 		GetDel(http.ResponseWriter, *http.Request, string) ([]byte, error)
 	}
+
 	// MdSets - the available metadata sets
 	mdSets struct {
 		Hub, Internal, ExternalIDP, ExternalSP *lmdq.MDQ
@@ -133,8 +106,6 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	config = Conf{}
-
 	allowedInFeds                       = regexp.MustCompile("[^\\w\\.-]")
 	scoped                              = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])$`)
 	dkcprpreg                           = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
@@ -160,40 +131,16 @@ var (
 // Main - start the hybrid
 func Main() {
 	log.SetFlags(0) // no predefined time
+
 	//log.SetOutput(new(logWriter))
 	hostName, _ = os.Hostname()
 
 	bypassMdUpdate := flag.Bool("nomd", false, "bypass MD update at start")
 	flag.Parse()
-	path := Env("WAYF_PATH", "/opt/wayf/")
 
-	tomlConfig, err := toml.LoadFile(path + "hybrid-config/hybrid-config.toml")
+	goeleven.Init(config.GoElevenHybrid)
 
-	if err != nil { // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %s", err))
-	}
-	err = tomlConfig.Unmarshal(&config)
-	if err != nil {
-		panic(fmt.Errorf("fatal error %s", err))
-	}
-
-	overrideConfig(&config, []string{"EptidSalt"})
-	overrideConfig(&config.GoEleven, []string{"SlotPassword"})
-
-	if config.GoEleven.SlotPassword != "" {
-		c := config.GoEleven
-		goeleven.LibraryInit(map[string]string{
-			"GOELEVEN_HSMLIB":        c.Hsmlib,
-			"GOELEVEN_USERTYPE":      c.Usertype,
-			"GOELEVEN_SERIALNUMBER":  c.Serialnumber,
-			"GOELEVEN_SLOT":          c.Slot,
-			"GOELEVEN_SLOT_PASSWORD": c.SlotPassword,
-			"GOELEVEN_KEY_LABEL":     c.KeyLabel,
-			"GOELEVEN_MAXSESSIONS":   c.Maxsessions,
-		})
-	}
-
-	tmpl = template.Must(template.ParseFiles(path + "hybrid-config/templates/hybrid.tmpl"))
+	tmpl = template.Must(template.New("name").Parse(config.HybridTmpl))
 	gosaml.PostForm = tmpl
 
 	metadataUpdateGuard = make(chan int, 1)
@@ -228,16 +175,6 @@ func Main() {
 		m.revmd = webMdMap[md.Rev].md
 	}
 
-	godiscoveryservice.Config = godiscoveryservice.Conf{
-		DiscoMetaData: config.Discometadata,
-		SpMetaData:    config.Discospmetadata,
-	}
-
-	gosaml.Config = gosaml.Conf{
-		SamlSchema: config.SamlSchema,
-		CertPath:   config.CertPath,
-	}
-
 	hashKey, _ := hex.DecodeString(config.SecureCookieHashKey)
 	authnRequestCookie = &gosaml.Hm{authnRequestTTL, sha256.New, hashKey}
 	gosaml.AuthnRequestCookie = authnRequestCookie
@@ -267,7 +204,7 @@ func Main() {
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 
-	fs := http.FileServer(http.Dir(config.Discopublicpath))
+	fs := http.FileServer(http.FS(config.PublicFiles))
 	f := func(w http.ResponseWriter, r *http.Request) (err error) {
 		fs.ServeHTTP(w, r)
 		return
@@ -312,23 +249,6 @@ func Main() {
 	}()
 
 	<-finish
-}
-
-func Env(name, defaultvalue string) string {
-	if val, ok := os.LookupEnv(name); ok {
-		return val
-	}
-	return defaultvalue
-}
-
-func overrideConfig(config interface{}, envvars []string) {
-	for _, k := range envvars {
-		envvar := strings.ToUpper("WAYF_" + k)
-		log.Println(envvar)
-		if val, ok := os.LookupEnv(envvar); ok {
-			reflect.ValueOf(config).Elem().FieldByName(k).Set(reflect.ValueOf(val))
-		}
-	}
 }
 
 func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
