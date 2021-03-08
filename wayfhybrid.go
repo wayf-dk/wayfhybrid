@@ -190,7 +190,6 @@ func Main() {
 	//httpMux.Handle("/pprof", appHandler(PProf))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
-	httpMux.Handle(config.Oauth, appHandler(SSOService))
 	httpMux.Handle(config.Idpslo, appHandler(IDPSLOService))
 	httpMux.Handle(config.Birkslo, appHandler(BirkSLOService))
 	httpMux.Handle(config.Spslo, appHandler(SPSLOService))
@@ -997,67 +996,6 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		newresponse.QueryDashP(nameidElement, "@Format", nameidformat, nil)
 		newresponse.QueryDashP(nameidElement, ".", nameid, nil)
-
-		if sRequest.Protocol == "oauth" {
-			/* 	payload := map[string]interface{}{}
-			payload["aud"] = newresponse.Query1(nil, "//saml:Audience")
-			payload["iss"] = newresponse.Query1(nil, "./saml:Issuer")
-			payload["iat"] = gosaml.SamlTime2JwtTime(newresponse.Query1(nil, "./@IssueInstant"))
-			payload["exp"] = gosaml.SamlTime2JwtTime(newresponse.Query1(nil, "//@SessionNotOnOrAfter"))
-			payload["sub"] = newresponse.Query1(nil, "//saml:NameID")
-			payload["appid"] = newresponse.Query1(nil, "./saml:Issuer")
-			payload["apptype"] = "Public"
-			payload["authmethod"] = newresponse.Query1(nil, "//saml:AuthnContextClassRef")
-			payload["auth_time"] = newresponse.Query1(nil, "//@AuthnInstant")
-			payload["ver"] = "1.0"
-			payload["scp"] = "openid profile"
-			for _, attr := range newresponse.Query(nil, "//saml:Attribute") {
-				payload[newresponse.Query1(attr, "@Name")] = newresponse.QueryMulti(attr, "./saml:AttributeValue")
-			}
-
-			privatekey, _, err := gosaml.GetPrivateKey(virtualIDPMd, "md:IDPSSODescriptor"+SigningCertQuery)
-			if err != nil {
-				return err
-			}
-
-			body, err := json.Marshal(payload)
-			if err != nil {
-				return err
-			}
-			privatekey = []byte("8Bw5iJEpH2XaD7Bw2H3iPsRhISBsQ3IipFko8YJ6vIiq4e27SKTDa7MAnrP5PwjT")
-			accessToken, atHash, err := gosaml.JwtSign(body, privatekey, "HS256")
-			if err != nil {
-				return err
-			}
-
-			payload["nonce"] = sRequest.RequestID
-			payload["at_hash"] = atHash
-			body, err = json.Marshal(payload)
-			if err != nil {
-				return err
-			}
-
-			idToken, _, err := gosaml.JwtSign(body, privatekey, "HS256")
-			if err != nil {
-				return err
-			}
-
-			u := url.Values{}
-			// do not use a parametername that sorts before access_token !!!
-
-			//u.Set("access_token", accessToken)
-			//u.Set("id_token", idToken) */
-			u := url.Values{}
-
-			u.Set("state", relayState)
-			//u.Set("token_type", "bearer")
-			//u.Set("expires_in", "3600")
-			u.Set("scope", "openid group")
-			u.Set("code", "ABCDEFHIJKLMNOPQ")
-			//http.Redirect(w, r, fmt.Sprintf("%s#%s", newresponse.Query1(nil, "@Destination"), u.Encode()), http.StatusFound)
-			http.Redirect(w, r, newresponse.Query1(nil, "@Destination")+"?"+u.Encode(), http.StatusFound)
-			return nil
-		}
 
 		// gosaml.NewResponse only handles simple attr values so .. send correct eptid to eduGAIN entities
 		if spMd.QueryBool(nil, "count("+xprefix+"feds[.='eduGAIN']) > 0") {
