@@ -9,10 +9,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
+	"x.config"
 )
 
 type (
@@ -116,7 +116,7 @@ var (
 		{c14n: "isMemberOf", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"},
 		{c14n: "isMemberOf", name: "isMemberOf"},
 		{c14n: "isMemberOf", name: "urn:oid:1.3.6.1.4.1.5923.1.5.1.1"},
-        {c14n: "mail", name: "emailaddress"},
+		{c14n: "mail", name: "emailaddress"},
 		{c14n: "mail", name: "mail"},
 		{c14n: "mail", name: "urn:oid:0.9.2342.19200300.100.1.3"},
 		{c14n: "mobile", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"},
@@ -370,14 +370,14 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				*v = values[attr][0]
 			}
 		case "norEduPersonNIN":
-		    if *v == "" {
-		        spuid := values["schacPersonalUniqueID"][0]
-                const prefix = "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"
-	            i := strings.LastIndex(spuid, prefix)
-                if i == 0 {
-                    *v = spuid[len(prefix):]
-                }
-		    }
+			if *v == "" {
+				spuid := values["schacPersonalUniqueID"][0]
+				const prefix = "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"
+				i := strings.LastIndex(spuid, prefix)
+				if i == 0 {
+					*v = spuid[len(prefix):]
+				}
+			}
 		}
 	}
 }
@@ -487,7 +487,7 @@ func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues 
 	if nl := spMd.Query(nil, xprefix+`ValueFilter`); len(nl) > 0 {
 		spValues = nl[0]
 	}
-	if nl := idpMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 {  // sp specific filters for an IdP
+	if nl := idpMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 { // sp specific filters for an IdP
 		idpValues = nl[0]
 	} else if nl := idpMd.Query(nil, xprefix+`ValueFilter[not(@ServiceProvider)]`); len(nl) > 0 { // default filters for an IdP - only if no sp specific filters are present
 		idpValues = nl[0]
@@ -580,7 +580,7 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 		case "regexp":
 			reg = val
 		default:
-		    reg = "^"+strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1)+"$"
+			reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
 		}
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
