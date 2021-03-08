@@ -613,8 +613,8 @@ func attributeValues(response, destinationMd, hubMd *goxml.Xp) (values []attrVal
 		values = append(values, attrValue{Name: name, FriendlyName: friendlyName, Must: must, Values: attrValues})
 	}
 
-    // Add a delimiter
-    values = append(values, attrValue{Name: "---"})
+	// Add a delimiter
+	values = append(values, attrValue{Name: "---"})
 
 	for _, name := range response.QueryMulti(nil, ".//saml:Attribute/@Name") {
 		if seen[name] {
