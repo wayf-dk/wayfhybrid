@@ -7,7 +7,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.0 // indirect
 	github.com/wayf-dk/go-libxml2 v0.0.0-20200913202138-5af62eb8566b
 	github.com/wayf-dk/godiscoveryservice v0.0.0-20200814223804-6155ba4f0849
-	github.com/wayf-dk/goeleven v0.0.0-20210202123953-25f2feba7c95
+	github.com/wayf-dk/goeleven v0.0.0-20210308204711-8ad7357fdc65
 	github.com/wayf-dk/gosaml v0.0.0-20200814223902-c82a90a196e3
 	github.com/wayf-dk/goxml v0.0.0-20201218125345-b1a8c71da4f0
 	github.com/wayf-dk/lmdq v0.0.0-20200814231607-c2ca41543d75
