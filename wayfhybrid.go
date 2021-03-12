@@ -243,9 +243,6 @@ func Main() {
 	if *config.Test { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
 		log.SetOutput(ioutil.Discard)
 	}
-
-	finish := make(chan bool)
-	<-finish
 }
 
 func (h *slashFix) ServeHTTP(w http.ResponseWriter, r *http.Request) {
