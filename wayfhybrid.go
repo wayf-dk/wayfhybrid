@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"html/template"
 	"io"
@@ -22,12 +21,12 @@ import (
 	"strings"
 	"time"
 
-	"x.config"
 	"github.com/wayf-dk/godiscoveryservice"
 	"github.com/wayf-dk/goeleven"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
 	"github.com/wayf-dk/lmdq"
+	"x.config"
 )
 
 const (
@@ -132,11 +131,7 @@ var (
 func Main() {
 	log.SetFlags(0) // no predefined time
 
-	//log.SetOutput(new(logWriter))
 	hostName, _ = os.Hostname()
-
-	bypassMdUpdate := flag.Bool("nomd", false, "bypass MD update at start")
-	flag.Parse()
 
 	goeleven.Init(config.GoElevenHybrid)
 
@@ -147,17 +142,17 @@ func Main() {
 
 	goxml.Algos[""] = goxml.Algos[defaultDigestAndSignatureAlgorithm]
 
-	md.Hub = &lmdq.MDQ{Path: config.Hub.Path, Table: config.Hub.Table, Rev: config.Hub.Table, Short: "hub"}
-	md.Internal = &lmdq.MDQ{Path: config.Internal.Path, Table: config.Internal.Table, Rev: config.Internal.Table, Short: "int"}
-	md.ExternalIDP = &lmdq.MDQ{Path: config.ExternalIDP.Path, Table: config.ExternalIDP.Table, Rev: config.ExternalSP.Table, Short: "idp"}
-	md.ExternalSP = &lmdq.MDQ{Path: config.ExternalSP.Path, Table: config.ExternalSP.Table, Rev: config.ExternalIDP.Table, Short: "sp"}
+	md.Hub = &lmdq.MDQ{MdDb: config.Hub}
+	md.Internal = &lmdq.MDQ{MdDb: config.Internal}
+	md.ExternalIDP = &lmdq.MDQ{MdDb: config.ExternalIDP}
+	md.ExternalSP = &lmdq.MDQ{MdDb: config.ExternalSP}
 
 	intExtSP = gosaml.MdSets{md.Internal, md.ExternalSP}
 	intExtIDP = gosaml.MdSets{md.Internal, md.ExternalIDP}
 	hubExtIDP = gosaml.MdSets{md.Hub, md.ExternalIDP}
 	hubExtSP = gosaml.MdSets{md.Hub, md.ExternalSP}
 
-	str, err := refreshAllMetadataFeeds(!*bypassMdUpdate)
+	str, err := refreshAllMetadataFeeds(!*config.BypassMdUpdate)
 	log.Printf("refreshAllMetadataFeeds: %s %v\n", str, err)
 
 	webMdMap = make(map[string]webMd)
@@ -187,7 +182,6 @@ func Main() {
 	}
 
 	httpMux.Handle("/production", appHandler(OkService))
-	//httpMux.Handle("/pprof", appHandler(PProf))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
 	httpMux.Handle(config.Idpslo, appHandler(IDPSLOService))
@@ -225,10 +219,8 @@ func Main() {
 	httpMux.Handle(config.TestSP2Acs, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
 
-	finish := make(chan bool)
-
+	log.Println("listening on ", config.Intf)
 	go func() {
-		log.Println("listening on ", config.Intf)
 		err = http.ListenAndServeTLS(config.Intf, config.HTTPSCert, config.HTTPSKey, &slashFix{httpMux})
 		if err != nil {
 			log.Printf("main(): %s\n", err)
@@ -238,15 +230,21 @@ func Main() {
 	mdUpdateMux := http.NewServeMux()
 	mdUpdateMux.Handle("/", appHandler(updateMetadataService)) // need a root "/" for routing
 
+	intf := regexp.MustCompile(`^(.*:).*$`).ReplaceAllString(config.Intf, "$1") + "9000"
+	log.Println("listening on ", intf)
 	go func() {
-		intf := regexp.MustCompile(`^(.*:).*$`).ReplaceAllString(config.Intf, "$1") + "9000"
-		log.Println("listening on ", intf)
 		err = http.ListenAndServe(intf, mdUpdateMux)
 		if err != nil {
 			log.Printf("main(): %s\n", err)
 		}
+
 	}()
 
+	if *config.Test { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
+		log.SetOutput(ioutil.Discard)
+	}
+
+	finish := make(chan bool)
 	<-finish
 }
 
