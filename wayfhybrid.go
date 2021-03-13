@@ -3,6 +3,7 @@ package wayfhybrid
 import (
 	"crypto"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -129,7 +130,7 @@ var (
 
 // Main - start the hybrid
 func Main() {
-	log.SetFlags(0) // no predefined time
+	//log.SetFlags(0) // no predefined time
 
 	hostName, _ = os.Hostname()
 
@@ -221,7 +222,16 @@ func Main() {
 
 	log.Println("listening on ", config.Intf)
 	go func() {
-		err = http.ListenAndServeTLS(config.Intf, config.HTTPSCert, config.HTTPSKey, &slashFix{httpMux})
+		cert, _ := tls.X509KeyPair(config.ServerCrt, config.ServerKey)
+		s := &http.Server{
+			Addr:    config.Intf,
+			Handler: httpMux,
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{cert},
+			},
+		}
+
+		err = s.ListenAndServeTLS("", "")
 		if err != nil {
 			log.Printf("main(): %s\n", err)
 		}
