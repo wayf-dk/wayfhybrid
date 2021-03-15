@@ -225,7 +225,7 @@ func Main() {
 		cert, _ := tls.X509KeyPair(config.ServerCrt, config.ServerKey)
 		s := &http.Server{
 			Addr:    config.Intf,
-			Handler: httpMux,
+			Handler: &slashFix{httpMux},
 			TLSConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 			},
