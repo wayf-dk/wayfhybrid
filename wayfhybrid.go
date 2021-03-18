@@ -247,7 +247,6 @@ func Main() {
 		if err != nil {
 			log.Printf("main(): %s\n", err)
 		}
-
 	}()
 
 	if *config.Test { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
