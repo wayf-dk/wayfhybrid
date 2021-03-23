@@ -2,6 +2,7 @@ package wayfhybrid
 
 import (
 	"crypto"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
@@ -140,8 +141,6 @@ func Main() {
 	gosaml.PostForm = tmpl
 
 	metadataUpdateGuard = make(chan int, 1)
-
-	goxml.Algos[""] = goxml.Algos[defaultDigestAndSignatureAlgorithm]
 
 	md.Hub = &lmdq.MDQ{MdDb: config.Hub}
 	md.Internal = &lmdq.MDQ{MdDb: config.Internal}
@@ -451,7 +450,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-		if scoping == "" {
+		if scoping == "" && idp == "" {
 			data := url.Values{}
 			data.Set("return", "https://"+r.Host+r.RequestURI)
 			data.Set("returnIDParam", "idpentityid")
@@ -489,7 +488,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", "")
+		u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", config.DefaultCryptoMethod)
 		if err != nil {
 			return err
 		}
@@ -542,7 +541,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		incomingResponseXML := response.PP()
 		protocol := response.QueryString(nil, "local-name(/*)")
 		if protocol == "Response" {
-			if err := gosaml.CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, issuerMd.QueryMulti(nil, xprefix+"SigningMethod")); err != nil {
+			if err := gosaml.CheckDigestAndSignatureAlgorithms(response); err != nil {
 				return err
 			}
 			hubMd, _ := md.Hub.MDQ(config.HubEntityID)
@@ -892,7 +891,8 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		}
 	}
 
-	algo := gosaml.DebugSettingWithDefault(r, "idpSigAlg", realIDPMd.Query1(nil, xprefix+"SigningMethod"))
+    algo := config.DefaultCryptoMethod
+	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
 	u, err := gosaml.SAMLRequest2URL(newrequest, relayState, string(privatekey), "-", algo)
 	if err != nil {
@@ -988,11 +988,23 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-	if err = gosaml.CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, virtualIDPMd.QueryMulti(nil, xprefix+"SigningMethod")); err != nil {
+	if err = gosaml.CheckDigestAndSignatureAlgorithms(response); err != nil {
 		return
 	}
 
-	signingMethod := gosaml.DebugSettingWithDefault(r, "spSigAlg", spMd.Query1(nil, xprefix+"SigningMethod"))
+    signingMethod := config.DefaultCryptoMethod
+    signingMethods := spMd.QueryMulti(nil, "./md:SPSSODescriptor/md:Extensions/alg:SigningMethod/@Algorithm")
+    signingMethods = append(signingMethods, spMd.QueryMulti(nil, "./md:Extensions/alg:SigningMethod/@Algorithm")...)
+    found:
+    for _, preferredMethod := range signingMethods {
+        for signingMethod, _ = range config.CryptoMethods {
+            if preferredMethod == config.CryptoMethods[signingMethod].SigningMethod {
+                break found
+            }
+        }
+    }
+
+	signingMethod = gosaml.DebugSettingWithDefault(r, "spSigAlg", signingMethod)
 	protocolBinding := request.Query1(nil, "@ProtocolBinding")
 
 	var newresponse *goxml.Xp
@@ -1084,7 +1096,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
 			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
 			assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-			newresponse.Encrypt(assertion, publicKey)
+			newresponse.Encrypt(assertion, publicKey.(*rsa.PublicKey))
 		}
 	} else {
 		newresponse = gosaml.NewErrorResponse(hubBirkIDPMd, spMd, request, response)
@@ -1107,7 +1119,7 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	gosaml.DumpFileIfTracing(r, newresponse)
 
 	var samlResponse string
-	sigAlg := goxml.Algos[signingMethod].Signature
+	sigAlg := config.CryptoMethods[signingMethod].SigningMethod
 	var signature []byte
 	responseXML := newresponse.Dump()
 
@@ -1117,11 +1129,12 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 			signed += "&RelayState=" + relayState
 		}
 		signed += "&SigAlg=" + sigAlg
-		privatekey, _, err := gosaml.GetPrivateKey(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
+		privatekey, _, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, config.CryptoMethods[signingMethod].Type)
 		if err != nil {
 			return err
 		}
-		signature, err = goxml.Sign(goxml.Hash(goxml.Algos[signingMethod].Algo, signed), privatekey, []byte("-"), signingMethod)
+		digest := goxml.Hash(config.CryptoMethods[signingMethod].Hash, signed)
+		signature, err = goxml.Sign(digest, privatekey, []byte("-"), signingMethod)
 		if err != nil {
 			return err
 		}
@@ -1167,7 +1180,7 @@ func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
-	return gosaml.Saml2jwt(w, r, md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP, RequestHandler, config.HubEntityID, allowedDigestAndSignatureAlgorithms, xprefix+"SigningMethod")
+	return gosaml.Saml2jwt(w, r, md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP, RequestHandler, config.HubEntityID)
 }
 
 // SLOService refers to single logout service. Takes request and issuer and destination metadata sets, role refers to if it as IDP or SP.
@@ -1228,12 +1241,12 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
 
 	privatekey, _, err := gosaml.GetPrivateKey(issMD, gosaml.Roles[(role+1)%2]+gosaml.SigningCertQuery)
-
 	if err != nil {
 		return err
 	}
 
-	algo := gosaml.DebugSettingWithDefault(r, "idpSigAlg", destMD.Query1(nil, xprefix+"SigningMethod"))
+    algo := config.DefaultCryptoMethod
+	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
 	switch binding {
 	case gosaml.REDIRECT:
