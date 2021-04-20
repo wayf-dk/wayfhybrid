@@ -1,0 +1,68 @@
+intf =          "0.0.0.0:443"
+httpskey =     "/etc/ssl/wayf/https/wildcard.wayf.dk.key"
+httpscert =    "/etc/ssl/wayf/https/wildcard.wayf.dk.pem"
+ssoservice =   "wayf.wayf.dk/saml2/idp/SSOService2.php"
+Oauth =         "wayf.wayf.dk/oauth"
+acs =           "wayf.wayf.dk/module.php/saml/sp/saml2-acs.php/wayf.wayf.dk"
+nemloginacs =   "nemlogin.wayf.dk/module.php/saml/sp/saml2-acs.php/nemlogin.wayf.dk"
+spslo =         "wayf.wayf.dk/module.php/saml/sp/saml2-logout.php/wayf.wayf.dk"
+vvpmss =        "wayf.wayf.dk/vvpmss"
+saml2jwt =      "wayf.wayf.dk/saml2jwt"
+jwt2saml =      "wayf.wayf.dk/jwt2saml"
+MDQ      =      "wayf.wayf.dk/MDQ/"
+nemloginslo =   "nemlogin.wayf.dk/module.php/saml/sp/saml2-logout.php/nemlogin.wayf.dk"
+idpslo =        "wayf.wayf.dk/saml2/idp/SingleLogoutService.php"
+birkslo =       "birk.wayf.dk/SLO/"
+kribslo =       "krib.wayf.dk/SLO/"
+birk =          "birk.wayf.dk/"
+krib =          "krib.wayf.dk/"
+dsbackend =     "wayf.wayf.dk/dsbackend"
+dstiming =      "wayf.wayf.dk/dstiming"
+public =        "/"
+discopublicpath = "/opt/wayf/hybrid-config/public/"
+discometadata   = "file:/opt/wayf/hybrid-metadata.mddb?mode=ro"
+discospmetadata = "file:/opt/wayf/hybrid-metadata.mddb?mode=ro"
+
+NotFoundRoutes = [
+    "favicon.ico",
+]
+
+Hub = {Path = "file:/opt/wayf/hybrid-metadata.mddb?mode=ro", Table = "HYBRID_HUB"}
+Internal = {Path = "file:/opt/wayf/hybrid-metadata.mddb?mode=ro", Table = "HYBRID_INTERNAL"}
+ExternalIDP = {Path = "file:/opt/wayf/hybrid-metadata.mddb?mode=ro", Table = "HYBRID_EXTERNAL_IDP"}
+ExternalSP = {Path = "file:/opt/wayf/hybrid-metadata.mddb?mode=ro", Table = "HYBRID_EXTERNAL_SP"}
+
+MetadataFeeds = [
+    {Path = "/opt/wayf/hybrid-metadata.mddb", URL = "https://phph.wayf.dk/md/hybrid-metadata.mddb"},
+]
+
+testsp2 =             "wayfsp2.wayf.dk"
+testsp2acs =          "wayfsp2.wayf.dk/ACS"
+testsp2slo =          "wayfsp2.wayf.dk/SLO"
+testsp =              "wayfsp.wayf.dk"
+testspacs =           "wayfsp.wayf.dk/ACS"
+testspslo =           "wayfsp.wayf.dk/SLO"
+
+saltforhashedeppn = "just testing for now"
+certpath = "/opt/wayf/hybrid-config/signing/"
+samlschema = "/opt/wayf/hybrid-config/schemas/saml-schema-protocol-2.0.xsd"
+
+discoveryservice =  "https://wayf.wayf.dk/ds/?"
+domain =            "wayf.dk"
+hubentityid =       "https://wayf.wayf.dk"
+#eptidsalt = "6xfkhc7juin4vlbetmmc0eyxumelnoku"
+eptidsalt = "jd2s6mkitweyw3fbb9hovqglxemp35es"
+securecookiehashkey = "144dfe890f9b155c06b8d464c38b192b844734c7de8d58b1b7325ab27f09627c"
+
+elementstosign = [
+    "/samlp:Response/saml:Assertion",
+]
+
+goeleven = {
+    hsmlib = "/usr/safenet/lunaclient/lib/libCryptoki2_64.so",
+    usertype = "crypto_officer",
+    serialnumber = "1467475059",
+    slot = "wayfha",
+    slotpassword = "qdisbdYANIGXtyn1NEVQpA}D4yJrvnjLGhZyLudGCHBPMpLPKrTRQBAuaoFHAICG",
+    keylabel = "wayf.2016.key:zzzzzzzzzzzz,VOCES_gyldig.key:zzzzzzzzzzzz,wildcard.wayf.dk.key:xxxxxxxxxxxxxxx,wildcard.test.lan.key:xxxxxxxxxxxxxxx",
+    maxsessions = "20"}

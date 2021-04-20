@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <body>
+  </body>
+  <script>
+    var loc = window.location.href
+    if (loc.match(/ds\.wayf\.dk\//)) {
+        loc = loc.replace(/ds\.wayf\.dk\//, 'wayf.wayf.dk/ds/')
+    } else {
+        loc = 'https://wayf.wayf.dk/my/'
+    }
+    window.location = loc
+  </script>
+</html>

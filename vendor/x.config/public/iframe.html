@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<script>
+	    var port2
+		function msg2(ev) {
+		    console.log("iframe ch", ev.data, ev);
+		    port2.postMessage({deg: ev.data.xyz+" zyz"})
+		}
+		function msg (ev) {
+            port2 = ev.ports[0];
+            port2.onmessage = msg2;
+			console.log('iframe msg', ev.data, ev)
+			ev.source.postMessage({abc: ev.data.abc+" abc"}, '*');
+		}
+		window.addEventListener("message", msg, false);
+	</script>
+</head>
+
+<body>
+</body>
+</html>
+
