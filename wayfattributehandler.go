@@ -336,12 +336,14 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if values[atd.c14n][0] == "" {
 				values[atd.c14n] = values[atd.c14n][1:]
 			}
-			for _, epa := range values["eduPersonAffiliation"] {
-				if epa == "" {
-					continue
+			if values["securitydomain"][0] != "" {
+				for _, epa := range values["eduPersonAffiliation"] {
+					if epa == "" {
+						continue
+					}
+					values[atd.c14n] = append(values[atd.c14n], epa+"@"+values["securitydomain"][0])
+					values[atd.c14n] = unique(values[atd.c14n])
 				}
-				values[atd.c14n] = append(values[atd.c14n], epa+"@"+values["securitydomain"][0])
-				values[atd.c14n] = unique(values[atd.c14n])
 			}
 		case "persistent":
 			*v = msg.Query1(nil, "./saml:Assertion/saml:Subject/saml:NameID[@Format='urn:oasis:names:tc:SAML:2.0:nameid-format:persistent']")
