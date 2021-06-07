@@ -1035,7 +1035,7 @@ found:
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", virtualIDPMd.Query1(nil, "@entityID"), nil)
 		}
 
-		ard.Values, ard.Hash = CopyAttributes(response, newresponse, idpMd, spMd)
+		ard.Values, ard.Hash = CopyAttributes(response, newresponse, virtualIDPMd, spMd)
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
