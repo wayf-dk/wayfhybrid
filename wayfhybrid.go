@@ -891,7 +891,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		}
 	}
 
-    algo := config.DefaultCryptoMethod
+	algo := config.DefaultCryptoMethod
 	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
 	u, err := gosaml.SAMLRequest2URL(newrequest, relayState, string(privatekey), "-", algo)
@@ -992,17 +992,17 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    signingMethod := config.DefaultCryptoMethod
-    signingMethods := spMd.QueryMulti(nil, "./md:SPSSODescriptor/md:Extensions/alg:SigningMethod/@Algorithm")
-    signingMethods = append(signingMethods, spMd.QueryMulti(nil, "./md:Extensions/alg:SigningMethod/@Algorithm")...)
-    found:
-    for _, preferredMethod := range signingMethods {
-        for signingMethod, _ = range config.CryptoMethods {
-            if preferredMethod == config.CryptoMethods[signingMethod].SigningMethod {
-                break found
-            }
-        }
-    }
+	signingMethod := config.DefaultCryptoMethod
+	signingMethods := spMd.QueryMulti(nil, "./md:SPSSODescriptor/md:Extensions/alg:SigningMethod/@Algorithm")
+	signingMethods = append(signingMethods, spMd.QueryMulti(nil, "./md:Extensions/alg:SigningMethod/@Algorithm")...)
+found:
+	for _, preferredMethod := range signingMethods {
+		for signingMethod, _ = range config.CryptoMethods {
+			if preferredMethod == config.CryptoMethods[signingMethod].SigningMethod {
+				break found
+			}
+		}
+	}
 
 	signingMethod = gosaml.DebugSettingWithDefault(r, "spSigAlg", signingMethod)
 	protocolBinding := request.Query1(nil, "@ProtocolBinding")
@@ -1245,7 +1245,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		return err
 	}
 
-    algo := config.DefaultCryptoMethod
+	algo := config.DefaultCryptoMethod
 	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
 	switch binding {
