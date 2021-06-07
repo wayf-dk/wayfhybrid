@@ -598,12 +598,12 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 			reg = "^" + regexp.QuoteMeta(val)
 		case "postfix":
 			reg = regexp.QuoteMeta(val) + "$"
-		case "wildcard":
+		case "wildcard", "":
 			reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
 		case "regexp":
 			reg = val
 		default:
-			reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
+			reg = "^$"
 		}
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
