@@ -1144,9 +1144,9 @@ found:
 	}
 
 	if sRequest.Protocol == "wsfed" {
-		samlResponse = string(newresponse.Dump())
+		samlResponse = string(responseXML)
 	} else {
-		samlResponse = base64.StdEncoding.EncodeToString(newresponse.Dump())
+		samlResponse = base64.StdEncoding.EncodeToString(responseXML)
 	}
 
 	data := gosaml.Formdata{WsFed: sRequest.Protocol == "wsfed", Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"),
