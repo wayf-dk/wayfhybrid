@@ -7,14 +7,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
-	"x.config"
 
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
+	"x.config"
 )
 
 type (
