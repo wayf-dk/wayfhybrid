@@ -235,7 +235,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	}
 
 	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
-	//	gosaml.PP(values)
+	//config.PP(values)
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	for basic, vals := range values {
