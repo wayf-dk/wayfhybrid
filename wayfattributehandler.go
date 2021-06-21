@@ -50,6 +50,8 @@ var (
 		// computed
 		{c14n: "idpPersistentID", op: "xp1:idp://wayf:persistentEntityID | @entityID"},
 		{c14n: "spPersistentID", op: "xp1:sp://wayf:persistentEntityID | @entityID"},
+		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
+		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "hub", op: "eq:Issuer:https://wayf.wayf.dk"},
 		{c14n: "persistent", op: "persistent:"},
 		{c14n: "displayName", op: "displayname:"},
@@ -58,13 +60,9 @@ var (
 		{c14n: "schacHomeOrganization", op: "xp:idp://wayf:wayf_schacHomeOrganization"},
 		{c14n: "schacHomeOrganizationType", op: "xp:idp://wayf:wayf_schacHomeOrganizationType"},
 		{c14n: "sn", op: "sn:"},
-		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
 		{c14n: "pairwise-id", name: "pairwise-id", op: "pairwise-id:"},
-		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
-		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
-		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "eduPersonScopedAffiliation", op: "epsa:"},
 		{c14n: "AuthnContextClassRef", op: "xp:msg://saml:AuthnContextClassRef"},
 		{c14n: "idpID", op: "xp:idp:@entityID"},
@@ -76,6 +74,8 @@ var (
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "val:username-password-protected-transport"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
+		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
+		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
 	}
 
 	requestAttributesBase = []attributeDescription{
