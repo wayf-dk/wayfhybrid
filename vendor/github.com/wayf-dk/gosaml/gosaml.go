@@ -22,6 +22,7 @@ import (
 	"hash"
 	"html/template"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"math"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/goxml"
+	"x.config"
 )
 
 var (
@@ -99,12 +101,6 @@ type (
 	// MdSets slice of Md sets - for searching one MD at at time and remembering the index
 	MdSets []Md
 
-	// Conf refers to Configuration values for Schema and Certificates
-	Conf struct {
-		SamlSchema string
-		CertPath   string
-		LogPath    string
-	}
 	// SLOInfo refers to Single Logout information
 	SLOInfo struct {
 		IDP, SP, NameID, SPNameQualifier, SessionIndex, ID, Protocol string
@@ -142,8 +138,6 @@ var (
 	TestAssertionID string
 	// Roles refers to defining roles for SPs and IDPs
 	Roles = []string{"md:IDPSSODescriptor", "md:SPSSODescriptor"}
-	// Config initialisation
-	Config = Conf{}
 	// ErrorACS refers error information
 	ErrorACS = errors.New("AsssertionConsumerService, AsssertionConsumerServiceIndex, ProtocolBinding combination not found in metadata")
 	// NameIDList list of supported nameid formats
@@ -236,7 +230,7 @@ func GetPrivateKey(md *goxml.Xp, path string) (privatekey []byte, cert string, e
 		return
 	}
 
-	privatekey, err = ioutil.ReadFile(Config.CertPath + keyname + ".key")
+	privatekey, err = fs.ReadFile(config.PrivateKeys, keyname + ".key")
 	if err != nil {
 		err = goxml.Wrap(err)
 		return
@@ -490,11 +484,10 @@ func DecodeSAMLMsg(r *http.Request, issuerMdSets, destinationMdSets MdSets, role
 
 	DumpFileIfTracing(r, tmpXp)
 	//log.Println("stack", goxml.New().Stack(1))
-	errs, err := tmpXp.SchemaValidate(Config.SamlSchema)
+	err = tmpXp.SchemaValidate()
 	if err != nil {
 		dump("raw", bmsg)
 		err = goxml.Wrap(err)
-		fmt.Println(errs)
 		return
 	}
 
@@ -668,7 +661,7 @@ findbinding:
 					}
 
 					// repeat schemacheck
-					_, err = xp.SchemaValidate(Config.SamlSchema)
+					err = xp.SchemaValidate()
 					if err != nil {
 						err = goxml.Wrap(err)
 						err = goxml.PublicError(err.(goxml.Werror), "cause:encryption error") // hide the real problem from attacker
@@ -1169,7 +1162,6 @@ func SignResponse(response *goxml.Xp, elementQuery string, md *goxml.Xp, signing
 	if err != nil {
 		return
 	}
-
 	element := response.Query(nil, elementQuery)
 	if len(element) != 1 {
 		err = errors.New("did not find exactly one element to sign")
@@ -1606,9 +1598,9 @@ func Saml2jwt(w http.ResponseWriter, r *http.Request, mdHub, mdInternal, mdExter
 		switch response.QueryString(nil, "local-name(/*)") {
 		case "Response":
 
-//			if err = CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, idpMd.QueryMulti(nil, signingMethodPath)); err != nil {
-//				return err
-//			}
+			if err = CheckDigestAndSignatureAlgorithms(response, allowedDigestAndSignatureAlgorithms, idpMd.QueryMulti(nil, signingMethodPath)); err != nil {
+				return err
+			}
 			if _, err = requestHandler(response, idpMd, spMd); err != nil {
 				return err
 			}

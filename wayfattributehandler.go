@@ -2,6 +2,7 @@ package wayfhybrid
 
 import (
 	"crypto/sha1"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/wayf-dk/go-libxml2/types"
 	"github.com/wayf-dk/gosaml"
 	"github.com/wayf-dk/goxml"
+	"x.config"
 )
 
 type (
@@ -37,6 +39,7 @@ var (
 
 		// nemlogin computed
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
+		{c14n: "nemlogin", op: "eq:Issuer:https://saml.test-nemlog-in.dk/"},
 		{c14n: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
@@ -44,6 +47,10 @@ var (
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
 
 		// computed
+		{c14n: "idpPersistentID", op: "xp1:idp://wayf:persistentEntityID | @entityID"},
+		{c14n: "spPersistentID", op: "xp1:sp://wayf:persistentEntityID | @entityID"},
+		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
+		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "hub", op: "eq:Issuer:https://wayf.wayf.dk"},
 		{c14n: "persistent", op: "persistent:"},
 		{c14n: "displayName", op: "displayname:"},
@@ -55,8 +62,6 @@ var (
 		{c14n: "pairwise-id", name: "pairwise-id", op: "pairwise-id:"},
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
-		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
-		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "eduPersonScopedAffiliation", op: "epsa:"},
 		{c14n: "AuthnContextClassRef", op: "xp:msg://saml:AuthnContextClassRef"},
 		{c14n: "idpID", op: "xp:idp:@entityID"},
@@ -68,6 +73,8 @@ var (
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "val:username-password-protected-transport"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
+		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
+		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
 	}
 
 	requestAttributesBase = []attributeDescription{
@@ -116,7 +123,7 @@ var (
 		{c14n: "isMemberOf", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"},
 		{c14n: "isMemberOf", name: "isMemberOf"},
 		{c14n: "isMemberOf", name: "urn:oid:1.3.6.1.4.1.5923.1.5.1.1"},
-        {c14n: "mail", name: "emailaddress"},
+		{c14n: "mail", name: "emailaddress"},
 		{c14n: "mail", name: "mail"},
 		{c14n: "mail", name: "urn:oid:0.9.2342.19200300.100.1.3"},
 		{c14n: "mobile", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/mobilephone"},
@@ -137,6 +144,8 @@ var (
 		{c14n: "schacHomeOrganization", name: "urn:oid:1.3.6.1.4.1.25178.1.2.9"},
 		{c14n: "schacHomeOrganizationType", name: "schacHomeOrganizationType"},
 		{c14n: "schacHomeOrganizationType", name: "urn:oid:1.3.6.1.4.1.25178.1.2.10"},
+		{c14n: "schacPersonalUniqueCode", name: "schacPersonalUniqueCode"},
+		{c14n: "schacPersonalUniqueCode", name: "urn:oid:1.3.6.1.4.1.25178.1.2.14"},
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID"},
 		{c14n: "schacPersonalUniqueID", name: "urn:oid:1.3.6.1.4.1.25178.1.2.15"},
 		{c14n: "norEduPersonNIN", name: "norEduPersonNIN"},
@@ -226,6 +235,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	}
 
 	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
+	//config.PP(values)
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	for basic, vals := range values {
@@ -269,6 +279,8 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			values[atd.c14n] = values[opParam[1]]
 		case "val":
 			*v = opParam[1]
+		case "append":
+			values[atd.c14n] = append(values[atd.c14n], values[opParam[1]]...)
 		case "prefix":
 			*v = opParam[1] + *v
 		case "postfix":
@@ -292,6 +304,9 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "xp":
 			opParam = strings.SplitN(opParam[1], ":", 2)
 			values[atd.c14n] = contextMap[opParam[0]].QueryMulti(nil, opParam[1])
+		case "xp1":
+			opParam = strings.SplitN(opParam[1], ":", 2)
+			*v = contextMap[opParam[0]].Query1(nil, opParam[1])
 		case "securitydomain":
 			eppns := values["eduPersonPrincipalName"]
 			if len(eppns) > 0 {
@@ -372,20 +387,30 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				*v = values[attr][0]
 			}
 		case "norEduPersonNIN":
-		    if *v == "" {
-		        spuid := values["schacPersonalUniqueID"][0]
-                const prefix = "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"
-	            i := strings.LastIndex(spuid, prefix)
-                if i == 0 {
-                    *v = spuid[len(prefix):]
-                }
-		    }
+			if *v == "" {
+				spuid := values["schacPersonalUniqueID"][0]
+				const prefix = "urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"
+				i := strings.LastIndex(spuid, prefix)
+				if i == 0 {
+					*v = spuid[len(prefix):]
+				}
+			}
+		case "europeanStudentIdentifier":
+			if idpMd.QueryXMLBool(nil, xprefix+"addESI") {
+				*v = "urn:schac:personalUniqueCode:int:esi:" + values["schacHomeOrganization"][0] + ":" + eptidforaudience(values, "europeanStudentIdentifier")
+			}
 		}
 	}
 }
 
+func eptidforaudience(values map[string][]string, audience string) string {
+	idPSpecificSalt := sha512.Sum512([]byte("IdPSpecificSalt" + config.EptidSalt + values["idpPersistentID"][0]))
+	hash := sha512.Sum512_224([]byte(audience + string(idPSpecificSalt[:]) + values["eduPersonPrincipalName"][0]))
+	return hex.EncodeToString(append(hash[:]))
+}
+
 func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
-	var idp, sp, epid string
+	var epid string
 
 	if epid = values["persistent"][0]; epid == "" {
 		if len(values["eduPersonPrincipalName"]) == 0 {
@@ -399,12 +424,8 @@ func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
 		return ""
 	}
 
-	if idp = idpMd.Query1(nil, xprefix+"persistentEntityID"); idp == "" {
-		idp = idpMd.Query1(nil, "@entityID")
-	}
-	if sp = spMd.Query1(nil, xprefix+"persistentEntityID"); sp == "" {
-		sp = spMd.Query1(nil, "@entityID")
-	}
+	idp := values["idpPersistentID"][0]
+	sp := values["spPersistentID"][0]
 
 	uidhashbase := "uidhashbase" + config.EptidSalt
 	uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
@@ -489,7 +510,7 @@ func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues 
 	if nl := spMd.Query(nil, xprefix+`ValueFilter`); len(nl) > 0 {
 		spValues = nl[0]
 	}
-	if nl := idpMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 {  // sp specific filters for an IdP
+	if nl := idpMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 { // sp specific filters for an IdP
 		idpValues = nl[0]
 	} else if nl := idpMd.Query(nil, xprefix+`ValueFilter[not(@ServiceProvider)]`); len(nl) > 0 { // default filters for an IdP - only if no sp specific filters are present
 		idpValues = nl[0]
@@ -577,12 +598,12 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 			reg = "^" + regexp.QuoteMeta(val)
 		case "postfix":
 			reg = regexp.QuoteMeta(val) + "$"
-		case "wildcard":
+		case "wildcard", "":
 			reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
 		case "regexp":
 			reg = val
 		default:
-		    reg = "^"+strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1)+"$"
+			reg = "^$"
 		}
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
