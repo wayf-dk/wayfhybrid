@@ -412,7 +412,7 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	defer os.Remove(tempmddb.Name())
 
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
 	}
 
 	client := &http.Client{
