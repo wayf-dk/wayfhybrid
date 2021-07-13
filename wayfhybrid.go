@@ -131,7 +131,7 @@ var (
 
 // Main - start the hybrid
 func Main() {
-	//log.SetFlags(0) // no predefined time
+	log.SetFlags(0) // no predefined time
 
 	hostName, _ = os.Hostname()
 
