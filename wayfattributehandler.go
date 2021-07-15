@@ -586,25 +586,7 @@ func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues 
 func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 	regexps = []*regexp.Regexp{}
 	for _, attr := range allowedValues {
-		tp := ""
-		tpAttribute, _ := attr.(types.Element).GetAttribute("type")
-		if tpAttribute != nil {
-			tp = tpAttribute.Value()
-		}
-		val := strings.TrimSpace(attr.NodeValue())
-		var reg string
-		switch tp {
-		case "prefix":
-			reg = "^" + regexp.QuoteMeta(val)
-		case "postfix":
-			reg = regexp.QuoteMeta(val) + "$"
-		case "wildcard", "":
-			reg = "^" + strings.Replace(regexp.QuoteMeta(val), "\\*", ".*", -1) + "$"
-		case "regexp":
-			reg = val
-		default:
-			reg = "^$"
-		}
+		reg := "^" + strings.Replace(regexp.QuoteMeta(strings.TrimSpace(attr.NodeValue())), "\\*", ".*", -1) + "$"
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
 	return
