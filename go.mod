@@ -3,14 +3,12 @@ module github.com/wayf-dk/wayfhybrid
 go 1.16
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/mattn/go-sqlite3 v1.14.0 // indirect
-	github.com/wayf-dk/go-libxml2 v0.0.0-20200913202138-5af62eb8566b
-	github.com/wayf-dk/godiscoveryservice v0.0.0-20200814223804-6155ba4f0849
-	github.com/wayf-dk/goeleven v0.0.0-20210308204711-8ad7357fdc65
-	github.com/wayf-dk/gosaml v0.0.0-20200814223902-c82a90a196e3
-	github.com/wayf-dk/goxml v0.0.0-20201218125345-b1a8c71da4f0
-	github.com/wayf-dk/lmdq v0.0.0-20200814231607-c2ca41543d75
+	github.com/wayf-dk/go-libxml2 v0.0.0-20210308214358-9c9e7b3a8e9c
+	github.com/wayf-dk/godiscoveryservice v0.0.0-20210718204616-d566bc752aa1
+	github.com/wayf-dk/goeleven v0.0.0-20210622080738-31052701ada3
+	github.com/wayf-dk/gosaml v0.0.0-20210625075105-0384b2997a7c
+	github.com/wayf-dk/goxml v0.0.0-20210624110732-3d7665237fff
+	github.com/wayf-dk/lmdq v0.0.0-20210625074409-32dad8c2e27a
 	x.config v0.0.0-00010101000000-000000000000
 )
 
