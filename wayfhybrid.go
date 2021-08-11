@@ -229,7 +229,7 @@ func Main() {
 				Certificates: []tls.Certificate{cert},
 			},
 		}
-
+        s.SetKeepAlivesEnabled(false)
 		err = s.ListenAndServeTLS("", "")
 		if err != nil {
 			log.Printf("main(): %s\n", err)
