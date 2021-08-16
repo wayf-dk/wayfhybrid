@@ -39,7 +39,6 @@ var (
 
 		// nemlogin computed
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
-		{c14n: "nemlogin", op: "eq:Issuer:https://saml.test-nemlog-in.dk/"},
 		{c14n: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
@@ -235,7 +234,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	}
 
 	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
-	//config.PP(values)
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	for basic, vals := range values {
