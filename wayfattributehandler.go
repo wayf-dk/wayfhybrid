@@ -46,8 +46,15 @@ var (
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
 
 		// computed
-		{c14n: "idpPersistentID", op: "xp1:idp://wayf:persistentEntityID | @entityID"},
-		{c14n: "spPersistentID", op: "xp1:sp://wayf:persistentEntityID | @entityID"},
+		{c14n: "idpPersistentID", op: "xp1:idp://wayf:persistentEntityID"},
+		{c14n: "spPersistentID", op: "xp1:sp://wayf:persistentEntityID"},
+		{c14n: "idpID", op: "xp:idp:@entityID"},
+		{c14n: "spID", op: "xp:sp:@entityID"},
+		{c14n: "schacHomeOrganization", op: "xp:idp://wayf:wayf_schacHomeOrganization"},
+		{c14n: "schacHomeOrganizationType", op: "xp:idp://wayf:wayf_schacHomeOrganizationType"},
+		{c14n: "oioCvrNumberIdentifier", op: "xp:idp://wayf:wayf/wayf:oioCvrNumberIdentifier"},
+		{c14n: "idpfeds", op: "xp:idp://wayf:wayf/wayf:feds"},
+		{c14n: "spfeds", op: "xp:sp://wayf:wayf/wayf:feds"},
 		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
 		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "hub", op: "eq:Issuer:https://wayf.wayf.dk"},
@@ -55,20 +62,13 @@ var (
 		{c14n: "displayName", op: "displayname:"},
 		{c14n: "eduPersonTargetedID", op: "eptid:"},
 		{c14n: "gn", op: "gn:"},
-		{c14n: "schacHomeOrganization", op: "xp:idp://wayf:wayf_schacHomeOrganization"},
-		{c14n: "schacHomeOrganizationType", op: "xp:idp://wayf:wayf_schacHomeOrganizationType"},
 		{c14n: "sn", op: "sn:"},
 		{c14n: "pairwise-id", name: "pairwise-id", op: "pairwise-id:"},
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
 		{c14n: "eduPersonScopedAffiliation", op: "epsa:"},
 		{c14n: "AuthnContextClassRef", op: "xp:msg://saml:AuthnContextClassRef"},
-		{c14n: "idpID", op: "xp:idp:@entityID"},
-		{c14n: "spID", op: "xp:sp:@entityID"},
-		{c14n: "idpfeds", op: "xp:idp://wayf:wayf/wayf:feds"},
-		{c14n: "spfeds", op: "xp:sp://wayf:wayf/wayf:feds"},
 		{c14n: "commonfederations", op: "commonfederations:"},
-		{c14n: "oioCvrNumberIdentifier", op: "xp:idp://wayf:wayf/wayf:oioCvrNumberIdentifier"},
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "val:username-password-protected-transport"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
@@ -402,7 +402,11 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 }
 
 func eptidforaudience(values map[string][]string, audience string) string {
-	idPSpecificSalt := sha512.Sum512([]byte("IdPSpecificSalt" + config.EptidSalt + values["idpPersistentID"][0]))
+    idpID := values["idpPersistentID"][0]
+    if idpID == "" {
+        idpID = values["idpID"][0]
+    }
+	idPSpecificSalt := sha512.Sum512([]byte("IdPSpecificSalt" + config.EptidSalt + idpID))
 	hash := sha512.Sum512_224([]byte(audience + string(idPSpecificSalt[:]) + values["eduPersonPrincipalName"][0]))
 	return hex.EncodeToString(append(hash[:]))
 }
@@ -423,7 +427,13 @@ func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
 	}
 
 	idp := values["idpPersistentID"][0]
+	if idp == "" {
+	    idp = values["idpID"][0]
+	}
 	sp := values["spPersistentID"][0]
+	if sp == "" {
+	    sp = values["spID"][0]
+	}
 
 	uidhashbase := "uidhashbase" + config.EptidSalt
 	uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
