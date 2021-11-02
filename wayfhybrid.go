@@ -448,19 +448,27 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 	spMd, err := md.Internal.MDQ("https://" + r.Host)
 	pk, _, _ := gosaml.GetPrivateKey(spMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery)
-	idp := r.Form.Get("idpentityid") + r.Form.Get("entityID")
-	idpList := r.Form.Get("idplist")
+	idp := r.Form.Get("idpentityid")
 	login := r.Form.Get("login") == "1"
 	scoping := r.Form.Get("scoping")
+	scopedIDP := r.Form.Get("scopedidp")
 
-	if login || idp != "" || idpList != "" {
+	if r.Form.Get("ds") != "" {
+
+		data := url.Values{}
+		data.Set("return", "https://"+r.Host+"/?previdplist="+r.Form.Get("scopedidp"))
+		data.Set("returnIDParam", "scopedidp")
+		data.Set("entityID", "https://"+r.Host)
+		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
+
+	} else if login || idp != "" {
 
 		idpMd, err := md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
 			return err
 		}
 
-		if scoping == "" && idp == "" {
+		if scopedIDP == "" && idp == "" {
 			data := url.Values{}
 			data.Set("return", "https://"+r.Host+r.RequestURI)
 			data.Set("returnIDParam", "idpentityid")
@@ -471,12 +479,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
 
-		scopedIDP := r.Form.Get("scopedidp") + r.Form.Get("entityID")
-		scopes := []string{}
-		if scoping == "scoping" {
-			scopes = strings.Split(scopedIDP, ",")
-		}
-
 		if scoping == "birk" {
 			idpMd, err = md.ExternalIDP.MDQ(scopedIDP)
 			if err != nil {
@@ -484,17 +486,36 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", scopes, "", false, 0, 0)
+		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0)
 
-		options := []struct{ name, path, value string }{
-			{"isPassive", "./@IsPassive", "true"},
-			{"forceAuthn", "./@ForceAuthn", "true"},
-			{"persistent", "./samlp:NameIDPolicy/@Format", gosaml.Persistent},
+		options := []struct {
+			name, path string
+			values     []string
+		}{
+			{"isPassive", "./@IsPassive", []string{"true"}},
+			{"forceAuthn", "./@ForceAuthn", []string{"true"}},
+			{"persistent", "./samlp:NameIDPolicy/@Format", []string{gosaml.Persistent}},
+			{"requestedauthncontext", "./samlp:RequestedAuthnContext/saml:AuthnContextClassRef[0]", []string{}},
+			{"requestedauthncontextcomparison", "./samlp:RequestedAuthnContext/@Comparison", []string{}},
 		}
 
 		for _, option := range options {
-			if r.Form.Get(option.name) != "" {
-				newrequest.QueryDashP(nil, option.path, option.value, nil)
+			vals := option.values
+			if len(vals) == 0 {
+				vals = r.Form[option.name]
+			} else if r.Form.Get(option.name) == "" {
+				vals = []string{}
+			}
+			for _, val := range vals {
+				if val != "" {
+					newrequest.QueryDashP(nil, option.path, val, nil)
+				}
+			}
+		}
+
+		if scoping == "scoping" {
+			for _, scope := range strings.Split(scopedIDP, ",") {
+				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
 			}
 		}
 
@@ -510,10 +531,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			q.Set("Signature", signature[:len(signature)-4]+"QEBA")
 		}
 
-		if idpList != "" {
-			q.Set("idplist", idpList)
-		}
-		if r.Form.Get("scoping") == "param" {
+		if scoping == "param" || scoping == "" {
 			idp = scopedIDP
 		}
 		if idp != "" {
@@ -570,12 +588,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, DebugValues: debugVals,
 			ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority"), Marshalled: marshalledResponse}
 		return tmpl.ExecuteTemplate(w, "testSPForm", data)
-	} else if r.Form.Get("ds") != "" {
-		data := url.Values{}
-		data.Set("return", "https://"+r.Host+r.RequestURI+"?previdplist="+r.Form.Get("scopedidp"))
-		data.Set("returnIDParam", "scopedidp")
-		data.Set("entityID", "https://"+r.Host)
-		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 	} else {
 		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedidp")+","+r.Form.Get("previdplist"), " ,")}
 		return tmpl.ExecuteTemplate(w, "testSPForm", data)
