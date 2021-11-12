@@ -163,6 +163,19 @@ var (
 		{c14n: "uid", name: "uid"},
 		{c14n: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1"},
 
+        // Nemlog-in-3
+		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
+		{c14n: "loa", name: "https://data.gov.dk/concept/core/nsis/loa"},
+        {c14n: "ial", name: "https://data.gov.dk/concept/core/nsis/ial"},
+        {c14n: "aal", name: "https://data.gov.dk/concept/core/nsis/aal"},
+        {c14n: "cn", name: "https://data.gov.dk/model/core/eid/fullName"},
+        {c14n: "gn", name: "https://data.gov.dk/model/core/eid/firstName"},
+        {c14n: "sn", name: "https://data.gov.dk/model/core/eid/lastName"},
+        {c14n: "mail", name: "https://data.gov.dk/model/core/eid/email"},
+        {c14n: "schacPersonalUniqueID", name: "https://data.gov.dk/model/core/eid/cprNumber"},
+        {c14n: "cprUuid", name: "https://data.gov.dk/model/core/eid/cprUuid"},
+        //{c14n: "schacDateOfBirth", name: "https://data.gov.dk/model/core/eid/dateOfBirth"}, // wrong format
+
 		// Modst specials
 		{c14n: "eduPersonPrincipalName", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"},
 		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid"},
