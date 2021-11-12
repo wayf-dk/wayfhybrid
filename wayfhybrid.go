@@ -379,7 +379,7 @@ func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 	case metadataUpdateGuard <- 1:
 		{
 			for _, mdfeed := range config.MetadataFeeds {
-				if err = refreshMetadataFeed(mdfeed.Path, mdfeed.URL); err != nil {
+				if err = refreshMetadataFeed(mdfeed); err != nil {
 					<-metadataUpdateGuard
 					return "", err
 				}
@@ -402,8 +402,8 @@ func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 }
 
 // refreshMetadataFeed is responsible for referishing a metadata feed
-func refreshMetadataFeed(mddbpath, url string) (err error) {
-	dir := path.Dir(mddbpath)
+func refreshMetadataFeed(mdfeed config.MdFeed) (err error) {
+	dir := path.Dir(mdfeed.Path)
 	tempmddb, err := ioutil.TempFile(dir, "")
 	if err != nil {
 		return err
@@ -412,7 +412,7 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	defer os.Remove(tempmddb.Name())
 
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: mdfeed.InsecureSkipVerify},
 	}
 
 	client := &http.Client{
@@ -421,7 +421,7 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	}
 
 	//client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
+	resp, err := client.Get(mdfeed.URL)
 	if err != nil {
 		return err
 	}
@@ -430,7 +430,7 @@ func refreshMetadataFeed(mddbpath, url string) (err error) {
 	if err != nil {
 		return err
 	}
-	if err = os.Rename(tempmddb.Name(), mddbpath); err != nil {
+	if err = os.Rename(tempmddb.Name(), mdfeed.Path); err != nil {
 		return err
 	}
 	return
