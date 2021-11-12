@@ -229,7 +229,7 @@ func Main() {
 				Certificates: []tls.Certificate{cert},
 			},
 		}
-        s.SetKeepAlivesEnabled(false)
+		s.SetKeepAlivesEnabled(false)
 		err = s.ListenAndServeTLS("", "")
 		if err != nil {
 			log.Printf("main(): %s\n", err)
@@ -416,8 +416,8 @@ func refreshMetadataFeed(mdfeed config.MdFeed) (err error) {
 	}
 
 	client := &http.Client{
-		Transport:     tr,
-        Timeout: 30 * time.Second,
+		Transport: tr,
+		Timeout:   30 * time.Second,
 	}
 
 	//client := &http.Client{Timeout: 30 * time.Second}
