@@ -916,6 +916,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	algo := config.DefaultCryptoMethod
 	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
+	gosaml.DumpFileIfTracing(r, newrequest)
 	u, err := gosaml.SAMLRequest2URL(newrequest, relayState, string(privatekey), "-", algo)
 	if err != nil {
 		return
