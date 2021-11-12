@@ -409,9 +409,6 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 
 func eptidforaudience(values map[string][]string, audience string) string {
     idpID := values["idpPersistentID"][0]
-    if idpID == "" {
-        idpID = values["idpID"][0]
-    }
 	idPSpecificSalt := sha512.Sum512([]byte("IdPSpecificSalt" + config.EptidSalt + idpID))
 	hash := sha512.Sum512_224([]byte(audience + string(idPSpecificSalt[:]) + values["eduPersonPrincipalName"][0]))
 	return hex.EncodeToString(append(hash[:]))
@@ -433,13 +430,7 @@ func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
 	}
 
 	idp := values["idpPersistentID"][0]
-	if idp == "" {
-	    idp = values["idpID"][0]
-	}
 	sp := values["spPersistentID"][0]
-	if sp == "" {
-	    sp = values["spID"][0]
-	}
 
 	uidhashbase := "uidhashbase" + config.EptidSalt
 	uidhashbase += strconv.Itoa(len(idp)) + ":" + idp
