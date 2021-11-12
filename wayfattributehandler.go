@@ -38,6 +38,7 @@ var (
 		{c14n: "Issuer", op: "xp:msg:./saml:Issuer"},
 
 		// nemlogin computed
+		{c14n: "nemlogin", op: "eq:Issuer:https://saml.test-devtest4-nemlog-in.dk"},
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
 		{c14n: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
@@ -46,7 +47,9 @@ var (
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
 
 		// computed
+		{c14n: "idpPersistentID", op: "xp:idp:@entityID"},
 		{c14n: "idpPersistentID", op: "xp1:idp://wayf:persistentEntityID"},
+		{c14n: "spPersistentID", op: "xp:sp:@entityID"},
 		{c14n: "spPersistentID", op: "xp1:sp://wayf:persistentEntityID"},
 		{c14n: "idpID", op: "xp:idp:@entityID"},
 		{c14n: "spID", op: "xp:sp:@entityID"},
