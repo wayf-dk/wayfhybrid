@@ -272,7 +272,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		switch opParam[0] {
 		case "eq":
 			opParam = strings.SplitN(opParam[1], ":", 2)
-			*v = strconv.FormatBool(values[opParam[0]][0] == opParam[1])
+			*v = strconv.FormatBool(values[opParam[0]][0] == opParam[1] || *v == "true")
 		case "cp":
 			values[atd.c14n] = values[opParam[1]]
 		case "val":
