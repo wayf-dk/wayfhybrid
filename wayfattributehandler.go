@@ -91,6 +91,7 @@ var (
 		{c14n: "RequesterID", op: "xp:msg:./samlp:Scoping/samlp:RequesterID"},
 		{c14n: "commonfederations", op: "commonfederations:"},
 		{c14n: "protocol", op: "xp:msg:local-name()"},
+		{c14n: "RequestedAuthnContextClassRef", op: "xp:sp://wayf:RequestedAuthnContext"},
 	}
 
 	attributesBase = []attributeDescription{
