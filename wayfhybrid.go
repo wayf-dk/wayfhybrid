@@ -866,6 +866,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return err
 	}
 
+	if values["commonfederations"][0] != "true" {
+		err = fmt.Errorf("no common federations")
 	}
 
 	realIDPMd := virtualIDPMd
