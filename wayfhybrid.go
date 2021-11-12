@@ -860,8 +860,12 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	VirtualIDPID = virtualIDPMd.Query1(nil, "./@entityID") // wayf might return domain or hash ...
 
 	// check for common feds before remapping!
-	if _, err = RequestHandler(request, virtualIDPMd, spMd); err != nil {
-		return
+
+	values, err := RequestHandler(request, virtualIDPMd, spMd)
+	if err != nil {
+		return err
+	}
+
 	}
 
 	realIDPMd := virtualIDPMd
