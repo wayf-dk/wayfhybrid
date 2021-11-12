@@ -272,9 +272,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string, err error) {
 	values = map[string][]string{}
 	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd)
-	if values["commonfederations"][0] != "true" {
-		err = fmt.Errorf("no common federations")
-	}
 	return
 }
 
