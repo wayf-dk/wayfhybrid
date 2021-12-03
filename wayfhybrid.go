@@ -903,7 +903,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-func getAccept(r *http.Request, header string, fallbacks []string) (res []string) {
+func getAcceptHeaderItems(r *http.Request, header string, fallbacks []string) (res []string) {
 	items := acceptHeader.FindAllStringSubmatch(r.Header.Get(header), -1)
 	for _, item := range items {
 		res = append(res, item[1])
@@ -912,9 +912,10 @@ func getAccept(r *http.Request, header string, fallbacks []string) (res []string
 	return
 }
 
-func getFirstByAttribute(xp *goxml.Xp, xpath, attr string, vals []string) (res string) {
-	for _, v := range vals {
-		if res = xp.Query1(nil, xpath+"[@"+attr+"="+strconv.Quote(v)+"]"); res != "" {
+func getFirstByAttribute(xp *goxml.Xp, templ string, vals []string) (res string) {
+ 	for _, v := range vals {
+ 	    xpath := strings.Replace(templ, "$", strconv.Quote(v), 1)
+		if res = xp.Query1(nil, xpath); res != "" {
 			return
 		}
 	}
@@ -929,7 +930,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		return
 	}
 
-	providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName", "xml:lang", getAccept(r, "Accept-Language", []string{"en", "da"}))
+	providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
 	newrequest.QueryDashP(nil, "./@ProviderName", providerName, nil)
 
 	buf := sRequest.Marshal()
