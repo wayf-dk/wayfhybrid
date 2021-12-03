@@ -284,7 +284,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		}
 		v := &values[atd.c14n][0]
 	handleop:
-		switch opParam[0] {
+		switch op := opParam[0]; op {
 		case "eq":
 			opParam = strings.SplitN(opParam[1], ":", 2)
 			*v = strconv.FormatBool(values[opParam[0]][0] == opParam[1] || *v == "true")
@@ -415,6 +415,8 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if idpMd.QueryXMLBool(nil, xprefix+"addESI") {
 				*v = "urn:schac:personalUniqueCode:int:esi:" + values["schacHomeOrganization"][0] + ":" + eptidforaudience(values, "europeanStudentIdentifier")
 			}
+		default:
+			// panic("unknown op: " + op)
 		}
 	}
 }
