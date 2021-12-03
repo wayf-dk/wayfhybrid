@@ -70,7 +70,8 @@ var (
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
 		{c14n: "eduPersonScopedAffiliation", op: "epsa:"},
-		{c14n: "AuthnContextClassRef", op: "xp:msg://saml:AuthnContextClassRef"},
+		{c14n: "AuthnContextClassRef", op: "xpm:msg://saml:AuthnContextClassRef"},
+		{c14n: "AuthnContextClassRef", op: "append:authenticationmethod"},
 		{c14n: "commonfederations", op: "commonfederations:"},
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "val:username-password-protected-transport"},
@@ -101,6 +102,7 @@ var (
 		//		{c14n: "eduPersonPrincipalName", name: "urn:oid:0.9.2342.19200300.100.1.1", nameformat: "basic"}, // basic ???
 
 		// wayf
+		{c14n: "authenticationmethod", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationmethod"},
 		{c14n: "cn", name: "cn"},
 		{c14n: "cn", name: "urn:oid:2.5.4.3"},
 		{c14n: "displayName", name: "displayName"},
@@ -163,18 +165,18 @@ var (
 		{c14n: "uid", name: "uid"},
 		{c14n: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1"},
 
-        // Nemlog-in-3
+		// Nemlog-in-3
 		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
 		{c14n: "loa", name: "https://data.gov.dk/concept/core/nsis/loa"},
-        {c14n: "ial", name: "https://data.gov.dk/concept/core/nsis/ial"},
-        {c14n: "aal", name: "https://data.gov.dk/concept/core/nsis/aal"},
-        {c14n: "cn", name: "https://data.gov.dk/model/core/eid/fullName"},
-        {c14n: "gn", name: "https://data.gov.dk/model/core/eid/firstName"},
-        {c14n: "sn", name: "https://data.gov.dk/model/core/eid/lastName"},
-        {c14n: "mail", name: "https://data.gov.dk/model/core/eid/email"},
-        {c14n: "schacPersonalUniqueID", name: "https://data.gov.dk/model/core/eid/cprNumber"},
-        {c14n: "cprUuid", name: "https://data.gov.dk/model/core/eid/cprUuid"},
-        //{c14n: "schacDateOfBirth", name: "https://data.gov.dk/model/core/eid/dateOfBirth"}, // wrong format
+		{c14n: "ial", name: "https://data.gov.dk/concept/core/nsis/ial"},
+		{c14n: "aal", name: "https://data.gov.dk/concept/core/nsis/aal"},
+		{c14n: "cn", name: "https://data.gov.dk/model/core/eid/fullName"},
+		{c14n: "gn", name: "https://data.gov.dk/model/core/eid/firstName"},
+		{c14n: "sn", name: "https://data.gov.dk/model/core/eid/lastName"},
+		{c14n: "mail", name: "https://data.gov.dk/model/core/eid/email"},
+		{c14n: "schacPersonalUniqueID", name: "https://data.gov.dk/model/core/eid/cprNumber"},
+		{c14n: "cprUuid", name: "https://data.gov.dk/model/core/eid/cprUuid"},
+		//{c14n: "schacDateOfBirth", name: "https://data.gov.dk/model/core/eid/dateOfBirth"}, // wrong format
 
 		// Modst specials
 		{c14n: "eduPersonPrincipalName", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"},
@@ -321,7 +323,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			opParam = strings.SplitN(opParam[1], ":", 2)
 			tmp := contextMap[opParam[0]].QueryMulti(nil, opParam[1])
 			if len(tmp) != 0 {
-			    values[atd.c14n] = tmp
+				values[atd.c14n] = tmp
 			}
 		case "xpm":
 			opParam = strings.SplitN(opParam[1], ":", 2)
@@ -425,7 +427,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 }
 
 func eptidforaudience(values map[string][]string, audience string) string {
-    idpID := values["idpPersistentID"][0]
+	idpID := values["idpPersistentID"][0]
 	idPSpecificSalt := sha512.Sum512([]byte("IdPSpecificSalt" + config.EptidSalt + idpID))
 	hash := sha512.Sum512_224([]byte(audience + string(idPSpecificSalt[:]) + values["eduPersonPrincipalName"][0]))
 	return hex.EncodeToString(append(hash[:]))
