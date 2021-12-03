@@ -323,6 +323,9 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if len(tmp) != 0 {
 			    values[atd.c14n] = tmp
 			}
+		case "xpm":
+			opParam = strings.SplitN(opParam[1], ":", 2)
+			values[atd.c14n] = append(values[atd.c14n], contextMap[opParam[0]].QueryMulti(nil, opParam[1])...)
 		case "securitydomain":
 			eppns := values["eduPersonPrincipalName"]
 			if len(eppns) > 0 {
