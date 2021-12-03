@@ -107,10 +107,12 @@ var (
 	_ = log.Printf // For debugging; delete when done.
 	_ = fmt.Printf
 
-	allowedInFeds                       = regexp.MustCompile("[^\\w\\.-]")
-	scoped                              = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])$`)
-	dkcprpreg                           = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
-	oldSafari                           = regexp.MustCompile("iPhone.*Version/12.*Safari")
+	allowedInFeds = regexp.MustCompile("[^\\w\\.-]")
+	scoped        = regexp.MustCompile(`^([^\@]+)\@([a-zA-Z0-9][a-zA-Z0-9\.-]+[a-zA-Z0-9])$`)
+	dkcprpreg     = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
+	oldSafari     = regexp.MustCompile("iPhone.*Version/12.*Safari")
+	acceptHeader  = regexp.MustCompile(`(?i)\s*([a-z]+-?(?:[a-z]+)?)\s*(?:;\s*q=(1|1\.0{0,3}|0|0\.\d{0,3}))?\s*(?:,|$)`)
+
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
 	defaultDigestAndSignatureAlgorithm  = "sha256"
 
@@ -901,6 +903,24 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+func getAccept(r *http.Request, header string, fallbacks []string) (res []string) {
+	items := acceptHeader.FindAllStringSubmatch(r.Header.Get(header), -1)
+	for _, item := range items {
+		res = append(res, item[1])
+	}
+	res = append(res, fallbacks...)
+	return
+}
+
+func getFirstByAttribute(xp *goxml.Xp, xpath, attr string, vals []string) (res string) {
+	for _, v := range vals {
+		if res = xp.Query1(nil, xpath+"[@"+attr+"="+strconv.Quote(v)+"]"); res != "" {
+			return
+		}
+	}
+	return
+}
+
 func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd *goxml.Xp, virtualIDPID, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex uint8, idPList []string) (err error) {
 	// why not use orig request?
 	wantRequesterID := realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) || gosaml.DebugSetting(r, "wantRequesterID") != ""
@@ -908,6 +928,9 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	if err != nil {
 		return
 	}
+
+	providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName", "xml:lang", getAccept(r, "Accept-Language", []string{"en", "da"}))
+	newrequest.QueryDashP(nil, "./@ProviderName", providerName, nil)
 
 	buf := sRequest.Marshal()
 	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
