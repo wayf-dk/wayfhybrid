@@ -588,7 +588,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		data := testSPFormData{RelayState: relayState, ResponsePP: incomingResponseXML, Destination: destinationMd.Query1(nil, "./@entityID"), Messages: messages,
 			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, DebugValues: debugVals,
-			ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority"), Marshalled: marshalledResponse}
+			ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority[last()]"), Marshalled: marshalledResponse}
 		return tmpl.ExecuteTemplate(w, "testSPForm", data)
 	} else {
 		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedidp")+","+r.Form.Get("previdplist"), " ,")}
