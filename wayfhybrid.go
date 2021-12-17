@@ -727,6 +727,7 @@ func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard.SPEntityID = spMd.Query1(nil, "@entityID")
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(`+xprefix+`consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
 	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryXMLBool(nil, xprefix+`consent.disable`)
+	ard.ForceConfirmation = spMd.QueryXMLBool(nil, xprefix+`consent.force`)
 	ard.ConsentAsAService = config.ConsentAsAService
 
 	if birk {
