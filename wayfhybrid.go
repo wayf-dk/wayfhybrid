@@ -862,13 +862,13 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	VirtualIDPID = virtualIDPMd.Query1(nil, "./@entityID") // wayf might return domain or hash ...
 
-	// check for common feds before remapping!
 
 	values, err := RequestHandler(request, virtualIDPMd, spMd)
 	if err != nil {
 		return err
 	}
 
+	// check for common feds before remapping!
 	if values["commonfederations"][0] != "true" {
 		err = fmt.Errorf("no common federations")
 	}
