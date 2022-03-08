@@ -257,13 +257,12 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 
 	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	for basic, vals := range values {
-		attr := response.QueryDashP(c14nAttributes, `saml:Attribute[@Name="`+basic+`"]`, "", nil)
 		seen := map[string]bool{}
 		for _, val := range vals {
 			if seen[val] || val == "" {
 				continue
 			}
-			response.QueryDashP(attr, "saml:AttributeValue[0]", val, nil)
+			response.QueryDashP(c14nAttributes, `saml:Attribute[@Name="`+basic+`"]/saml:AttributeValue[0]`, val, nil)
 			seen[val] = true
 		}
 	}
