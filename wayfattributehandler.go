@@ -48,9 +48,9 @@ var (
 
 		// computed
 		{c14n: "idpPersistentID", op: "xp:idp:@entityID"},
-		{c14n: "idpPersistentID", op: "xp1:idp://wayf:persistentEntityID"},
+		{c14n: "idpPersistentID", op: "xp:idp://wayf:persistentEntityID"},
 		{c14n: "spPersistentID", op: "xp:sp:@entityID"},
-		{c14n: "spPersistentID", op: "xp1:sp://wayf:persistentEntityID"},
+		{c14n: "spPersistentID", op: "xp:sp://wayf:persistentEntityID"},
 		{c14n: "idpID", op: "xp:idp:@entityID"},
 		{c14n: "spID", op: "xp:sp:@entityID"},
 		{c14n: "schacHomeOrganization", op: "xp:idp://wayf:wayf_schacHomeOrganization"},
