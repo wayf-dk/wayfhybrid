@@ -318,9 +318,6 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			*v = idpMd.Query1(nil, xprefix+opParam[1])
 		case "xp":
 			opParam = strings.SplitN(opParam[1], ":", 2)
-			values[atd.c14n] = contextMap[opParam[0]].QueryMulti(nil, opParam[1])
-		case "xp1":
-			opParam = strings.SplitN(opParam[1], ":", 2)
 			tmp := contextMap[opParam[0]].QueryMulti(nil, opParam[1])
 			if len(tmp) != 0 {
 				values[atd.c14n] = tmp
