@@ -233,7 +233,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 	attributeStatement := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
 	sourceAttributes := response.Query(attributeStatement, `./saml:Attribute`)
 	values := map[string][]string{}
-	atds := []attributeDescription{}
+	attributeStatement2 := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 
 	//response.QueryDashP(attributeStatement, "./saml:Attribute[1]/@Name", "\x1b", nil)
 	//response.QueryDashP(attributeStatement, "./saml:Attribute[1]/saml:AttributeValue[1]", "\x1b", nil)
@@ -246,7 +246,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 			atd, ok = incomingAttributeDescriptions[attributeKey{name, ""}]
 		}
 		if ok {
-			atds = append(atds, atd)
 			values[atd.c14n] = response.QueryMulti(attribute, `saml:AttributeValue`)
 			if base64encoded {
 				for i, val := range values[atd.c14n] {
@@ -257,41 +256,18 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 		}
 	}
 
-	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
-
-	c14nAttributes := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
-	for basic, vals := range values {
-		seen := map[string]bool{}
-		for _, val := range vals {
-			if seen[val] || val == "" {
-				continue
-			}
-			response.QueryDashP(c14nAttributes, `saml:Attribute[@Name="`+basic+`"]/saml:AttributeValue[0]`, val, nil)
-			seen[val] = true
-		}
-	}
+	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
 	goxml.RmElement(attributeStatement)
 }
 
 // RequestHandler - runs attributeOpsHandler for requestAttributesBase and returns the result as values
 func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string, err error) {
-	values = map[string][]string{}
-	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd)
-	c14nAttributes := request.QueryDashP(nil, `/saml:AttributeStatement`, "", nil)
-	for basic, vals := range values {
-		seen := map[string]bool{}
-		for _, val := range vals {
-			if seen[val] || val == "" {
-				continue
-			}
-			request.QueryDashP(c14nAttributes, `saml:Attribute[@Name="`+basic+`"]/saml:AttributeValue[0]`, val, nil)
-			seen[val] = true
-		}
-	}
+    values = map[string][]string{}
+	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd, request.QueryDashP(nil, `/saml:AttributeStatement`, "", nil))
 	return
 }
 
-func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp) {
+func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp, dest types.Node) {
 	contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg}
 	for _, atd := range atds {
 		opParam := strings.SplitN(atd.op, ":", 2)
@@ -433,6 +409,17 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			}
 		default:
 			// panic("unknown op: " + op)
+		}
+	}
+
+	for basic, vals := range values {
+		seen := map[string]bool{}
+		for _, val := range vals {
+			if seen[val] || val == "" {
+				continue
+			}
+			msg.QueryDashP(dest, `saml:Attribute[@Name="`+basic+`"]/saml:AttributeValue[0]`, val, nil)
+			seen[val] = true
 		}
 	}
 }
