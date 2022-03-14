@@ -533,7 +533,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			q.Set("Signature", signature[:len(signature)-4]+"QEBA")
 		}
 
-		if scoping == "param" || scoping == "" {
+		if scoping == "param" {
 			idp = scopedIDP
 		}
 		if idp != "" {
