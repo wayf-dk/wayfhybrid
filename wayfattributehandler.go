@@ -502,7 +502,7 @@ func yearfromyearandcifferseven(year, c7 int) int {
 }
 
 // CopyAttributes copies the attributes
-func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
+func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 
@@ -521,7 +521,7 @@ func CopyAttributes(sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues 
 
 	destinationAttributes := response.QueryDashP(assertionList[0], saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
 
-	if spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
+	if gosaml.DebugSetting(r, "allAttrs") == "1"  || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
 		destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
 		goxml.RmElement(destinationAttributes)
 		return nil, ""
