@@ -170,6 +170,15 @@ var (
 		{c14n: "uid", name: "uid"},
 		{c14n: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1"},
 
+		{c14n: "postalAddress", name: "postalAddress"},
+		{c14n: "postalAddress", name: "urn:oid:2.5.4.16"},
+		{c14n: "postalCode", name: "postalCode"},
+		{c14n: "postalCode", name: "urn:oid:2.5.4.17"},
+		{c14n: "localityName", name: "localityName"},
+		{c14n: "localityName", name: "urn:oid:2.5.4.7"},
+		{c14n: "ou", name: "ou"},
+		{c14n: "ou", name: "urn:oid:2.5.4.11"},
+
 		// Nemlog-in-3
 		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
 		{c14n: "loa", name: "https://data.gov.dk/concept/core/nsis/loa"},
