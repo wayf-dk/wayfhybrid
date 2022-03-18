@@ -1080,7 +1080,7 @@ found:
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", virtualIDPMd.Query1(nil, "@entityID"), nil)
 		}
 
-		ard.Values, ard.Hash = CopyAttributes(response, newresponse, virtualIDPMd, spMd)
+		ard.Values, ard.Hash = CopyAttributes(r, response, newresponse, virtualIDPMd, spMd)
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
@@ -1117,7 +1117,7 @@ found:
 		signingType := gosaml.SAMLSign
 		if sRequest.Protocol == "wsfed" {
 			newresponse = gosaml.NewWsFedResponse(hubBirkIDPMd, spMd, newresponse)
-			ard.Values, ard.Hash = CopyAttributes(response, newresponse, idpMd, spMd)
+			ard.Values, ard.Hash = CopyAttributes(r, response, newresponse, idpMd, spMd)
 
 			signingType = gosaml.WSFedSign
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
