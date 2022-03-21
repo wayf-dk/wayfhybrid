@@ -39,7 +39,7 @@ var (
 		{c14n: "Issuer", op: "xp:msg:./saml:Issuer"},
 
 		// nemlogin computed
-		{c14n: "nemlogin", op: "eq:Issuer:https://saml-nemlog-in.dk"},
+		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.test-nemlog-in.dk/"},
 		{c14n: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
