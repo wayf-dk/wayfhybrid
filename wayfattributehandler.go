@@ -178,6 +178,7 @@ var (
 		{c14n: "localityName", name: "urn:oid:2.5.4.7"},
 		{c14n: "ou", name: "ou"},
 		{c14n: "ou", name: "urn:oid:2.5.4.11"},
+        {c14n: "schacGender", name: "urn:oid:1.3.6.1.4.1.25178.1.2.2"},
 
 		// Nemlog-in-3
 		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
