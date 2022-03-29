@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -1136,12 +1137,17 @@ found:
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
 		}
 
-		if spMd.QueryXMLBool(nil, xprefix+"assertion.encryption ") || gosaml.DebugSetting(r, "encryptAssertion") == "1" {
+        gosaml.NemLog(newresponse, idpMd, origRequestID)
+		if spMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
+		    virtualIDPMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
+		    gosaml.DebugSetting(r, "encryptAssertion") == "1" {
 			gosaml.DumpFileIfTracing(r, newresponse)
-			cert := spMd.Query1(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
-			_, publicKey, _ := gosaml.PublicKeyInfo(cert)
+			certs := spMd.QueryMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
+			//_, publicKey, _ := gosaml.PublicKeyInfo(cert)
+			_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(certs, x509.RSA)
+
 			assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-			newresponse.Encrypt(assertion, publicKey.(*rsa.PublicKey))
+			newresponse.Encrypt(assertion, "saml:EncryptedAssertion", pubs[0].(*rsa.PublicKey))
 		}
 	} else {
 		newresponse = gosaml.NewErrorResponse(hubBirkIDPMd, spMd, request, response)
