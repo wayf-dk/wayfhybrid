@@ -911,6 +911,12 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			hubKribSP = tmp
 		}
 
+        if request.QueryXMLBool(nil, `//*[@Name="nemlogin"]/saml:AttributeValue[1]`) {
+            if tmp := spMd.Query1(nil, `//wayf:map2SP`); tmp != "" {
+            	hubKribSP = tmp
+    	    }
+	    }
+
 		if hubKribSPMd, err = md.Hub.MDQ(hubKribSP); err != nil {
 			return
 		}
