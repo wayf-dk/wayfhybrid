@@ -258,7 +258,7 @@ func Main() {
 	}()
 
 	if *config.Test { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
-		log.SetOutput(ioutil.Discard)
+	    log.SetOutput(ioutil.Discard)
 	}
 
 	stopCh, closeCh := createChannel()
@@ -899,7 +899,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	RequestHandler(request, virtualIDPMd, spMd)
 
 	// check for common feds before remapping!
-    if !request.QueryXMLBool(nil, `//saml:AttributeStatement/saml:Attribute[@Name="commonfederations"]/saml:AttributeValue[1]`) {
+	if !request.QueryXMLBool(nil, `//saml:AttributeStatement/saml:Attribute[@Name="commonfederations"]/saml:AttributeValue[1]`) {
 		err = fmt.Errorf("no common federations")
 	}
 
@@ -935,8 +935,8 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 			return
 		}
 	}
-
-	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, VirtualIDPID, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, nil)
+	gosaml.NemLog.Log(request, realIDPMd, request.Query1(nil, "@ID"))
+	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, nil)
 	return
 }
 
@@ -950,8 +950,8 @@ func getAcceptHeaderItems(r *http.Request, header string, fallbacks []string) (r
 }
 
 func getFirstByAttribute(xp *goxml.Xp, templ string, vals []string) (res string) {
- 	for _, v := range vals {
- 	    xpath := strings.Replace(templ, "$", strconv.Quote(v), 1)
+	for _, v := range vals {
+		xpath := strings.Replace(templ, "$", strconv.Quote(v), 1)
 		if res = xp.Query1(nil, xpath); res != "" {
 			return
 		}
@@ -959,8 +959,9 @@ func getFirstByAttribute(xp *goxml.Xp, templ string, vals []string) (res string)
 	return
 }
 
-func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd *goxml.Xp, virtualIDPID, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex uint8, idPList []string) (err error) {
+func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd *goxml.Xp, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex uint8, idPList []string) (err error) {
 	// why not use orig request?
+	virtualIDPID := virtualIDPMd.Query1(nil, "./@entityID") // wayf might return domain or hash ...
 	wantRequesterID := realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) || gosaml.DebugSetting(r, "wantRequesterID") != ""
 	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, wantRequesterID, spIndex, hubBirkIndex)
 	if err != nil {
@@ -1016,6 +1017,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		legacyStatJSONLog(jsonlog)
 	}
 
+	gosaml.NemLog.Log(newrequest, realIDPMd, request.Query1(nil, "@ID"))
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -1082,6 +1084,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
+
+	origRequestID := request.Query1(nil, "@ID")
+	gosaml.NemLog.Log(response, idpMd, origRequestID)
 
 	if err = gosaml.CheckDigestAndSignatureAlgorithms(response); err != nil {
 		return
@@ -1189,10 +1194,10 @@ found:
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
 		}
 
-        gosaml.NemLog(newresponse, idpMd, origRequestID)
+		gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
 		if spMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
-		    virtualIDPMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
-		    gosaml.DebugSetting(r, "encryptAssertion") == "1" {
+			virtualIDPMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
+			gosaml.DebugSetting(r, "encryptAssertion") == "1" {
 			gosaml.DumpFileIfTracing(r, newresponse)
 			multi := spMd.QueryMultiMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery, []string{".", "../../../md:EncryptionMethod/@Algorithm"})
 			_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(goxml.Flatten(multi[0]), x509.RSA)
@@ -1206,6 +1211,7 @@ found:
 		if err != nil {
 			return
 		}
+		gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
 		ard = AttributeReleaseData{BypassConfirmation: true}
 	}
 
@@ -1288,10 +1294,12 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destinationMdSet gosaml.Md, finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, role int, tag string) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	request, _, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
+	request, issuerMd, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
 	if err != nil {
 		return err
 	}
+	gosaml.NemLog.Log(request, issuerMd, "")
+
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
 	_, sloinfo, ok, sendResponse := SLOInfoHandler(w, r, request, nil, destination, request, nil, role, request.Query1(nil, "./samlp:Extensions/wayf:protocol"))
@@ -1349,9 +1357,14 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	algo := config.DefaultCryptoMethod
 	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
+	gosaml.NemLog.Log(msg, destMD, "")
+
 	switch binding {
 	case gosaml.REDIRECT:
-		u, _ := gosaml.SAMLRequest2URL(msg, relayState, string(privatekey), "-", algo)
+		u, err := gosaml.SAMLRequest2URL(msg, relayState, string(privatekey), "-", algo)
+		if err != nil {
+		    return err
+		}
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case gosaml.POST:
 		err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign)
