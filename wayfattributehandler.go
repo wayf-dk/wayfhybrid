@@ -431,6 +431,11 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if idpMd.QueryXMLBool(nil, xprefix+"addESI") {
 				*v = "urn:schac:personalUniqueCode:int:esi:" + values["schacHomeOrganization"][0] + ":" + eptidforaudience(values, "europeanStudentIdentifier")
 			}
+		case "loa":
+			levels := map[string]string{"Low": "Low", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are ignored
+			for i, loa := range values[atd.c14n] {
+				values[atd.c14n][i] = levels[loa]
+			}
 		default:
 			// panic("unknown op: " + op)
 		}
