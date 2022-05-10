@@ -450,7 +450,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	spMd, err := md.Internal.MDQ("https://" + r.Host)
-	pk, _, _ := gosaml.GetPrivateKey(spMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery)
+	pk, _, _ := gosaml.GetPrivateKey(spMd, "md:SPSSODescriptor"+gosaml.SigningCertQuery)
 	idp := r.Form.Get("idpentityid")
 	login := r.Form.Get("login") == "1"
 	scoping := r.Form.Get("scoping")
