@@ -895,8 +895,6 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
-	VirtualIDPID = virtualIDPMd.Query1(nil, "./@entityID") // wayf might return domain or hash ...
-
 
 	RequestHandler(request, virtualIDPMd, spMd)
 
