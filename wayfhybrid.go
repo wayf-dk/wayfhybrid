@@ -970,6 +970,17 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
 	newrequest.QueryDashP(nil, "./@ProviderName", providerName, nil)
 
+	if request != nil && request.QueryXMLBool(nil, `//*[@Name="nemlogin"]/saml:AttributeValue`) {
+	    if tmp := hubKribSPMd.Query1(nil, `//wayf:map2IdP`); tmp != "" { // let the SP choose which SSOIndex to use
+		    dest := realIDPMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[`+tmp+`][@Binding="`+gosaml.REDIRECT+`"]/@Location`)
+	        newrequest.QueryDashP(nil, "./@Destination", dest, nil)
+    	}
+	}
+
+	if virtualIDPMd.QueryXMLBool(nil, xprefix+`forceAuthn`) && spMd.QueryXMLBool(nil, xprefix+`forceAuthn`) {
+	    newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
+	}
+
 	buf := sRequest.Marshal()
 	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
 	var privatekey []byte
