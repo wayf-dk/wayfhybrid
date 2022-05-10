@@ -247,12 +247,16 @@ func init() {
 }
 
 // Attributesc14n - Convert to - and compute canonical attributes
-func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
+func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 	base64encoded := idpMd.QueryXMLBool(nil, xprefix+"base64attributes")
-	attributeStatement := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0]
-	sourceAttributes := response.Query(attributeStatement, `./saml:Attribute`)
+	attributeStatementList := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)
+	if len(attributeStatementList) == 0 {
+		return fmt.Errorf("No AttributeStatement")
+	}
 	values := map[string][]string{}
 	attributeStatement2 := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
+	attributeStatement := attributeStatementList[0]
+	sourceAttributes := response.Query(attributeStatement, `./saml:Attribute`)
 
 	//response.QueryDashP(attributeStatement, "./saml:Attribute[1]/@Name", "\x1b", nil)
 	//response.QueryDashP(attributeStatement, "./saml:Attribute[1]/saml:AttributeValue[1]", "\x1b", nil)
@@ -277,6 +281,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) {
 
 	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
 	goxml.RmElement(attributeStatement)
+	return
 }
 
 // RequestHandler - runs attributeOpsHandler for requestAttributesBase and returns the result as values
