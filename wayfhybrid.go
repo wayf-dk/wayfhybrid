@@ -1,6 +1,7 @@
 package wayfhybrid
 
 import (
+    "context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -17,11 +18,13 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path"
 	"regexp"
 	"runtime/pprof"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/wayf-dk/godiscoveryservice"
@@ -223,9 +226,10 @@ func Main() {
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
 
 	log.Println("listening on ", config.Intf)
+	var s *http.Server
 	go func() {
 		cert, _ := tls.X509KeyPair(config.ServerCrt, config.ServerKey)
-		s := &http.Server{
+		s = &http.Server{
 			Addr:    config.Intf,
 			Handler: &slashFix{httpMux},
 			TLSConfig: &tls.Config{
@@ -236,6 +240,8 @@ func Main() {
 		err = s.ListenAndServeTLS("", "")
 		if err != nil {
 			log.Printf("main(): %s\n", err)
+		} else {
+			log.Println("hybrid stopped gracefully")
 		}
 	}()
 
@@ -253,6 +259,34 @@ func Main() {
 
 	if *config.Test { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
 		log.SetOutput(ioutil.Discard)
+	}
+
+	stopCh, closeCh := createChannel()
+	go func() {
+		defer closeCh()
+		log.Println("notified:", <-stopCh)
+		log.SetOutput(os.Stderr)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := s.Shutdown(ctx); err != nil {
+			panic(err)
+		} else {
+			log.Println("finalize nemlog")
+			gosaml.NemLog.Finalize()
+			log.Println("application shutdowned")
+			os.Exit(5)
+		}
+	}()
+}
+
+func createChannel() (chan os.Signal, func()) {
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	return stopCh, func() {
+		close(stopCh)
 	}
 }
 
