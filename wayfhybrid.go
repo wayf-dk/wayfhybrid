@@ -1194,12 +1194,10 @@ found:
 		    virtualIDPMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
 		    gosaml.DebugSetting(r, "encryptAssertion") == "1" {
 			gosaml.DumpFileIfTracing(r, newresponse)
-			certs := spMd.QueryMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery) // actual encryption key is always first
-			//_, publicKey, _ := gosaml.PublicKeyInfo(cert)
-			_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(certs, x509.RSA)
-
+			multi := spMd.QueryMultiMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery, []string{".", "../../../md:EncryptionMethod/@Algorithm"})
+			_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(goxml.Flatten(multi[0]), x509.RSA)
 			assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-			newresponse.Encrypt(assertion, "saml:EncryptedAssertion", pubs[0].(*rsa.PublicKey))
+			newresponse.Encrypt(assertion, "saml:EncryptedAssertion", pubs[0].(*rsa.PublicKey), multi[1][0]) // multi[1] is a list of list of Algos for each key
 		}
 	} else {
 		newresponse = gosaml.NewErrorResponse(hubBirkIDPMd, spMd, request, response)
