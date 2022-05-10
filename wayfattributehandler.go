@@ -46,6 +46,10 @@ var (
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:cp:uid"},
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
+		{c14n: "ial", name: "loa", op: "nemlogin:loa"},
+		{c14n: "aal", name: "loa", op: "nemlogin:loa"},
+		{c14n: "loa", name: "loa", op: "nemlogin:loa"},
+		{c14n: "eduPersonAssurance", name: "eduPersonAssurance", op: "nemlogin:cp:loa"},
 
 		// computed
 		{c14n: "idpPersistentID", op: "xp:idp:@entityID"},
@@ -99,6 +103,8 @@ var (
 		{c14n: "RequestedAuthnContextComparison", op: "xp:msg:./samlp:RequestedAuthnContext/@Comparison"},
 		{c14n: "RequestedAuthnContextClassRef", op: "xp:idp://wayf:RequestedAuthnContext/wayf:AuthnContextClassRef"},
 		{c14n: "RequestedAuthnContextComparison", op: "xp:idp://wayf:RequestedAuthnContext/@Comparison"},
+		{c14n: "idpEntityID", op: "xp:idp:@entityID"},
+		{c14n: "nemlogin", op: "eq:idpEntityID:https://nemlogin.wayf.dk"},
 	}
 
 	attributesBase = []attributeDescription{
@@ -165,6 +171,8 @@ var (
 		{c14n: "sn", name: "sn"},
 		{c14n: "sn", name: "surname"},
 		{c14n: "sn", name: "urn:oid:2.5.4.4"},
+		{c14n: "street", name: "street"},
+		{c14n: "street", name: "urn:oid:2.5.4.9"},
 		{c14n: "subject-id", name: "subject-id"},
 		{c14n: "subject-id", name: "urn:oasis:names:tc:SAML:attribute:subject-id"},
 		{c14n: "uid", name: "uid"},
@@ -178,7 +186,7 @@ var (
 		{c14n: "localityName", name: "urn:oid:2.5.4.7"},
 		{c14n: "ou", name: "ou"},
 		{c14n: "ou", name: "urn:oid:2.5.4.11"},
-        {c14n: "schacGender", name: "urn:oid:1.3.6.1.4.1.25178.1.2.2"},
+		{c14n: "schacGender", name: "urn:oid:1.3.6.1.4.1.25178.1.2.2"},
 
 		// Nemlog-in-3
 		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
