@@ -1105,7 +1105,10 @@ found:
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		Attributesc14n(request, response, virtualIDPMd, spMd)
+
+		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
+		    return
+		}
 		if err = checkForCommonFederations(response); err != nil {
 			return
 		}
