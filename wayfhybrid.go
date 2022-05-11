@@ -198,6 +198,7 @@ func Main() {
 
 	httpMux.Handle(config.Acs, appHandler(ACSService))
 	httpMux.Handle(config.NemloginAcs, appHandler(ACSService))
+	httpMux.Handle(config.NemloginAcs3, appHandler(ACSService))
 	httpMux.Handle(config.Birk, appHandler(SSOService))
 	httpMux.Handle(config.Krib, appHandler(ACSService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
