@@ -1197,7 +1197,7 @@ found:
 
 		gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
 		if spMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
-			virtualIDPMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
+			hubKribSpMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
 			gosaml.DebugSetting(r, "encryptAssertion") == "1" {
 			gosaml.DumpFileIfTracing(r, newresponse)
 			multi := spMd.QueryMultiMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery, []string{".", "../../../md:EncryptionMethod/@Algorithm"})
