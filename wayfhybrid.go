@@ -1350,7 +1350,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
 
-	privatekey, _, err := gosaml.GetPrivateKey(issMD, gosaml.Roles[(role+1)%2]+gosaml.SigningCertQuery)
+	privatekey, _, err := gosaml.GetPrivateKey(issMD, gosaml.Roles[sloinfo.HubRole]+gosaml.SigningCertQuery)
 	if err != nil {
 		return err
 	}
