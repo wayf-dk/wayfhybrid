@@ -46,9 +46,9 @@ var (
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:cp:uid"},
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
-		{c14n: "ial", name: "loa", op: "nemlogin:loa"},
-		{c14n: "aal", name: "loa", op: "nemlogin:loa"},
-		{c14n: "loa", name: "loa", op: "nemlogin:loa"},
+		{c14n: "ial", name: "loa", op: "nemlogin:loaLimiter"},
+		{c14n: "aal", name: "loa", op: "nemlogin:loaLimiter"},
+		{c14n: "loa", name: "loa", op: "nemlogin:loaLimiter"},
 		{c14n: "eduPersonAssurance", name: "eduPersonAssurance", op: "nemlogin:cp:loa"},
 
 		// computed
@@ -431,7 +431,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if idpMd.QueryXMLBool(nil, xprefix+"addESI") {
 				*v = "urn:schac:personalUniqueCode:int:esi:" + values["schacHomeOrganization"][0] + ":" + eptidforaudience(values, "europeanStudentIdentifier")
 			}
-		case "loa":
+		case "loaLimiter":
 			levels := map[string]string{"Low": "Low", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are ignored
 			for i, loa := range values[atd.c14n] {
 				values[atd.c14n][i] = levels[loa]
