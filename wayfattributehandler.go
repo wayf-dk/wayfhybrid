@@ -26,6 +26,11 @@ type (
 		op         string
 	}
 
+	requestedAttributeType struct {
+		friendlyName, name, nameFormat string
+		values                         []*regexp.Regexp
+	}
+
 	attributeKey struct {
 		name, nameFormat string
 	}
@@ -230,6 +235,10 @@ var (
 		"isMemberOf": true,
 	}
 
+	autoAttributes = []requestedAttributeType{
+//		{friendlyName: "eduPersonAssurance", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.11"},
+	}
+
 	internalAttributeDescriptions       = attributeDescriptionsMap{}
 	requestAttributeDescriptions        = attributeDescriptionsMap{}
 	incomingAttributeDescriptions       = attributeDescriptionsMap{}
@@ -286,7 +295,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 
 // RequestHandler - runs attributeOpsHandler for requestAttributesBase and returns the result as values
 func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string, err error) {
-    values = map[string][]string{}
+	values = map[string][]string{}
 	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd, request.QueryDashP(nil, `/saml:AttributeStatement`, "", nil))
 	return
 }
@@ -550,7 +559,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 
 	destinationAttributes := response.QueryDashP(assertionList[0], saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
 
-	if gosaml.DebugSetting(r, "allAttrs") == "1"  || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
+	if gosaml.DebugSetting(r, "allAttrs") == "1" || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
 		destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
 		goxml.RmElement(destinationAttributes)
 		return nil, ""
@@ -567,22 +576,47 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 		idpValues = nl[0]
 	}
 
-	h := sha1.New()
+    requestedAttributeList := []requestedAttributeType{}
+	c14nSeen := map[string]bool{}
 	for _, requestedAttribute := range requestedAttributes {
 		friendlyName := spMd.Query1(requestedAttribute, "@FriendlyName")
-		name := spMd.Query1(requestedAttribute, "@Name")
-		nameFormat := spMd.Query1(requestedAttribute, "@NameFormat")
+		c14nSeen[friendlyName] = true
+		requestedAttributeList = append(requestedAttributeList, requestedAttributeType{
+			friendlyName: friendlyName,
+			name:         spMd.Query1(requestedAttribute, "@Name"),
+			nameFormat:   spMd.Query1(requestedAttribute, "@NameFormat"),
+			values:       makeFilters(spMd.Query(requestedAttribute, `saml:AttributeValue`)),
+		})
+	}
 
-		atd, ok := outgoingAttributeDescriptions[attributeKey{name, ""}]
+	nameFormat := spMd.Query1(nil, xprefix+"AttributeNameFormat")
+	if nameFormat == "" {
+		nameFormat = attributenameFormats["uri"]
+	}
+	basicName := nameFormat != attributenameFormats["uri"]
+	for _, ra := range autoAttributes {
+		if !c14nSeen[ra.friendlyName] {
+			requestedAttributeList = append(requestedAttributeList, requestedAttributeType{
+				friendlyName: ra.friendlyName,
+				name:         map[bool]string{true: ra.friendlyName, false: ra.name}[basicName],
+				nameFormat:   nameFormat,
+			})
+		}
+	}
+
+	h := sha1.New()
+	for _, requestedAttribute := range requestedAttributeList {
+
+		atd, ok := outgoingAttributeDescriptions[attributeKey{requestedAttribute.name, ""}]
 		if !ok {
-			atd, ok = outgoingAttributeDescriptionsByC14n[attributeKey{friendlyName, ""}]
+			atd, ok = outgoingAttributeDescriptionsByC14n[attributeKey{requestedAttribute.friendlyName, ""}]
 		}
 		if !ok {
 			continue
 		}
 
 		filters := []*regexp.Regexp{}
-		filters = append(filters, makeFilters(spMd.Query(requestedAttribute, `saml:AttributeValue`))...)
+		filters = append(filters, requestedAttribute.values...)
 		filters = append(filters, makeFilters(spMd.Query(spValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
 		filters = append(filters, makeFilters(idpMd.Query(idpValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
 
@@ -609,9 +643,9 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 
 		io.WriteString(h, atd.c14n)
 
-		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@"+nameName, name, nil)
-		if nameFormat != "" {
-			response.QueryDashP(newAttribute, "@"+nameFormatName, nameFormat, nil)
+		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@"+nameName, requestedAttribute.name, nil)
+		if requestedAttribute.nameFormat != "" {
+			response.QueryDashP(newAttribute, "@"+nameFormatName, requestedAttribute.nameFormat, nil)
 		}
 		response.QueryDashP(newAttribute, "@FriendlyName", atd.c14n, nil)
 
