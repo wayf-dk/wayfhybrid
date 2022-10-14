@@ -55,6 +55,7 @@ var (
 		{c14n: "aal", name: "loa", op: "nemlogin:loaLimiter"},
 		{c14n: "loa", name: "loa", op: "nemlogin:loaLimiter"},
 		{c14n: "eduPersonAssurance", name: "eduPersonAssurance", op: "nemlogin:cp:loa"},
+		{c14n: "eduPersonAssurance", name: "eduPersonAssurance", op: "nemlogin:append:eduPersonAssurance"},
 
 		// computed
 		{c14n: "idpPersistentID", op: "xp:idp:@entityID"},
