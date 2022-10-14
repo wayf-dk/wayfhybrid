@@ -53,9 +53,7 @@ var (
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
 		{c14n: "ial", name: "loa", op: "nemlogin:loaLimiter"},
 		{c14n: "aal", name: "loa", op: "nemlogin:loaLimiter"},
-		{c14n: "loa", name: "loa", op: "nemlogin:loaLimiter"},
-		{c14n: "eduPersonAssurance", name: "eduPersonAssurance", op: "nemlogin:cp:loa"},
-		{c14n: "eduPersonAssurance", name: "eduPersonAssurance", op: "nemlogin:append:eduPersonAssurance"},
+		{c14n: "eduPersonAssurance", name: "loa", op: "nemlogin:loaLimiter"},
 
 		// computed
 		{c14n: "idpPersistentID", op: "xp:idp:@entityID"},
@@ -196,7 +194,7 @@ var (
 
 		// Nemlog-in-3
 		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
-		{c14n: "loa", name: "https://data.gov.dk/concept/core/nsis/loa"},
+		{c14n: "eduPersonAssurance", name: "https://data.gov.dk/concept/core/nsis/loa"},
 		{c14n: "ial", name: "https://data.gov.dk/concept/core/nsis/ial"},
 		{c14n: "aal", name: "https://data.gov.dk/concept/core/nsis/aal"},
 		{c14n: "cn", name: "https://data.gov.dk/model/core/eid/fullName"},
