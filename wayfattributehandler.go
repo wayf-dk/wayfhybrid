@@ -443,7 +443,9 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "loaLimiter":
 			levels := map[string]string{"Low": "Low", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are ignored
 			for i, loa := range values[atd.c14n] {
-				values[atd.c14n][i] = levels[loa]
+			    if level, ok := levels[loa]; ok {
+				    values[atd.c14n][i] = level
+				}
 			}
 		default:
 			// panic("unknown op: " + op)
