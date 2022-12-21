@@ -83,7 +83,7 @@ var (
 		{c14n: "AuthnContextClassRef", op: "append:authenticationmethod"},
 		{c14n: "commonfederations", op: "commonfederations:"},
 		{c14n: "nameID", op: "nameid:"},
-		{c14n: "modstlogonmethod", op: "val:username-password-protected-transport"},
+		{c14n: "modstlogonmethod", op: "modstlogonmethod:username-password-protected-transport"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
 		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
 		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
@@ -444,6 +444,15 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			for i, loa := range values[atd.c14n] {
 			    if level, ok := levels[loa]; ok {
 				    values[atd.c14n][i] = level
+				}
+			}
+		case "modstlogonmethod":
+            *v = opParam[1]
+            levels := map[string]string{"3": "two-factor"}
+			for _, loa := range values["eduPersonAssurance"] {
+			    if level, ok := levels[loa]; ok {
+				    *v = level
+				    break
 				}
 			}
 		default:
