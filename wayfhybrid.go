@@ -1224,6 +1224,11 @@ found:
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
 		}
 
+		if gosaml.DebugSetting(r, "timingError") == "1" {
+			fakeTime := time.Now().UTC().Add(-time.Hour).Format(gosaml.XsDateTime)
+			newresponse.QueryDashP(nil, "./saml:Assertion/saml:Conditions/@NotOnOrAfter", fakeTime, nil)
+		}
+
 		if protocolBinding != gosaml.SIMPLESIGN { // always sign - unless SIMPLESIGN is explicit chosen
 			for _, q := range elementsToSign {
 				err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
