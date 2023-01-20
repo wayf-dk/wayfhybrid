@@ -1124,7 +1124,7 @@ found:
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 
 		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
-		    return
+			return
 		}
 		if err = checkForCommonFederations(response); err != nil {
 			return
