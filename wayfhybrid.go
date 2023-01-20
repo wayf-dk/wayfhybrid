@@ -1299,10 +1299,28 @@ found:
 		}
 	}
 
-	if sRequest.Protocol == "wsfed" {
-		samlResponse = string(responseXML)
-	} else {
-		samlResponse = base64.StdEncoding.EncodeToString(responseXML)
+	switch sRequest.Protocol {
+	default:
+		data.Samlresponse = base64.StdEncoding.EncodeToString(responseXML)
+	case "wsfed":
+		data.Samlresponse = string(responseXML)
+	case "oidc":
+		id_token := gosaml.Saml2map(newresponse)
+		json, err := json.Marshal(&id_token)
+		if err != nil {
+			return err
+		}
+
+		privatekey, _, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
+		if err != nil {
+			return err
+		}
+		signed_id_token, _, err := gosaml.JwtSign(json, privatekey, "RS256")
+		if err != nil {
+			return err
+		}
+		data.Id_token = signed_id_token
+		data.Acs = newresponse.Query1(nil, "@Destination")
 	}
 
 	data := gosaml.Formdata{WsFed: sRequest.Protocol == "wsfed", Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"),
