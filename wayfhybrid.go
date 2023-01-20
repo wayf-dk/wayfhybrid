@@ -1274,8 +1274,14 @@ found:
 
 	gosaml.DumpFileIfTracing(r, newresponse)
 
-	var samlResponse string
-	sigAlg := config.CryptoMethods[signingMethod].SigningMethod
+	data := gosaml.Formdata{
+		Protocol:   sRequest.Protocol,
+		Acs:        request.Query1(nil, "./@AssertionConsumerServiceURL"),
+		SigAlg:     config.CryptoMethods[signingMethod].SigningMethod,
+		RelayState: relayState,
+		Ard:        template.JS(ardjson),
+	}
+
 	var signature []byte
 	responseXML := newresponse.Dump()
 
@@ -1284,7 +1290,7 @@ found:
 		if relayState != "" {
 			signed += "&RelayState=" + relayState
 		}
-		signed += "&SigAlg=" + sigAlg
+		signed += "&SigAlg=" + data.SigAlg
 		privatekey, _, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, config.CryptoMethods[signingMethod].Type)
 		if err != nil {
 			return err
@@ -1323,8 +1329,7 @@ found:
 		data.Acs = newresponse.Query1(nil, "@Destination")
 	}
 
-	data := gosaml.Formdata{WsFed: sRequest.Protocol == "wsfed", Acs: request.Query1(nil, "./@AssertionConsumerServiceURL"),
-		Samlresponse: samlResponse, RelayState: relayState, Signature: base64.RawURLEncoding.EncodeToString(signature), SigAlg: sigAlg, Ard: template.JS(ardjson)}
+	data.Signature = base64.RawURLEncoding.EncodeToString(signature)
 	return tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
 }
 
@@ -1439,7 +1444,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 			return err
 		}
 		data := gosaml.Formdata{Acs: msg.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(msg.Dump())}
-		return gosaml.PostForm.ExecuteTemplate(w, "postForm", data)
+		return tmpl.ExecuteTemplate(w, "postForm", data)
 	}
 	return
 }
