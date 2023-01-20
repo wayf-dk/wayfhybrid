@@ -473,9 +473,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	r.ParseForm()
 
 	type testSPFormData struct {
-		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP string
-		Messages, Marshalled                                                       string
-		AttrValues, DebugValues                                                    []attrValue
+		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP, Marshalled string
+		Code_challenge, AssertionConsumerServiceURL                                            string
+		Messages                                                                               template.HTML
+		AttrValues, DebugValues                                                                []attrValue
 	}
 
 	spMd, err := md.Internal.MDQ("https://" + r.Host)
