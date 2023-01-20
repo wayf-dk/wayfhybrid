@@ -591,7 +591,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		// try to decode SAML message to ourselves or just another SP
 		// don't do destination check - we accept and dumps anything ...
 		external := "0"
-		messages := "none"
+		messages := []string{}
 		response, issuerMd, destinationMd, relayState, _, _, err := gosaml.DecodeSAMLMsg(r, hubExtIDP, gosaml.MdSets{md.Internal}, gosaml.SPRole, []string{"Response", "LogoutRequest", "LogoutResponse"}, "https://"+r.Host+r.URL.Path, nil)
 		if err != nil {
 			return err
@@ -612,8 +612,24 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			Attributesc14n(response, response, issuerMd, destinationMd)
 			err = wayfScopeCheck(response, issuerMd)
 			if err != nil {
-				messages = err.Error()
+				messages = append(messages, err.Error())
 			}
+
+			xpathTests, err := r.Cookie("xpathchecks")
+			if err == nil && xpathTests.Value != "" {
+				var tests []string
+				val, _ := url.QueryUnescape(xpathTests.Value)
+				if err := json.Unmarshal([]byte(val), &tests); err == nil {
+					for _, test := range tests {
+						if test != "" {
+							res := fmt.Sprintf("%v == %v", test, response.Query1(nil, test))
+							messages = append(messages, res)
+						}
+
+					}
+				}
+			}
+
 			debugVals = attributeValues(response, destinationMd, hubMd)
 		}
 
