@@ -486,6 +486,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	scoping := r.Form.Get("scoping")
 	scopedIDP := r.Form.Get("scopedidp")
 
+	formdata := testSPFormData{
+		AssertionConsumerServiceURL: "https://" + r.Host + "/ACS",
+	}
+
 	if r.Form.Get("ds") != "" {
 
 		data := url.Values{}
@@ -633,13 +637,40 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			debugVals = attributeValues(response, destinationMd, hubMd)
 		}
 
-		data := testSPFormData{RelayState: relayState, ResponsePP: incomingResponseXML, Destination: destinationMd.Query1(nil, "./@entityID"), Messages: messages,
-			Issuer: issuerMd.Query1(nil, "./@entityID"), External: external, Protocol: protocol, AttrValues: vals, DebugValues: debugVals,
-			ScopedIDP: response.Query1(nil, "//saml:AuthenticatingAuthority[last()]"), Marshalled: marshalledResponse}
-		return tmpl.ExecuteTemplate(w, "testSPForm", data)
+		formdata.RelayState = relayState
+		formdata.ResponsePP = incomingResponseXML
+		formdata.Destination = destinationMd.Query1(nil, "./@entityID")
+		formdata.Messages = template.HTML(strings.Join(messages, "<br>"))
+		formdata.Issuer = issuerMd.Query1(nil, "./@entityID")
+		formdata.External = external
+		formdata.Protocol = protocol
+		formdata.AttrValues = vals
+		formdata.DebugValues = debugVals
+		formdata.ScopedIDP = response.Query1(nil, "//saml:AuthenticatingAuthority[last()]")
+		formdata.Marshalled = marshalledResponse
+		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
+	} else if id_token := r.Form.Get("id_token"); id_token != "" {
+
+		hubMd, _ := md.Hub.MDQ(config.HubEntityID)
+
+		payload, err := gosaml.JwtVerify(id_token, hubMd.QueryMulti(nil, "./md:IDPSSODescriptor"+gosaml.SigningCertQuery))
+		if err != nil {
+			return err
+		}
+
+		attrs := map[string]interface{}{}
+		err = json.Unmarshal(payload, &attrs)
+		if err != nil {
+			return err
+		}
+		jsonDump, _ := json.MarshalIndent(attrs, "", "    ")
+
+		formdata.RelayState = r.Form.Get("state")
+		formdata.ResponsePP = string(jsonDump)
+		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else {
-		data := testSPFormData{ScopedIDP: strings.Trim(r.Form.Get("scopedidp")+","+r.Form.Get("previdplist"), " ,")}
-		return tmpl.ExecuteTemplate(w, "testSPForm", data)
+		formdata.ScopedIDP = strings.Trim(r.Form.Get("scopedidp")+","+r.Form.Get("previdplist"), " ,")
+		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	}
 	return
 }
