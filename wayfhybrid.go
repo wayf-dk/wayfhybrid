@@ -1,7 +1,7 @@
 package wayfhybrid
 
 import (
-    "context"
+	"context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -259,7 +259,7 @@ func Main() {
 	}()
 
 	if *config.Test { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
-	    log.SetOutput(ioutil.Discard)
+		log.SetOutput(ioutil.Discard)
 	}
 
 	stopCh, closeCh := createChannel()
@@ -1365,7 +1365,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	case gosaml.REDIRECT:
 		u, err := gosaml.SAMLRequest2URL(msg, relayState, string(privatekey), "-", algo)
 		if err != nil {
-		    return err
+			return err
 		}
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case gosaml.POST:
