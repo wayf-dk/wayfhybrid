@@ -43,12 +43,6 @@ const (
 	sloCookieName   = "SLO"
 )
 
-const (
-	saml = iota
-	wsfed
-	oauth
-)
-
 type (
 	appHandler func(http.ResponseWriter, *http.Request) error
 
