@@ -1015,14 +1015,14 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	newrequest.QueryDashP(nil, "./@ProviderName", providerName, nil)
 
 	if request != nil && request.QueryXMLBool(nil, `//*[@Name="nemlogin"]/saml:AttributeValue`) {
-	    if tmp := hubKribSPMd.Query1(nil, `//wayf:map2IdP`); tmp != "" { // let the SP choose which SSOIndex to use
-		    dest := realIDPMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[`+tmp+`][@Binding="`+gosaml.REDIRECT+`"]/@Location`)
-	        newrequest.QueryDashP(nil, "./@Destination", dest, nil)
-    	}
+		if tmp := hubKribSPMd.Query1(nil, `//wayf:map2IdP`); tmp != "" { // let the SP choose which SSOIndex to use
+			dest := realIDPMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[`+tmp+`][@Binding="`+gosaml.REDIRECT+`"]/@Location`)
+			newrequest.QueryDashP(nil, "./@Destination", dest, nil)
+		}
 	}
 
 	if virtualIDPMd.QueryXMLBool(nil, xprefix+`forceAuthn`) && spMd.QueryXMLBool(nil, xprefix+`forceAuthn`) {
-	    newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
+		newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 	}
 
 	buf := sRequest.Marshal()
