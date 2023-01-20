@@ -1244,7 +1244,7 @@ found:
 
 		gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
 		if spMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
-    		// spMd.Query1(nil, "./md:SPSSODescriptor/md:KeyDescriptor/md:EncryptionMethod/@Algorithm") != "" ||
+			// spMd.Query1(nil, "./md:SPSSODescriptor/md:KeyDescriptor/md:EncryptionMethod/@Algorithm") != "" ||
 			hubKribSpMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
 			gosaml.DebugSetting(r, "encryptAssertion") == "1" {
 			gosaml.DumpFileIfTracing(r, newresponse)
