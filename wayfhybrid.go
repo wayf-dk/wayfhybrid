@@ -1312,6 +1312,7 @@ found:
 		data.Samlresponse = string(responseXML)
 	case "oidc":
 		id_token := gosaml.Saml2map(newresponse)
+		id_token["nonce"] = sRequest.OidcNonce
 		json, err := json.Marshal(&id_token)
 		if err != nil {
 			return err
