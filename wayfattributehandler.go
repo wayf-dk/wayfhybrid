@@ -35,7 +35,7 @@ type (
 		name, nameFormat string
 	}
 
-	attributeDescriptionsMap      map[attributeKey]attributeDescription
+	attributeDescriptionsMap      map[string]attributeDescription
 	attributeDescriptionsListtype map[string][]attributeDescription
 )
 
@@ -190,6 +190,7 @@ var (
 		{c14n: "localityName", name: "urn:oid:2.5.4.7"},
 		{c14n: "ou", name: "ou"},
 		{c14n: "ou", name: "urn:oid:2.5.4.11"},
+		{c14n: "schacGender", name: "schacGender"},
 		{c14n: "schacGender", name: "urn:oid:1.3.6.1.4.1.25178.1.2.2"},
 
 		// Nemlog-in-3
@@ -247,10 +248,10 @@ var (
 
 func init() {
 	for _, ad := range attributesBase {
-		incomingAttributeDescriptions[attributeKey{ad.name, attributenameFormats[ad.nameformat]}] = ad
-		incomingAttributeDescriptions[attributeKey{ad.name, ""}] = ad
-		outgoingAttributeDescriptions[attributeKey{ad.name, ""}] = ad
-		outgoingAttributeDescriptionsByC14n[attributeKey{ad.c14n, ""}] = ad
+		incomingAttributeDescriptions[ad.name] = ad
+		incomingAttributeDescriptions[ad.c14n] = ad
+		outgoingAttributeDescriptions[ad.name] = ad
+		outgoingAttributeDescriptionsByC14n[ad.c14n] = ad
 	}
 }
 
@@ -271,11 +272,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 	//fmt.Println(response.PP())
 	for _, attribute := range sourceAttributes {
 		name := response.Query1(attribute, "@Name")
-		nameFormat := response.Query1(attribute, "@NameFormat")
-		atd, ok := incomingAttributeDescriptions[attributeKey{name, nameFormat}]
-		if !ok {
-			atd, ok = incomingAttributeDescriptions[attributeKey{name, ""}]
-		}
+		atd, ok := incomingAttributeDescriptions[name]
 		if ok {
 			values[atd.c14n] = response.QueryMulti(attribute, `saml:AttributeValue`)
 			if base64encoded {
@@ -617,9 +614,9 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	h := sha1.New()
 	for _, requestedAttribute := range requestedAttributeList {
 
-		atd, ok := outgoingAttributeDescriptions[attributeKey{requestedAttribute.name, ""}]
+		atd, ok := outgoingAttributeDescriptions[requestedAttribute.name]
 		if !ok {
-			atd, ok = outgoingAttributeDescriptionsByC14n[attributeKey{requestedAttribute.friendlyName, ""}]
+			atd, ok = outgoingAttributeDescriptionsByC14n[requestedAttribute.friendlyName]
 		}
 		if !ok {
 			continue
