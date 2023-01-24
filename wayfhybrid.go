@@ -491,7 +491,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	if r.Form.Get("ds") != "" {
-
 		data := url.Values{}
 		data.Set("return", "https://"+r.Host+"/?previdplist="+r.Form.Get("scopedidp"))
 		data.Set("returnIDParam", "scopedidp")
@@ -499,6 +498,30 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
 
 	} else if login || idp != "" {
+
+		protocol := r.Form.Get("protocol")
+		if protocol == "oidc" {
+			data := url.Values{}
+			data.Set("response_type", "id_token")
+			data.Set("client_id", "https://"+r.Host)
+			data.Set("redirect_uri", "https://"+r.Host+"/ACS")
+			if scopedIDP != "" {
+				data.Set("idpentityid", scopedIDP)
+			}
+			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
+			return
+		}
+
+		if protocol == "wsfed" {
+			data := url.Values{}
+			data.Set("wa", "wsignin1.0")
+			data.Set("wtrealm", "https://"+r.Host)
+			if scopedIDP != "" {
+				data.Set("idpentityid", scopedIDP)
+			}
+			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
+			return
+		}
 
 		idpMd, err := md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
@@ -571,8 +594,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		if scoping == "param" {
 			idp = scopedIDP
 		}
-		if idp != "" {
-			q.Set("idplist", idp)
+		if scopedIDP != "" {
+			q.Set("idplist", scopedIDP)
 		}
 		u.RawQuery = q.Encode()
 		http.Redirect(w, r, u.String(), http.StatusFound)
