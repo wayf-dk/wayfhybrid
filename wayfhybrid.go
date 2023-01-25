@@ -1241,8 +1241,6 @@ found:
 		signingType := gosaml.SAMLSign
 		if sRequest.Protocol == "wsfed" {
 			newresponse = gosaml.NewWsFedResponse(hubBirkIDPMd, spMd, newresponse)
-			ard.Values, ard.Hash = CopyAttributes(r, response, newresponse, idpMd, spMd)
-
 			signingType = gosaml.WSFedSign
 			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
 		}
