@@ -163,6 +163,7 @@ var (
 
 		// Nemlog-in-3
 		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
+		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/rid"},
 		{c14n: "eduPersonAssurance", name: "https://data.gov.dk/concept/core/nsis/loa"},
 		{c14n: "ial", name: "https://data.gov.dk/concept/core/nsis/ial"},
 		{c14n: "aal", name: "https://data.gov.dk/concept/core/nsis/aal"},
