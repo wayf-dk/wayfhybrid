@@ -552,19 +552,8 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
-	nameName := "Name"
-	nameFormatName := "NameFormat"
-
-	saml := "saml"
 	assertionList := response.Query(nil, "./saml:Assertion")
-	if len(assertionList) == 0 {
-		assertionList = response.Query(nil, "./t:RequestedSecurityToken/saml1:Assertion")
-		saml = "saml1"
-		nameName = "AttributeName"
-		nameFormatName = "AttributeNamespace"
-	}
-
-	destinationAttributes := response.QueryDashP(assertionList[0], saml+":AttributeStatement", "", nil) // only if there are actually some requested attributes
+	destinationAttributes := response.QueryDashP(assertionList[0], "saml:AttributeStatement", "", nil) // only if there are actually some requested attributes
 
 	if gosaml.DebugSetting(r, "allAttrs") == "1" || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
 		destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
@@ -650,9 +639,9 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 
 		io.WriteString(h, atd.c14n)
 
-		newAttribute := response.QueryDashP(destinationAttributes, saml+":Attribute[0]/@"+nameName, requestedAttribute.name, nil)
+		newAttribute := response.QueryDashP(destinationAttributes, "saml:Attribute[0]/@Name", requestedAttribute.name, nil)
 		if requestedAttribute.nameFormat != "" {
-			response.QueryDashP(newAttribute, "@"+nameFormatName, requestedAttribute.nameFormat, nil)
+			response.QueryDashP(newAttribute, "@NameFormat", requestedAttribute.nameFormat, nil)
 		}
 		response.QueryDashP(newAttribute, "@FriendlyName", atd.c14n, nil)
 
@@ -663,7 +652,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 				v := base64.StdEncoding.EncodeToString([]byte(value))
 				value = string(v)
 			}
-			response.QueryDashP(newAttribute, saml+":AttributeValue[0]", value, nil)
+			response.QueryDashP(newAttribute, "saml:AttributeValue[0]", value, nil)
 		}
 	}
 
