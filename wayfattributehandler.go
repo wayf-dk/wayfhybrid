@@ -204,7 +204,7 @@ var (
 	}
 
 	autoAttributes = []requestedAttributeType{
-//		{friendlyName: "eduPersonAssurance", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.11"},
+		//		{friendlyName: "eduPersonAssurance", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.11"},
 	}
 
 	internalAttributeDescriptions       = attributeDescriptionsMap{}
@@ -407,17 +407,17 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "loaLimiter":
 			levels := map[string]string{"Low": "Low", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are ignored
 			for i, loa := range values[atd.c14n] {
-			    if level, ok := levels[loa]; ok {
-				    values[atd.c14n][i] = level
+				if level, ok := levels[loa]; ok {
+					values[atd.c14n][i] = level
 				}
 			}
 		case "modstlogonmethod":
-            *v = opParam[1]
-            levels := map[string]string{"3": "two-factor"}
+			*v = opParam[1]
+			levels := map[string]string{"3": "two-factor"}
 			for _, loa := range values["eduPersonAssurance"] {
-			    if level, ok := levels[loa]; ok {
-				    *v = level
-				    break
+				if level, ok := levels[loa]; ok {
+					*v = level
+					break
 				}
 			}
 		default:
@@ -540,7 +540,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 		idpValues = nl[0]
 	}
 
-    requestedAttributeList := []requestedAttributeType{}
+	requestedAttributeList := []requestedAttributeType{}
 	c14nSeen := map[string]bool{}
 	for _, requestedAttribute := range requestedAttributes {
 		friendlyName := spMd.Query1(requestedAttribute, "@FriendlyName")
