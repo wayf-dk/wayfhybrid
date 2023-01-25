@@ -45,11 +45,10 @@ var (
 
 		// nemlogin computed
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
-		{c14n: "nemlogin", op: "eq:Issuer:https://saml.test-nemlog-in.dk/"},
 		{c14n: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
 		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
-		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:cp:uid"},
+		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:nemloginEppn"},
 		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
 		{c14n: "ial", name: "loa", op: "nemlogin:loaLimiter"},
 		{c14n: "aal", name: "loa", op: "nemlogin:loaLimiter"},
@@ -162,8 +161,9 @@ var (
 		{c14n: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1"},
 
 		// Nemlog-in-3
-		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/person/pid"},
-		{c14n: "uid", name: "https://data.gov.dk/model/core/eid/professional/rid"},
+		{c14n: "pid", name: "https://data.gov.dk/model/core/eid/person/pid"},
+		{c14n: "rid", name: "https://data.gov.dk/model/core/eid/professional/rid"},
+		{c14n: "cvr", name: "https://data.gov .dk/model/core/eid/professional/cvr"},
 		{c14n: "eduPersonAssurance", name: "https://data.gov.dk/concept/core/nsis/loa"},
 		{c14n: "ial", name: "https://data.gov.dk/concept/core/nsis/ial"},
 		{c14n: "aal", name: "https://data.gov.dk/concept/core/nsis/aal"},
@@ -376,6 +376,12 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				opParam = strings.SplitN(opParam[1], ":", 2)
 				goto handleop
 			}
+		case "nemloginEppn":
+		    if len(values["rid"]) > 0 {
+                *v = "CVR:"+values["cvr"][0]+"-RID:"+values["rid"][0]
+		    } else {
+		        *v = values["pid"][0]
+		    }
 		case "commonfederations":
 			*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
 		case "nameid":
