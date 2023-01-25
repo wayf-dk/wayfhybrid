@@ -252,7 +252,7 @@ func Main() {
 		}
 	}()
 
-	if *config.Test { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
+	if *config.Test && !*config.Verbose { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
 		log.SetOutput(ioutil.Discard)
 	}
 
