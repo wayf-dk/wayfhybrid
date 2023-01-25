@@ -485,6 +485,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	login := r.Form.Get("login") == "1"
 	scoping := r.Form.Get("scoping")
 	scopedIDP := r.Form.Get("scopedidp")
+	idpList := strings.Split(scopedIDP, ",")
 
 	formdata := testSPFormData{
 		AssertionConsumerServiceURL: "https://" + r.Host + "/ACS",
@@ -493,32 +494,29 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	if r.Form.Get("ds") != "" {
 		data := url.Values{}
 		data.Set("return", "https://"+r.Host+"/?previdplist="+r.Form.Get("scopedidp"))
-		data.Set("returnIDParam", "scopedidp")
+		data.Set("returnIDParam", "idpentityid")
 		data.Set("entityID", "https://"+r.Host)
 		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
-
-	} else if login || idp != "" {
+	} else if login {
+		data := url.Values{}
+		switch {
+		case len(idpList) == 1 && idpList[0] == "":
+		case len(idpList) == 1:
+			data.Set("idpentityid", scopedIDP)
+		default:
+			data.Set("idplist", scopedIDP)
+		}
 
 		protocol := r.Form.Get("protocol")
 		if protocol == "oidc" {
-			data := url.Values{}
 			data.Set("response_type", "id_token")
 			data.Set("client_id", "https://"+r.Host)
 			data.Set("redirect_uri", "https://"+r.Host+"/ACS")
-			if scopedIDP != "" {
-				data.Set("idpentityid", scopedIDP)
-			}
 			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
 			return
-		}
-
-		if protocol == "wsfed" {
-			data := url.Values{}
+		} else if protocol == "wsfed" {
 			data.Set("wa", "wsignin1.0")
 			data.Set("wtrealm", "https://"+r.Host)
-			if scopedIDP != "" {
-				data.Set("idpentityid", scopedIDP)
-			}
 			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
 			return
 		}
@@ -574,7 +572,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scoping == "scoping" {
-			for _, scope := range strings.Split(scopedIDP, ",") {
+			for _, scope := range idpList {
 				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
 			}
 		}
@@ -592,10 +590,13 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scoping == "param" {
-			idp = scopedIDP
-		}
-		if scopedIDP != "" {
-			q.Set("idplist", scopedIDP)
+			switch len(idpList) {
+			case 0:
+			case 1:
+				q.Set("idpentityid", scopedIDP)
+			default:
+				q.Set("idplist", scopedIDP)
+			}
 		}
 		u.RawQuery = q.Encode()
 		http.Redirect(w, r, u.String(), http.StatusFound)
@@ -691,8 +692,13 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		formdata.RelayState = r.Form.Get("state")
 		formdata.ResponsePP = string(jsonDump)
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
+	} else if wresult := r.Form.Get("wresult"); wresult != "" {
+		xp := goxml.NewXpFromString(wresult)
+		formdata.ResponsePP = xp.PP()
+		formdata.Protocol = xp.QueryString(nil, "local-name(/*)")
+		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else {
-		formdata.ScopedIDP = strings.Trim(r.Form.Get("scopedidp")+","+r.Form.Get("previdplist"), " ,")
+		formdata.ScopedIDP = strings.Trim(r.Form.Get("idpentityid")+","+r.Form.Get("previdplist"), " ,")
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	}
 	return
