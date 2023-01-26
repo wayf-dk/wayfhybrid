@@ -634,7 +634,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`))
 	io.WriteString(h, spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`))
 	io.WriteString(h, spMd.Query1(nil, `@entityID`))
-	io.WriteString(h, response.Query1(nil, `saml:Issuer`))
+	io.WriteString(h, response.Query1(nil, `saml:Assertion/saml:Issuer`))
 	ardHash = fmt.Sprintf("%.5x", h.Sum(nil))
 	return
 }
