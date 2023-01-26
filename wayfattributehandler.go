@@ -41,7 +41,7 @@ type (
 
 var (
 	internalAttributesBase = []attributeDescription{
-		{c14n: "Issuer", op: "xp:msg:./saml:Issuer"},
+		{c14n: "Issuer", op: "xp:msg:saml:Assertion/saml:Issuer"},
 
 		// nemlogin computed
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
