@@ -45,11 +45,11 @@ var (
 
 		// nemlogin computed
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
-		{c14n: "eduPersonPrimaryAffiliation", name: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
+		{c14n: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
-		{c14n: "schacPersonalUniqueID", name: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
-		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:nemloginEppn"},
-		{c14n: "eduPersonPrincipalName", name: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
+		{c14n: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
+		{c14n: "eduPersonPrincipalName", op: "nemlogin:nemloginEppn"},
+		{c14n: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
 		{c14n: "ial", name: "loa", op: "nemlogin:loaLimiter"},
 		{c14n: "aal", name: "loa", op: "nemlogin:loaLimiter"},
 		{c14n: "eduPersonAssurance", name: "loa", op: "nemlogin:loaLimiter"},
