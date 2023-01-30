@@ -156,6 +156,11 @@ var (
 		{c14n: "subject-id", name: "urn:oasis:names:tc:SAML:attribute:subject-id"},
 		{c14n: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1"},
 
+        // Nemlog-in-2
+		{c14n: "pid", name: "dk:gov:saml:attribute:PidNumberIdentifier"},
+		{c14n: "rid", name: "dk:gov:saml:attribute:RidNumberIdentifier"},
+		{c14n: "cvr", name: "dk:gov:saml:attribute:CvrNumberIdentifier"},
+
 		// Nemlog-in-3
 		{c14n: "pid", name: "https://data.gov.dk/model/core/eid/person/pid"},
 		{c14n: "rid", name: "https://data.gov.dk/model/core/eid/professional/rid"},
@@ -376,7 +381,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		    if len(values["rid"]) > 0 {
                 *v = "CVR:"+values["cvr"][0]+"-RID:"+values["rid"][0]
 		    } else {
-		        *v = values["pid"][0]
+		        *v = "PID:"+values["pid"][0]
 		    }
 		case "commonfederations":
 			*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
