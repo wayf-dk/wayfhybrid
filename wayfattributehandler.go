@@ -286,9 +286,13 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "append":
 			values[atd.c14n] = append(values[atd.c14n], values[opParam[1]]...)
 		case "prefix":
-			*v = opParam[1] + *v
+			if *v != "" {
+				*v = opParam[1] + *v
+			}
 		case "postfix":
-			*v = *v + opParam[1]
+		    if *v != "" {
+    			*v = *v + opParam[1]
+    		}
 		case "displayname":
 			if *v == "" && len(values["cn"]) != 0 {
 				*v = values["cn"][0]
