@@ -676,16 +676,24 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	} else if id_token := r.Form.Get("id_token"); id_token != "" {
 
 		hubMd, _ := md.Hub.MDQ(config.HubEntityID)
+        privatekey, _, err := gosaml.GetPrivateKeyByMethod(spMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery, x509.RSA)
+        if err != nil {
+            return goxml.Wrap(err)
+        }
 
+        id_token, err = goxml.DeJwe(id_token, privatekey, []byte("-"))
+        if err != nil {
+            return err
+        }
 		payload, err := gosaml.JwtVerify(id_token, hubMd.QueryMulti(nil, "./md:IDPSSODescriptor"+gosaml.SigningCertQuery))
 		if err != nil {
-			return err
+			return goxml.Wrap(err)
 		}
 
 		attrs := map[string]interface{}{}
 		err = json.Unmarshal(payload, &attrs)
 		if err != nil {
-			return err
+			return goxml.Wrap(err)
 		}
 		jsonDump, _ := json.MarshalIndent(attrs, "", "    ")
 
@@ -1181,6 +1189,9 @@ found:
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
+	doEncrypt := false
+    var id_token map[string]interface{}
+
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 
 		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
@@ -1243,6 +1254,9 @@ found:
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
+
+        id_token = gosaml.Saml2map(newresponse) // last chance to use a non-encrypted and non-saml1 newresponse
+
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
 		signingType := gosaml.SAMLSign
 		if sRequest.Protocol == "wsfed" {
@@ -1270,16 +1284,10 @@ found:
 		}
 
 		gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
-		if spMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
-			// spMd.Query1(nil, "./md:SPSSODescriptor/md:KeyDescriptor/md:EncryptionMethod/@Algorithm") != "" ||
+		doEncrypt = spMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
 			hubKribSpMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
-			gosaml.DebugSetting(r, "encryptAssertion") == "1" {
-			gosaml.DumpFileIfTracing(r, newresponse)
-			multi := spMd.QueryMultiMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery, []string{".", "../../../md:EncryptionMethod/@Algorithm"})
-			_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(goxml.Flatten(multi[0]), x509.RSA)
-			assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
-			newresponse.Encrypt(assertion, "saml:EncryptedAssertion", pubs[0].(*rsa.PublicKey), multi[1][0]) // multi[1] is a list of list of Algos for each key
-		}
+			gosaml.DebugSetting(r, "encryptAssertion") == "1"
+		// spMd.Query1(nil, "./md:SPSSODescriptor/md:KeyDescriptor/md:EncryptionMethod/@Algorithm") != ""
 	} else {
 		newresponse = gosaml.NewErrorResponse(hubBirkIDPMd, spMd, request, response)
 
@@ -1310,6 +1318,16 @@ found:
 	}
 
 	var signature []byte
+
+	gosaml.DumpFileIfTracing(r, newresponse)
+	multi := spMd.QueryMultiMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery, []string{".", "../../../md:EncryptionMethod/@Algorithm"})
+	_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(goxml.Flatten(multi[0]), x509.RSA)
+
+	if doEncrypt {
+		assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
+		newresponse.Encrypt(assertion, "saml:EncryptedAssertion", pubs[0].(*rsa.PublicKey), multi[1][0]) // multi[1] is a list of list of Algos for each key
+	}
+
 	responseXML := newresponse.Dump()
 
 	if protocolBinding == gosaml.SIMPLESIGN {
@@ -1338,7 +1356,6 @@ found:
 	case "wsfed":
 		data.Samlresponse = string(responseXML)
 	case "oidc":
-		id_token := gosaml.Saml2map(newresponse)
 		id_token["nonce"] = sRequest.OidcNonce
 		json, err := json.Marshal(&id_token)
 		if err != nil {
@@ -1354,6 +1371,9 @@ found:
 			return err
 		}
 		data.Id_token = signed_id_token
+
+		jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), nil)
+        data.Id_token = jwe
 		data.Acs = newresponse.Query1(nil, "@Destination")
 	}
 
