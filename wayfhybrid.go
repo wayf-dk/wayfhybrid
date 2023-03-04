@@ -1491,7 +1491,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		if err != nil {
 			return err
 		}
-		data := gosaml.Formdata{Acs: msg.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(msg.Dump())}
+		data := gosaml.Formdata{Acs: msg.Query1(nil, "./@Destination"), Samlresponse: base64.StdEncoding.EncodeToString(msg.Dump()), RelayState: relayState}
 		return tmpl.ExecuteTemplate(w, "postForm", data)
 	}
 	return
