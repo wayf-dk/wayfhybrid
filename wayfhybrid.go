@@ -1283,7 +1283,6 @@ found:
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
 		}
 
-		gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
 		doEncrypt = spMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
 			hubKribSpMd.QueryXMLBool(nil, xprefix+"assertion.encryption") ||
 			gosaml.DebugSetting(r, "encryptAssertion") == "1"
@@ -1295,9 +1294,9 @@ found:
 		if err != nil {
 			return
 		}
-		gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
 		ard = AttributeReleaseData{BypassConfirmation: true}
 	}
+	gosaml.NemLog.Log(newresponse, idpMd, origRequestID)
 
 	// when consent as a service is ready - we will post to that
 	// acs := newresponse.Query1(nil, "@Destination")
