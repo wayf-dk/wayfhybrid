@@ -1060,7 +1060,6 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		if spMd.QueryNumber(nil, "count(./md:SPSSODescriptor/md:SingleLogoutService)") != 0 {
     		newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 		}
-
 	}
 
 	if virtualIDPMd.QueryXMLBool(nil, xprefix+`forceAuthn`) && spMd.QueryXMLBool(nil, xprefix+`forceAuthn`) {
