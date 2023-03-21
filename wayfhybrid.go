@@ -1057,7 +1057,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 			newrequest.QueryDashP(nil, "./@Destination", dest, nil)
 		}
 		// Nemlog-in SPs announce their ability to do SLO by providing SingleLogoutService(s)
-		if spMd.QueryNumber(nil, "count(./md:SPSSODescriptor/md:SingleLogoutService)") != 0 {
+		if spMd.QueryNumber(nil, "count(./md:SPSSODescriptor/md:SingleLogoutService)") == 0 {
     		newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 		}
 	}
