@@ -1375,7 +1375,7 @@ found:
 		}
 		data.Id_token = signed_id_token
 
-		jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), nil)
+		jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), multi[1][0])
         data.Id_token = jwe
 		data.Acs = newresponse.Query1(nil, "@Destination")
 	}
