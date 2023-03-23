@@ -254,7 +254,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 		}
 	}
 
-	attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
+	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
 	goxml.RmElement(attributeStatement)
 	return
 }
@@ -266,7 +266,7 @@ func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string,
 	return
 }
 
-func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp, dest types.Node) {
+func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp, dest types.Node) (err error) {
 	contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg}
 	for _, atd := range atds {
 		opParam := strings.SplitN(atd.op, ":", 2)
@@ -447,6 +447,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			seen[val] = true
 		}
 	}
+	return
 }
 
 func eptidforaudience(values map[string][]string, audience string) string {
