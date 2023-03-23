@@ -290,9 +290,9 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				*v = opParam[1] + *v
 			}
 		case "postfix":
-		    if *v != "" {
-    			*v = *v + opParam[1]
-    		}
+			if *v != "" {
+				*v = *v + opParam[1]
+			}
 		case "displayname":
 			if *v == "" && len(values["cn"]) != 0 {
 				*v = values["cn"][0]
@@ -382,10 +382,15 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				goto handleop
 			}
 		case "nemloginEppn":
-			if len(values["rid"]) > 0 {
-				*v = "CVR:" + values["cvr"][0] + "-RID:" + values["rid"][0]
+			rid := values["rid"]
+			cvr := values["cvr"]
+			pid := values["pid"]
+			if len(rid) > 0 && len(cvr) > 0 {
+				*v = "CVR:" + cvr[0] + "-RID:" + rid[0]
+			} else if len(pid) > 0 {
+				*v = "PID:" + pid[0]
 			} else {
-				*v = "PID:" + values["pid"][0]
+				return fmt.Errorf("No pid or rid and cvr values")
 			}
 		case "commonfederations":
 			*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
