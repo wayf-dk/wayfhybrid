@@ -637,7 +637,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			vals = attributeValues(response, destinationMd, hubMd)
 			s, _ := json.MarshalIndent(response2JSON(response), "", "    ")
 			marshalledResponse = string(s)
-			Attributesc14n(response, response, issuerMd, destinationMd)
+			err = Attributesc14n(response, response, issuerMd, destinationMd)
+			if err != nil {
+				messages = append(messages, err.Error())
+			}
 			err = wayfScopeCheck(response, issuerMd)
 			if err != nil {
 				messages = append(messages, err.Error())
