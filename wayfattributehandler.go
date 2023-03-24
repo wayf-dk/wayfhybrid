@@ -422,7 +422,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				*v = "urn:schac:personalUniqueCode:int:esi:" + values["schacHomeOrganization"][0] + ":" + eptidforaudience(values, "europeanStudentIdentifier")
 			}
 		case "loaLimiter":
-			levels := map[string]string{"": "", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are errors, blanks are ok
+			levels := map[string]string{"": "", "3": "3", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are errors, blanks are ok
 			for i, loa := range values[atd.c14n] {
 				level, ok := levels[loa]
 				if ok {
