@@ -1186,9 +1186,17 @@ found:
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
 	doEncrypt := false
-    var id_token map[string]interface{}
+	var id_token map[string]interface{}
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
+		aud := response.Query1(nil, "./saml:Assertion/saml:Conditions/saml:AudienceRestriction/saml:Audience")
+		requester := spMd.Query1(nil, "@entityID")
+		// allow for Krib audience + special audience from Grandunified and none at all
+		switch aud {
+		case requester, config.HubEntityID, "":
+		default:
+			return fmt.Errorf("Audience mismatch %s not in [%s, %s]", aud, requester, config.HubEntityID)
+		}
 
 		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
 			return
