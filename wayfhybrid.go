@@ -1272,8 +1272,7 @@ found:
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
-
-        id_token = gosaml.Saml2map(newresponse) // last chance to use a non-encrypted and non-saml1 newresponse
+		id_token = gosaml.Saml2map(newresponse) // last chance to use a non-encrypted and non-saml1 newresponse
 
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
 		signingType := gosaml.SAMLSign
@@ -1390,7 +1389,7 @@ found:
 		data.Id_token = signed_id_token
 
 		jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), multi[1][0])
-        data.Id_token = jwe
+		data.Id_token = jwe
 		data.Acs = newresponse.Query1(nil, "@Destination")
 	}
 
