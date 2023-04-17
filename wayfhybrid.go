@@ -577,7 +577,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		u, err := gosaml.SAMLRequest2URL(newrequest, "", string(pk), "-", config.DefaultCryptoMethod)
+		u, err := gosaml.SAMLRequest2URL(newrequest, "", pk, config.DefaultCryptoMethod)
 		if err != nil {
 			return err
 		}
@@ -611,9 +611,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 		if r.Form.Get("logout") == "1" {
-			gosaml.SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, string(pk), "")
+			gosaml.SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, pk, "")
 		} else {
-			gosaml.SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, string(pk), gosaml.IDPRole)
+			gosaml.SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, pk, gosaml.IDPRole)
 		}
 	} else if r.Form.Get("SAMLRequest") != "" || r.Form.Get("SAMLResponse") != "" {
 		// try to decode SAML message to ourselves or just another SP
@@ -677,18 +677,16 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		formdata.Marshalled = marshalledResponse
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else if id_token := r.Form.Get("id_token"); id_token != "" {
+		privatekey, _, err := gosaml.GetPrivateKeyByMethod(spMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery, x509.RSA)
+		if err != nil {
+			return goxml.Wrap(err)
+		}
 
-		hubMd, _ := md.Hub.MDQ(config.HubEntityID)
-        privatekey, _, err := gosaml.GetPrivateKeyByMethod(spMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery, x509.RSA)
-        if err != nil {
-            return goxml.Wrap(err)
-        }
-
-        id_token, err = goxml.DeJwe(id_token, privatekey, []byte("-"))
-        if err != nil {
-            return err
-        }
-		payload, err := gosaml.JwtVerify(id_token, hubMd.QueryMulti(nil, "./md:IDPSSODescriptor"+gosaml.SigningCertQuery))
+		id_token, err = goxml.DeJwe(id_token, privatekey)
+		if err != nil {
+			return err
+		}
+		payload, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub})
 		if err != nil {
 			return goxml.Wrap(err)
 		}
@@ -1061,7 +1059,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		}
 		// Nemlog-in SPs announce their ability to do SLO by providing SingleLogoutService(s)
 		if spMd.QueryNumber(nil, "count(./md:SPSSODescriptor/md:SingleLogoutService)") == 0 {
-    		newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
+			newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 		}
 	}
 
@@ -1071,21 +1069,12 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 
 	buf := sRequest.Marshal()
 	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
-	var privatekey []byte
+	var privatekey crypto.PrivateKey
 	if realIDPMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || hubKribSPMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) || gosaml.DebugSetting(r, "idpSigAlg") != "" {
 		privatekey, _, err = gosaml.GetPrivateKey(hubKribSPMd, "md:SPSSODescriptor"+gosaml.SigningCertQuery)
 		if err != nil {
 			return
 		}
-	}
-
-	algo := config.DefaultCryptoMethod
-	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
-
-	gosaml.DumpFileIfTracing(r, newrequest)
-	u, err := gosaml.SAMLRequest2URL(newrequest, relayState, string(privatekey), "-", algo)
-	if err != nil {
-		return
 	}
 
 	legacyLog("", "SAML2.0 - IDP.SSOService: Incomming Authentication request:", "'"+request.Query1(nil, "./saml:Issuer")+"'", "", "")
@@ -1347,7 +1336,7 @@ found:
 			return err
 		}
 		digest := goxml.Hash(config.CryptoMethods[signingMethod].Hash, signed)
-		signature, err = goxml.Sign(digest, privatekey, []byte("-"), signingMethod)
+		signature, err = goxml.Sign(digest, privatekey, signingMethod)
 		if err != nil {
 			return err
 		}
@@ -1487,7 +1476,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 
 	switch binding {
 	case gosaml.REDIRECT:
-		u, err := gosaml.SAMLRequest2URL(msg, relayState, string(privatekey), "-", algo)
+		u, err := gosaml.SAMLRequest2URL(msg, relayState, privatekey, algo)
 		if err != nil {
 			return err
 		}
