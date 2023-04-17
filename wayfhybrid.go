@@ -1093,7 +1093,21 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		legacyStatJSONLog(jsonlog)
 	}
 
+	gosaml.DumpFileIfTracing(r, newrequest)
 	gosaml.NemLog.Log(newrequest, realIDPMd, request.Query1(nil, "@ID"))
+
+	oidc := realIDPMd.QueryBool(nil, "boolean("+xprefix+`simplesaml.attributes[.="oidc"])`)
+	log.Printf("oidc %v\n", oidc)
+	var u *url.URL
+	if oidc {
+		u, err = gosaml.SAMLRequest2OIDCRequest(newrequest, relayState)
+	} else {
+		u, err = gosaml.SAMLRequest2URL(newrequest, relayState, privatekey, gosaml.DebugSettingWithDefault(r, "idpSigAlg", config.DefaultCryptoMethod))
+	}
+	if err != nil {
+		return
+	}
+
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
