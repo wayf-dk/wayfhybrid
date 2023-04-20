@@ -1080,11 +1080,13 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	gosaml.DumpFileIfTracing(r, newrequest)
 	gosaml.NemLog.Log(newrequest, realIDPMd, request.Query1(nil, "@ID"))
 
-	oidc := realIDPMd.QueryBool(nil, "boolean("+xprefix+`simplesaml.attributes[.="oidc"])`)
-	log.Printf("oidc %v\n", oidc)
+	flow := realIDPMd.Query1(nil, xprefix+`simplesaml.attributes`)
+	if f := gosaml.DebugSetting(r, "oidcflow"); f != "" {
+	    flow = f
+	}
 	var u *url.URL
-	if oidc {
-		u, err = gosaml.SAMLRequest2OIDCRequest(newrequest, relayState)
+	if flow != "" {
+		u, err = gosaml.SAMLRequest2OIDCRequest(newrequest, relayState, flow, realIDPMd)
 	} else {
 		u, err = gosaml.SAMLRequest2URL(newrequest, relayState, privatekey, gosaml.DebugSettingWithDefault(r, "idpSigAlg", config.DefaultCryptoMethod))
 	}
@@ -1372,8 +1374,11 @@ found:
 		}
 		data.Id_token = signed_id_token
 
-		jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), multi[1][0])
-		data.Id_token = jwe
+        if doEncrypt {
+		    jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), multi[1][0])
+		    data.Id_token = jwe
+		}
+
 		data.Acs = newresponse.Query1(nil, "@Destination")
 	}
 
