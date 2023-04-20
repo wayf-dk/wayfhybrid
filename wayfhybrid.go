@@ -677,27 +677,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		formdata.Marshalled = marshalledResponse
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else if id_token := r.Form.Get("id_token"); id_token != "" {
-		privatekey, _, err := gosaml.GetPrivateKeyByMethod(spMd, "md:SPSSODescriptor"+gosaml.EncryptionCertQuery, x509.RSA)
-		if err != nil {
-			return goxml.Wrap(err)
-		}
-
-		id_token, err = goxml.DeJwe(id_token, privatekey)
-		if err != nil {
-			return err
-		}
-		payload, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub})
-		if err != nil {
-			return goxml.Wrap(err)
-		}
-
-		attrs := map[string]interface{}{}
-		err = json.Unmarshal(payload, &attrs)
+		attrs, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub}, spMd, gosaml.SPEnc)
 		if err != nil {
 			return goxml.Wrap(err)
 		}
 		jsonDump, _ := json.MarshalIndent(attrs, "", "    ")
-
 		formdata.RelayState = r.Form.Get("state")
 		formdata.ResponsePP = string(jsonDump)
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
