@@ -677,7 +677,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		formdata.Marshalled = marshalledResponse
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else if id_token := r.Form.Get("id_token"); id_token != "" {
-		attrs, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub}, spMd, gosaml.SPEnc)
+		attrs, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub}, spMd, gosaml.SPEnc, "")
 		if err != nil {
 			return goxml.Wrap(err)
 		}
