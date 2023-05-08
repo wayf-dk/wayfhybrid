@@ -237,9 +237,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 	attributeStatement := attributeStatementList[0]
 	sourceAttributes := response.Query(attributeStatement, `./saml:Attribute`)
 
-	//response.QueryDashP(attributeStatement, "./saml:Attribute[1]/@Name", "\x1b", nil)
-	//response.QueryDashP(attributeStatement, "./saml:Attribute[1]/saml:AttributeValue[1]", "\x1b", nil)
-	//fmt.Println(response.PP())
 	for _, attribute := range sourceAttributes {
 		name := response.Query1(attribute, "@Name")
 		atd, ok := incomingAttributeDescriptions[name]
