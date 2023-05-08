@@ -512,6 +512,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			data.Set("response_type", "id_token")
 			data.Set("client_id", "https://"+r.Host)
 			data.Set("redirect_uri", "https://"+r.Host+"/ACS")
+			data.Set("nonce", gosaml.ID())
 			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
 			return
 		} else if protocol == "wsfed" {
