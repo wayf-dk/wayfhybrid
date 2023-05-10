@@ -1359,7 +1359,7 @@ found:
 	case "wsfed":
 		data.Samlresponse = string(responseXML)
 	case "oidc":
-		id_token["nonce"] = sRequest.OidcNonce
+		id_token["nonce"] = sRequest.RequestID
 		json, err := json.Marshal(&id_token)
 		if err != nil {
 			return err
