@@ -1371,7 +1371,7 @@ found:
 	case "wsfed":
 		data.Samlresponse = string(responseXML)
 	case "oidc":
-		id_token["nonce"] = sRequest.RequestID
+		id_token["nonce"] = sRequest.RequestID[1:] // remove _ added when we received the request to make it a valid @ID
 		json, err := json.Marshal(&id_token)
 		if err != nil {
 			return err
