@@ -365,6 +365,10 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	//log.Printf("%s %s %s %+v", remoteAddr, r.Method, r.Host, r.URL)
 	starttime := time.Now()
+
+    w.Header().Set("X-Frame-Options", "sameorigin")
+    w.Header().Set("Content-Security-Policy", "frame-ancestors 'self'")
+
 	err := fn(w, r)
 
 	status := 200
