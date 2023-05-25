@@ -1198,7 +1198,6 @@ found:
 	}
 
 	signingMethod = gosaml.DebugSettingWithDefault(r, "spSigAlg", signingMethod)
-	protocolBinding := request.Query1(nil, "@ProtocolBinding")
 
 	var newresponse *goxml.Xp
 	var ard AttributeReleaseData
@@ -1289,14 +1288,12 @@ found:
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:Conditions/@NotOnOrAfter", fakeTime, nil)
 		}
 
-		if protocolBinding != gosaml.SIMPLESIGN { // always sign - unless SIMPLESIGN is explicit chosen
-			for _, q := range elementsToSign {
-				err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
-				if err != nil {
-					return err
-				}
-			}
-		}
+        for _, q := range elementsToSign {
+            err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
+            if err != nil {
+                return err
+            }
+        }
 
 		if gosaml.DebugSetting(r, "signingError") == "1" {
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
@@ -1347,26 +1344,6 @@ found:
 	}
 
 	responseXML := newresponse.Dump()
-
-	if protocolBinding == gosaml.SIMPLESIGN {
-		signed := "SAMLResponse=" + string(responseXML)
-		if relayState != "" {
-			signed += "&RelayState=" + relayState
-		}
-		signed += "&SigAlg=" + data.SigAlg
-		privatekey, _, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, config.CryptoMethods[signingMethod].Type)
-		if err != nil {
-			return err
-		}
-		digest := goxml.Hash(config.CryptoMethods[signingMethod].Hash, signed)
-		signature, err = goxml.Sign(digest, privatekey, signingMethod)
-		if err != nil {
-			return err
-		}
-		if gosaml.DebugSetting(r, "signingError") == "1" {
-			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
-		}
-	}
 
 	switch sRequest.Protocol {
 	default:
