@@ -1134,7 +1134,7 @@ func getOriginalRequest(w http.ResponseWriter, r *http.Request, response *goxml.
 		return
 	}
 
-	if virtualIDPMd, err = md.ExternalIDP.MDQ(sRequest.VirtualIDPID); err != nil {
+	if virtualIDPMd, err = md.ExternalIDP.MDQ(sRequest.VirtualIDP); err != nil {
 		return
 	}
 
