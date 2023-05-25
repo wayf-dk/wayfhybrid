@@ -1173,12 +1173,9 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    virtualIDP := virtualIDPMd.Query1(nil, "@entityID")
-    realIDP := idpMd.Query1(nil, "@entityID")
-    map2IDP := virtualIDPMd.Query1(nil, xprefix+"map2IdP")
-
-    if realIDP != virtualIDP && realIDP != map2IDP {
-    	return fmt.Errorf("IdP mismatch Issuer: %s, Virtual: %s, Mapped: %s", realIDP, virtualIDP, map2IDP)
+    // check for ID Spoofing attempt - HackmanIT report 2023
+    if gosaml.IDHash(idpMd.Query1(nil, "@entityID")) != sRequest.IDP {
+    	return fmt.Errorf("IdP mismatch")
     }
 
 	origRequestID := request.Query1(nil, "@ID")
