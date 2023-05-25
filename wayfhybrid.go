@@ -368,6 +368,9 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
     w.Header().Set("X-Frame-Options", "sameorigin")
     w.Header().Set("Content-Security-Policy", "frame-ancestors 'self'")
+    w.Header().Set("X-XSS-Protection", "0")
+    w.Header().Set("X-Content-Type-Options", "nosniff")
+    w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
 	err := fn(w, r)
 
