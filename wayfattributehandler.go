@@ -82,7 +82,7 @@ var (
 		{c14n: "AuthnContextClassRef", op: "append:authenticationmethod"},
 		{c14n: "commonfederations", op: "commonfederations:"},
 		{c14n: "nameID", op: "nameid:"},
-		{c14n: "modstlogonmethod", op: "modstlogonmethod:username-password-protected-transport"},
+		{c14n: "modstlogonmethod", op: "modstlogonmethod:username-password-protectedtransport"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
 		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
 		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
