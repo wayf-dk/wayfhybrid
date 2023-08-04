@@ -564,7 +564,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}{
 			{"isPassive", "./@IsPassive", []string{"true"}},
 			{"forceAuthn", "./@ForceAuthn", []string{"true"}},
-			{"persistent", "./samlp:NameIDPolicy/@Format", []string{gosaml.Persistent}},
+			{"nameIDPolicy", "./samlp:NameIDPolicy/@Format", []string{}},
 			{"requestedauthncontext", "./samlp:RequestedAuthnContext/saml:AuthnContextClassRef[0]", []string{}},
 			{"requestedauthncontextcomparison", "./samlp:RequestedAuthnContext/@Comparison", []string{}},
 		}
