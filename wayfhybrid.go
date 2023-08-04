@@ -1210,12 +1210,10 @@ found:
 	var id_token map[string]interface{}
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
-		aud := response.Query1(nil, "./saml:Assertion/saml:Conditions/saml:AudienceRestriction/saml:Audience")
-		requester := spMd.Query1(nil, "@entityID")
-		// allowed is us or a krib entity
-		audience := []string{config.HubEntityID, requester}[hubKribSpIndex]
-		if aud != audience {
-		    return fmt.Errorf("Audience mismatch %s not %s %s", aud, audience, hubKribSpIndex)
+		audience := response.Query1(nil, "./saml:Assertion/saml:Conditions/saml:AudienceRestriction/saml:Audience")
+		expectedAudience := sRequest.WAYFSP
+		if gosaml.IDHash(audience) != expectedAudience {
+		    return fmt.Errorf("Audience mismatch %s not %s", gosaml.IDHash(audience), expectedAudience)
 		}
 
 		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
