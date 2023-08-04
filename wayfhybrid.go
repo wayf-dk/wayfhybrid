@@ -1063,8 +1063,6 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 	}
 
-	buf := sRequest.Marshal()
-	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
 	var privatekey crypto.PrivateKey
 	if realIDPMd.QueryXMLBool(nil, `./md:IDPSSODescriptor/@WantAuthnRequestsSigned`) || hubKribSPMd.QueryXMLBool(nil, `./md:SPSSODescriptor/@AuthnRequestsSigned`) || gosaml.DebugSetting(r, "idpSigAlg") != "" {
 		privatekey, _, err = gosaml.GetPrivateKey(hubKribSPMd, "md:SPSSODescriptor"+gosaml.SigningCertQuery)
@@ -1105,7 +1103,9 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	if err != nil {
 		return
 	}
-
+	sRequest.IDPProtocol = flow
+	buf := sRequest.Marshal()
+	session.Set(w, r, prefix+gosaml.IDHash(newrequest.Query1(nil, "./@ID")), domain, buf, authnRequestCookie, authnRequestTTL)
 	http.Redirect(w, r, u.String(), http.StatusFound)
 	return
 }
@@ -1172,6 +1172,11 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return
 	}
+
+    // check for protocol / flow
+    if sRequest.IDPProtocol != response.Query1(nil, "@Flow") {
+    	return fmt.Errorf("protocol mismatch")
+    }
 
     // check for ID Spoofing attempt - HackmanIT report 2023
     if gosaml.IDHash(idpMd.Query1(nil, "@entityID")) != sRequest.IDP {
