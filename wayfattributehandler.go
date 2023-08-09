@@ -82,7 +82,7 @@ var (
 		{c14n: "AuthnContextClassRef", op: "append:authenticationmethod"},
 		{c14n: "commonfederations", op: "commonfederations:"},
 		{c14n: "nameID", op: "nameid:"},
-		{c14n: "modstlogonmethod", op: "modstlogonmethod:username-password-protectedtransport"},
+		{c14n: "modstlogonmethod", op: "modstlogonmethod:"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
 		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
 		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
@@ -429,7 +429,14 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				return fmt.Errorf("Nemlog-in %s not supported: %s", atd.c14n, loa)
 			}
 		case "modstlogonmethod":
-			*v = opParam[1]
+			sp := spMd.Query1(nil, "@entityID")
+			vals := map[string]string{
+				"https://auth.prep.statens-sso.dk/realms/Statens_SSO": "username-password-protectedtransport",
+				"https://auth.prod.statens-sso.dk/realms/Statens_SSO": "username-password-protectedtransport",
+				"https://sso.modst.dk/runtime/":                       "username-password-protected-transport",
+				"https://testsso.modst.dk/runtime/":                   "username-password-protected-transport",
+			}
+			*v = vals[sp]
 			levels := map[string]string{"3": "two-factor"}
 			for _, loa := range values["eduPersonAssurance"] {
 				if level, ok := levels[loa]; ok {
