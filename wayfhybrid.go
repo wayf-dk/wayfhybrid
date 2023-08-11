@@ -560,23 +560,16 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		options := []struct {
 			name, path string
-			values     []string
 		}{
-			{"isPassive", "./@IsPassive", []string{"true"}},
-			{"forceAuthn", "./@ForceAuthn", []string{"true"}},
-			{"nameIDPolicy", "./samlp:NameIDPolicy/@Format", []string{}},
-			{"requestedauthncontext", "./samlp:RequestedAuthnContext/saml:AuthnContextClassRef[0]", []string{}},
-			{"requestedauthncontextcomparison", "./samlp:RequestedAuthnContext/@Comparison", []string{}},
+			{"isPassive", "./@IsPassive"},
+			{"forceAuthn", "./@ForceAuthn"},
+			{"nameIDPolicy", "./samlp:NameIDPolicy/@Format"},
+			{"requestedauthncontext", "./samlp:RequestedAuthnContext/saml:AuthnContextClassRef[0]"},
+			{"requestedauthncontextcomparison", "./samlp:RequestedAuthnContext/@Comparison"},
 		}
 
 		for _, option := range options {
-			vals := option.values
-			if len(vals) == 0 {
-				vals = r.Form[option.name]
-			} else if r.Form.Get(option.name) == "" {
-				vals = []string{}
-			}
-			for _, val := range vals {
+			for _, val := range r.Form[option.name] {
 				if val != "" {
 					newrequest.QueryDashP(nil, option.path, val, nil)
 				}
