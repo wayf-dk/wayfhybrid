@@ -366,11 +366,11 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	//log.Printf("%s %s %s %+v", remoteAddr, r.Method, r.Host, r.URL)
 	starttime := time.Now()
 
-    w.Header().Set("X-Frame-Options", "sameorigin")
-    w.Header().Set("Content-Security-Policy", "frame-ancestors 'self'")
-    w.Header().Set("X-XSS-Protection", "0")
-    w.Header().Set("X-Content-Type-Options", "nosniff")
-    w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+	w.Header().Set("X-Frame-Options", "sameorigin")
+	w.Header().Set("Content-Security-Policy", "frame-ancestors 'self'")
+	w.Header().Set("X-XSS-Protection", "0")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 
 	err := fn(w, r)
 
@@ -575,6 +575,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 				}
 			}
 		}
+
+		nidp := newrequest.Query(nil, "./samlp:NameIDPolicy")[0]
+		sub := newrequest.QueryDashP(nil, "./saml:Subject/saml:NameID", "0123456789", nidp)
+		newrequest.QueryDashP(sub, "@Format", "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified", nil)
 
 		if scoping == "scoping" {
 			for _, scope := range idpList {
@@ -1085,7 +1089,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 
 	flow := realIDPMd.Query1(nil, xprefix+`simplesaml.attributes`)
 	if f := gosaml.DebugSetting(r, "oidcflow"); f != "" {
-	    flow = f
+		flow = f
 	}
 	var u *url.URL
 	if flow != "" {
@@ -1166,15 +1170,15 @@ func ACSService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
-    // check for protocol / flow
-    if sRequest.IDPProtocol != response.Query1(nil, "@Flow") {
-    	return fmt.Errorf("protocol mismatch")
-    }
+	// check for protocol / flow
+	if sRequest.IDPProtocol != response.Query1(nil, "@Flow") {
+		return fmt.Errorf("protocol mismatch")
+	}
 
-    // check for ID Spoofing attempt - HackmanIT report 2023
-    if gosaml.IDHash(idpMd.Query1(nil, "@entityID")) != sRequest.IDP {
-    	return fmt.Errorf("IdP mismatch")
-    }
+	// check for ID Spoofing attempt - HackmanIT report 2023
+	if gosaml.IDHash(idpMd.Query1(nil, "@entityID")) != sRequest.IDP {
+		return fmt.Errorf("IdP mismatch")
+	}
 
 	origRequestID := request.Query1(nil, "@ID")
 	gosaml.NemLog.Log(response, idpMd, origRequestID)
@@ -1206,7 +1210,7 @@ found:
 		audience := response.Query1(nil, "./saml:Assertion/saml:Conditions/saml:AudienceRestriction/saml:Audience")
 		expectedAudience := sRequest.WAYFSP
 		if gosaml.IDHash(audience) != expectedAudience {
-		    return fmt.Errorf("Audience mismatch %s not %s", gosaml.IDHash(audience), expectedAudience)
+			return fmt.Errorf("Audience mismatch %s not %s", gosaml.IDHash(audience), expectedAudience)
 		}
 
 		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
@@ -1284,12 +1288,12 @@ found:
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:Conditions/@NotOnOrAfter", fakeTime, nil)
 		}
 
-        for _, q := range elementsToSign {
-            err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
-            if err != nil {
-                return err
-            }
-        }
+		for _, q := range elementsToSign {
+			err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
+			if err != nil {
+				return err
+			}
+		}
 
 		if gosaml.DebugSetting(r, "signingError") == "1" {
 			newresponse.QueryDashP(nil, `./saml:Assertion/@ID`, newresponse.Query1(nil, `./saml:Assertion/@ID`)+"1", nil)
@@ -1363,9 +1367,9 @@ found:
 		}
 		data.Id_token = signed_id_token
 
-        if doEncrypt {
-		    jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), multi[1][0])
-		    data.Id_token = jwe
+		if doEncrypt {
+			jwe, _ := goxml.Jwe([]byte(signed_id_token), pubs[0].(*rsa.PublicKey), multi[1][0])
+			data.Id_token = jwe
 		}
 
 		data.Acs = newresponse.Query1(nil, "@Destination")
