@@ -576,10 +576,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		nidp := newrequest.Query(nil, "./samlp:NameIDPolicy")[0]
-		sub := newrequest.QueryDashP(nil, "./saml:Subject/saml:NameID", "0123456789", nidp)
-		newrequest.QueryDashP(sub, "@Format", "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified", nil)
-
 		if scoping == "scoping" {
 			for _, scope := range idpList {
 				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
