@@ -444,6 +444,8 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 					break
 				}
 			}
+		case "requestedAuthnContext":
+			findRAC(spMd, msg, idpMd, values)
 		default:
 			// panic("unknown op: " + op)
 		}
@@ -654,6 +656,36 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	io.WriteString(h, spMd.Query1(nil, `@entityID`))
 	io.WriteString(h, response.Query1(nil, `saml:Assertion/saml:Issuer`))
 	ardHash = fmt.Sprintf("%.5x", h.Sum(nil))
+	return
+}
+
+// Search for RAC
+func findRAC(spMd, msg, idpMd *goxml.Xp, values map[string][]string) {
+	const ctx = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:RequestedAuthnContext"
+	theDoc := spMd
+	rac := theDoc.Query(nil, ctx+"[wayf:Provider='"+idpMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
+	if len(rac) == 0 {
+		rac = theDoc.Query(nil, ctx+"[not(wayf:Provider)]")
+	}
+	if len(rac) == 0 {
+		theDoc = msg
+		rac = theDoc.Query(nil, "/samlp:AuthnRequest/samlp:RequestedAuthnContext")
+	}
+	if len(rac) == 0 { // Pick out ACCRs and a possible Comp in the RAC found:
+		theDoc = idpMd
+		rac = theDoc.Query(nil, ctx+"[wayf:Provider='"+spMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
+		if len(rac) == 0 {
+			rac = theDoc.Query(nil, ctx+"[not(wayf:Provider)]")
+		}
+	}
+	if len(rac) == 0 {
+		return
+	}
+	// Pick out ACCRs and a possible Comp in the RAC found:
+	values["RequestedAuthnContextClassRef"] = theDoc.QueryMulti(rac[0], "./wayf:RequestedAuthnContextClassRef") // We know there must be at least one ACCR, no reason to check.
+	if comp := theDoc.Query1(rac[0], "./@Comparison"); comp != "" {
+		values["RequestedAuthnContextComparison"] = []string{comp}
+	}
 	return
 }
 
