@@ -100,12 +100,7 @@ var (
 		{c14n: "RequesterID", op: "xp:msg:./samlp:Scoping/samlp:RequesterID"},
 		{c14n: "commonfederations", op: "commonfederations:"},
 		{c14n: "protocol", op: "xp:msg:local-name()"},
-		{c14n: "RequestedAuthnContextClassRef", op: "xp:sp://wayf:RequestedAuthnContext/wayf:AuthnContextClassRef"},
-		{c14n: "RequestedAuthnContextComparison", op: "xp:sp://wayf:RequestedAuthnContext/@Comparison"},
-		{c14n: "RequestedAuthnContextClassRef", op: "xp:msg:./samlp:RequestedAuthnContext/saml:AuthnContextClassRef"},
-		{c14n: "RequestedAuthnContextComparison", op: "xp:msg:./samlp:RequestedAuthnContext/@Comparison"},
-		{c14n: "RequestedAuthnContextClassRef", op: "xp:idp://wayf:RequestedAuthnContext/wayf:AuthnContextClassRef"},
-		{c14n: "RequestedAuthnContextComparison", op: "xp:idp://wayf:RequestedAuthnContext/@Comparison"},
+		{c14n: "RequestedAuthnContext", op: "requestedAuthnContext:"},
 		{c14n: "idpEntityID", op: "xp:idp:@entityID"},
 		{c14n: "nemlogin", op: "eq:idpEntityID:https://nemlogin.wayf.dk"},
 	}
