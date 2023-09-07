@@ -440,7 +440,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				}
 			}
 		case "requestedAuthnContext":
-			findRAC(spMd, msg, idpMd, values)
+			findRequestedAuthnContext(idpMd, msg, spMd, values)
 		default:
 			// panic("unknown op: " + op)
 		}
@@ -654,11 +654,11 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	return
 }
 
-// Search for RAC
-func findRAC(spMd, msg, idpMd *goxml.Xp, values map[string][]string) {
-	const ctx = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:RequestedAuthnContext"
-	theDoc := spMd
-	rac := theDoc.Query(nil, ctx+"[wayf:Provider='"+idpMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
+// Search for RequestedAuthnContext
+func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]string) {
+	const ctx = "/md:EntityDescriptor/md:Extensions/wayf:wayf/samlp:RequestedAuthnContext"
+	theDoc := idpMd
+	rac := theDoc.Query(nil, ctx+"[wayf:Provider='"+spMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
 	if len(rac) == 0 {
 		rac = theDoc.Query(nil, ctx+"[not(wayf:Provider)]")
 	}
@@ -666,9 +666,9 @@ func findRAC(spMd, msg, idpMd *goxml.Xp, values map[string][]string) {
 		theDoc = msg
 		rac = theDoc.Query(nil, "/samlp:AuthnRequest/samlp:RequestedAuthnContext")
 	}
-	if len(rac) == 0 { // Pick out ACCRs and a possible Comp in the RAC found:
-		theDoc = idpMd
-		rac = theDoc.Query(nil, ctx+"[wayf:Provider='"+spMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
+	if len(rac) == 0 {
+		theDoc = spMd
+		rac = theDoc.Query(nil, ctx+"[wayf:Provider='"+idpMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
 		if len(rac) == 0 {
 			rac = theDoc.Query(nil, ctx+"[not(wayf:Provider)]")
 		}
@@ -677,7 +677,7 @@ func findRAC(spMd, msg, idpMd *goxml.Xp, values map[string][]string) {
 		return
 	}
 	// Pick out ACCRs and a possible Comp in the RAC found:
-	values["RequestedAuthnContextClassRef"] = theDoc.QueryMulti(rac[0], "./wayf:RequestedAuthnContextClassRef") // We know there must be at least one ACCR, no reason to check.
+	values["RequestedAuthnContextClassRef"] = theDoc.QueryMulti(rac[0], "./saml:AuthnContextClassRef") // We know there must be at least one ACCR, no reason to check.
 	if comp := theDoc.Query1(rac[0], "./@Comparison"); comp != "" {
 		values["RequestedAuthnContextComparison"] = []string{comp}
 	}
