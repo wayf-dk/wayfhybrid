@@ -656,7 +656,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 
 // Search for RequestedAuthnContext
 func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]string) {
-	const ctx = "/md:EntityDescriptor/md:Extensions/wayf:wayf/samlp:RequestedAuthnContext"
+	const ctx = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:RequestedAuthnContext"
 	theDoc := idpMd
 	rac := theDoc.Query(nil, ctx+"[wayf:Provider='"+spMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
 	if len(rac) == 0 {
