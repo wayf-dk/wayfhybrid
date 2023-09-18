@@ -1206,7 +1206,11 @@ found:
 		audience := response.Query1(nil, "./saml:Assertion/saml:Conditions/saml:AudienceRestriction/saml:Audience")
 		expectedAudience := sRequest.WAYFSP
 		if gosaml.IDHash(audience) != expectedAudience {
-			return fmt.Errorf("Audience mismatch %s not %s", gosaml.IDHash(audience), expectedAudience)
+			spMd, _, err = gosaml.FindInMetadataSets(hubExtSP, expectedAudience)
+			if err != nil {
+				return
+			}
+			return fmt.Errorf(`Audience mismatch "%s" != "%s"`, audience, spMd.Query1(nil, "@entityID"))
 		}
 
 		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
