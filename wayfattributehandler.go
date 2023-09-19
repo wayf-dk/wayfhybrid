@@ -601,22 +601,23 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 			continue
 		}
 
-		filters := []*regexp.Regexp{}
-		filters = append(filters, requestedAttribute.values...)
-		filters = append(filters, makeFilters(spMd.Query(spValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
-		filters = append(filters, makeFilters(idpMd.Query(idpValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))...)
+		f1 := requestedAttribute.values
+		f2 := makeFilters(spMd.Query(spValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))
+		f3 := makeFilters(idpMd.Query(idpValues, `wayf:Attribute[@CanonicalName="`+atd.c14n+`"]/wayf:Value`))
+
+		noFilters := len(f1) == 0 && len(f2) == 0 && len(f3) == 0
 
 		// if filter is required, but none is specified
-		if filtered[atd.c14n] && len(filters) == 0 {
+		if filtered[atd.c14n] && noFilters {
 			continue
 		}
 
 		values := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="`+atd.c14n+`"]/saml:AttributeValue`)
 
-		if len(filters) > 0 {
+		if !noFilters {
 			filteredValues := []string{}
 			for _, value := range values {
-				if matchRegexpArray(value, filters) {
+				if matchRegexpArray(value, f1) && matchRegexpArray(value, f2) && matchRegexpArray(value, f3) {
 					filteredValues = append(filteredValues, value)
 				}
 			}
@@ -693,9 +694,13 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 	return
 }
 
-func matchRegexpArray(item string, array []*regexp.Regexp) bool {
-	for _, i := range array {
-		if i.MatchString(item) {
+func matchRegexpArray(item string, regexps []*regexp.Regexp) bool {
+    if len(regexps) == 0 {
+        return true // no filters => everything allowed
+    }
+	for _, i := range regexps {
+	    ok := i.MatchString(item)
+		if ok {
 			return true
 		}
 	}
