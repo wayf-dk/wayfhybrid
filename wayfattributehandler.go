@@ -556,9 +556,9 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	if nl := spMd.Query(nil, xprefix+`ValueFilter`); len(nl) > 0 {
 		spValues = nl[0]
 	}
-	if nl := idpMd.Query(nil, xprefix+`ValueFilter[@ServiceProvider="`+spID+`"]`); len(nl) > 0 { // sp specific filters for an IdP
+	if nl := idpMd.Query(nil, xprefix+`ValueFilter[wayf:ServiceProvider="`+spID+`"]`); len(nl) > 0 { // sp specific filters for an IdP
 		idpValues = nl[0]
-	} else if nl := idpMd.Query(nil, xprefix+`ValueFilter[not(@ServiceProvider)]`); len(nl) > 0 { // default filters for an IdP - only if no sp specific filters are present
+	} else if nl := idpMd.Query(nil, xprefix+`ValueFilter[not(wayf:ServiceProvider)]`); len(nl) > 0 { // default filters for an IdP - only if no sp specific filters are present
 		idpValues = nl[0]
 	}
 
