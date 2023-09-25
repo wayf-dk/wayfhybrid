@@ -1083,7 +1083,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	gosaml.DumpFileIfTracing(r, newrequest)
 	gosaml.NemLog.Log(newrequest, realIDPMd, request.Query1(nil, "@ID"))
 
-	flow := realIDPMd.Query1(nil, xprefix+`simplesaml.attributes`)
+	flow := realIDPMd.Query1(nil, xprefix+`response_type`)
 	if f := gosaml.DebugSetting(r, "oidcflow"); f != "" {
 		flow = f
 	}
