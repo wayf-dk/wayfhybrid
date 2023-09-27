@@ -942,7 +942,11 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 		}
 	}
 
-	data.Set("return", "https://"+r.Host+r.RequestURI)
+    if r.Method == "POST" {
+    	data.Set("return", "https://"+config.SsoService+"?SAMLRequest="+url.QueryEscape(base64.StdEncoding.EncodeToString(gosaml.Deflate(request.Dump())))+"&RelayState="+url.QueryEscape(r.Form.Get("RelayState")))
+    } else {
+    	data.Set("return", "https://"+r.Host+r.RequestURI)
+    }
 	data.Set("returnIDParam", "idpentityid")
 	data.Set("entityID", sp)
 	http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
