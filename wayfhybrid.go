@@ -495,7 +495,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	idp := r.Form.Get("idpentityid")
 	login := r.Form.Get("login") == "1"
 	scoping := r.Form.Get("scoping")
-	scopedIDP := r.Form.Get("scopedidp")
+	scopedIDP := r.Form.Get("scopedidp")+r.Form.Get("entityID") // RI says entityID
 	idpList := strings.Split(scopedIDP, ",")
 
 	formdata := testSPFormData{
