@@ -949,7 +949,13 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
     }
 	data.Set("returnIDParam", "idpentityid")
 	data.Set("entityID", sp)
-	http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
+
+    discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+    if discoService == "" {
+        discoService = config.DiscoveryService
+    }
+
+    http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
 	return "" // needed to tell our caller to return for discovery ...
 }
 
