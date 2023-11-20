@@ -495,7 +495,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	idp := r.Form.Get("idpentityid")
 	login := r.Form.Get("login") == "1"
 	scoping := r.Form.Get("scoping")
-	scopedIDP := r.Form.Get("scopedidp")+r.Form.Get("entityID") // RI says entityID
+	scopedIDP := r.Form.Get("scopedidp")+r.Form.Get("entityID")+idp // RI says entityID
 	idpList := strings.Split(scopedIDP, ",")
 
 	formdata := testSPFormData{
@@ -507,7 +507,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		data.Set("return", "https://"+r.Host+"/?previdplist="+r.Form.Get("scopedidp"))
 		data.Set("returnIDParam", "idpentityid")
 		data.Set("entityID", "https://"+r.Host)
-		http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
+        discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+        if discoService == "" {
+            discoService = config.DiscoveryService
+        }
+        http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
 	} else if login {
 		data := url.Values{}
 		switch {
@@ -543,7 +547,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			data.Set("return", "https://"+r.Host+r.RequestURI)
 			data.Set("returnIDParam", "idpentityid")
 			data.Set("entityID", "https://"+r.Host)
-			http.Redirect(w, r, config.DiscoveryService+data.Encode(), http.StatusFound)
+            discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+            if discoService == "" {
+                discoService = config.DiscoveryService
+            }
+			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
 			return err
 		}
 
@@ -576,7 +584,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		if scoping == "scoping" {
+		if scoping == "scoping" || scoping == "" {
 			for _, scope := range idpList {
 				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
 			}
