@@ -1291,6 +1291,15 @@ found:
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
+        // Replace hub issuer if sp wants special hub issuer value and response is sent by the hub (i.e. non-birk):
+
+        if sRequest.HubBirkIndex == 0 {
+            if setHubIdPIssuerTo := spMd.Query1(nil, xprefix+"setHubIdPIssuerTo"); setHubIdPIssuerTo != "" {
+                newresponse.QueryDashP(nil, "./saml:Issuer", setHubIdPIssuerTo, nil)
+                newresponse.QueryDashP(nil, "/saml:Assertion/saml:Issuer", setHubIdPIssuerTo, nil)
+            }
+        }
+
 		id_token = gosaml.Saml2map(newresponse) // last chance to use a non-encrypted and non-saml1 newresponse
 
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
