@@ -127,6 +127,7 @@ var (
 	intExtSP, intExtIDP, hubExtIDP, hubExtSP gosaml.MdSets
 
 	webMdMap map[string]webMd
+	client   = &http.Client{}
 )
 
 // Main - start the hybrid
@@ -495,7 +496,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	idp := r.Form.Get("idpentityid")
 	login := r.Form.Get("login") == "1"
 	scoping := r.Form.Get("scoping")
-	scopedIDP := r.Form.Get("scopedidp")+r.Form.Get("entityID")+idp // RI says entityID
+	scopedIDP := r.Form.Get("scopedidp") + r.Form.Get("entityID") + idp // RI says entityID
 	idpList := strings.Split(scopedIDP, ",")
 
 	formdata := testSPFormData{
@@ -507,11 +508,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		data.Set("return", "https://"+r.Host+"/?previdplist="+r.Form.Get("scopedidp"))
 		data.Set("returnIDParam", "idpentityid")
 		data.Set("entityID", "https://"+r.Host)
-        discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-        if discoService == "" {
-            discoService = config.DiscoveryService
-        }
-        http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
+		discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+		if discoService == "" {
+			discoService = config.DiscoveryService
+		}
+		http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
 	} else if login {
 		data := url.Values{}
 		switch {
@@ -547,10 +548,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			data.Set("return", "https://"+r.Host+r.RequestURI)
 			data.Set("returnIDParam", "idpentityid")
 			data.Set("entityID", "https://"+r.Host)
-            discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-            if discoService == "" {
-                discoService = config.DiscoveryService
-            }
+			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+			if discoService == "" {
+				discoService = config.DiscoveryService
+			}
 			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
 			return err
 		}
@@ -950,20 +951,20 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 		}
 	}
 
-    if r.Method == "POST" {
-    	data.Set("return", "https://"+config.SsoService+"?SAMLRequest="+url.QueryEscape(base64.StdEncoding.EncodeToString(gosaml.Deflate(request.Dump())))+"&RelayState="+url.QueryEscape(r.Form.Get("RelayState")))
-    } else {
-    	data.Set("return", "https://"+r.Host+r.RequestURI)
-    }
+	if r.Method == "POST" {
+		data.Set("return", "https://"+config.SsoService+"?SAMLRequest="+url.QueryEscape(base64.StdEncoding.EncodeToString(gosaml.Deflate(request.Dump())))+"&RelayState="+url.QueryEscape(r.Form.Get("RelayState")))
+	} else {
+		data.Set("return", "https://"+r.Host+r.RequestURI)
+	}
 	data.Set("returnIDParam", "idpentityid")
 	data.Set("entityID", sp)
 
-    discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-    if discoService == "" {
-        discoService = config.DiscoveryService
-    }
+	discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+	if discoService == "" {
+		discoService = config.DiscoveryService
+	}
 
-    http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
+	http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
 	return "" // needed to tell our caller to return for discovery ...
 }
 
@@ -1056,10 +1057,11 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		return
 	}
 
-	providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
-	newrequest.QueryDashP(nil, "./@ProviderName", providerName, nil)
 
 	if request != nil && request.QueryXMLBool(nil, `//*[@Name="nemlogin"]/saml:AttributeValue`) {
+        providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
+        newrequest.QueryDashP(nil, "./@ProviderName", base64.StdEncoding.EncodeToString([]byte(providerName)), nil)
+
 		if tmp := hubKribSPMd.Query1(nil, `//wayf:map2IdP`); tmp != "" { // let the SP choose which SSOIndex to use
 			dest := realIDPMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[`+tmp+`][@Binding="`+gosaml.REDIRECT+`"]/@Location`)
 			newrequest.QueryDashP(nil, "./@Destination", dest, nil)
@@ -1291,14 +1293,14 @@ found:
 			elementsToSign = []string{"/samlp:Response"}
 		}
 
-        // Replace hub issuer if sp wants special hub issuer value and response is sent by the hub (i.e. non-birk):
+		// Replace hub issuer if sp wants special hub issuer value and response is sent by the hub (i.e. non-birk):
 
-        if sRequest.HubBirkIndex == 0 {
-            if setHubIdPIssuerTo := spMd.Query1(nil, xprefix+"setHubIdPIssuerTo"); setHubIdPIssuerTo != "" {
-                newresponse.QueryDashP(nil, "./saml:Issuer", setHubIdPIssuerTo, nil)
-                newresponse.QueryDashP(nil, "/saml:Assertion/saml:Issuer", setHubIdPIssuerTo, nil)
-            }
-        }
+		if sRequest.HubBirkIndex == 0 {
+			if setHubIdPIssuerTo := spMd.Query1(nil, xprefix+"setHubIdPIssuerTo"); setHubIdPIssuerTo != "" {
+				newresponse.QueryDashP(nil, "./saml:Issuer", setHubIdPIssuerTo, nil)
+				newresponse.QueryDashP(nil, "/saml:Assertion/saml:Issuer", setHubIdPIssuerTo, nil)
+			}
+		}
 
 		id_token = gosaml.Saml2map(newresponse) // last chance to use a non-encrypted and non-saml1 newresponse
 
