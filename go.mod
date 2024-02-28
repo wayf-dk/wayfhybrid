@@ -6,7 +6,7 @@ require (
 	github.com/wayf-dk/go-libxml2 v0.0.0-20240227081341-0086175c2fd4
 	github.com/wayf-dk/godiscoveryservice v0.0.0-20240227102648-7b540d8b2195
 	github.com/wayf-dk/goeleven v0.0.0-20230816115740-d287bc08e939
-	github.com/wayf-dk/gosaml v0.0.0-20240226131603-95c38d32b4c5
+	github.com/wayf-dk/gosaml v0.0.0-20240228091111-7bcd141f879d
 	github.com/wayf-dk/goxml v0.0.0-20240226131044-6b837b25feb7
 	github.com/wayf-dk/lmdq v0.0.0-20240226132521-4385378ef6b2
 	x.config v0.0.0-00010101000000-000000000000
