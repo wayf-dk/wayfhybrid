@@ -630,7 +630,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 
 		io.WriteString(h, atd.c14n)
 
-		newAttribute := response.QueryDashP(destinationAttributes, "saml:Attribute[0]/@Name", requestedAttribute.name, nil)
+		newAttribute := response.QueryDashP(destinationAttributes, "saml:Attribute[0]/@Name", strings.TrimPrefix(requestedAttribute.name, "*"), nil)
 		if requestedAttribute.nameFormat != "" {
 			response.QueryDashP(newAttribute, "@NameFormat", requestedAttribute.nameFormat, nil)
 		}
