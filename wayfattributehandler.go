@@ -209,15 +209,20 @@ var (
 	incomingAttributeDescriptions       = attributeDescriptionsMap{}
 	outgoingAttributeDescriptions       = attributeDescriptionsMap{}
 	outgoingAttributeDescriptionsByC14n = attributeDescriptionsMap{}
+
+	attributePrefixesRegexp *regexp.Regexp
 )
 
 func init() {
+	prefixes := []string{}
 	for _, ad := range attributesBase {
 		incomingAttributeDescriptions[ad.name] = ad
 		incomingAttributeDescriptions[ad.c14n] = ad
 		outgoingAttributeDescriptions[ad.name] = ad
 		outgoingAttributeDescriptionsByC14n[ad.c14n] = ad
+		prefixes = append(prefixes, ad.name, ad.c14n)
 	}
+	attributePrefixesRegexp = regexp.MustCompile("^(" + strings.Join(prefixes, "|") + ")")
 }
 
 // Attributesc14n - Convert to - and compute canonical attributes
@@ -235,17 +240,22 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 	for _, attribute := range sourceAttributes {
 		name := response.Query1(attribute, "@Name")
 		atd, ok := incomingAttributeDescriptions[name]
-		if ok {
-			values[atd.c14n] = response.QueryMulti(attribute, `saml:AttributeValue`)
-			if base64encoded {
-				for i, val := range values[atd.c14n] {
-					v, _ := base64.StdEncoding.DecodeString(val)
-					values[atd.c14n][i] = string(v)
-				}
+		if !ok {
+			if attrName := attributePrefixesRegexp.FindString(name); attrName != "" {
+				atd, ok = incomingAttributeDescriptions[attrName]
 			}
 		}
+		if ok {
+			tmpValues := response.QueryMulti(attribute, `saml:AttributeValue`)
+			if base64encoded {
+				for i, val := range tmpValues {
+					v, _ := base64.StdEncoding.DecodeString(val)
+					tmpValues[i] = string(v)
+				}
+			}
+			values[atd.c14n] = append(values[atd.c14n], tmpValues...)
+		}
 	}
-
 	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
 	goxml.RmElement(attributeStatement)
 	return
