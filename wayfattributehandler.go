@@ -695,11 +695,11 @@ func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 }
 
 func matchRegexpArray(item string, regexps []*regexp.Regexp) bool {
-    if len(regexps) == 0 {
-        return true // no filters => everything allowed
-    }
+	if len(regexps) == 0 {
+		return true // no filters => everything allowed
+	}
 	for _, i := range regexps {
-	    ok := i.MatchString(item)
+		ok := i.MatchString(item)
 		if ok {
 			return true
 		}
