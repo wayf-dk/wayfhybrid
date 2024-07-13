@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -222,7 +223,11 @@ func init() {
 		outgoingAttributeDescriptionsByC14n[ad.c14n] = ad
 		prefixes = append(prefixes, ad.name, ad.c14n)
 	}
-	attributePrefixesRegexp = regexp.MustCompile("^(" + strings.Join(prefixes, "|") + ")")
+	slices.Sort(prefixes)
+	prefixes = slices.Compact(prefixes)
+	slices.Reverse(prefixes)
+	prefixesRegexp :=  strings.Join(prefixes, "|")
+	attributePrefixesRegexp = regexp.MustCompile("^(" + prefixesRegexp + ")")
 }
 
 // Attributesc14n - Convert to - and compute canonical attributes
