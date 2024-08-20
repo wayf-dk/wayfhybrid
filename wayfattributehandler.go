@@ -582,11 +582,9 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
         for _, k := range keys {
             io.WriteString(h, k)
             io.WriteString(h, strings.Join(ardValues[k], "#"))
-            fmt.Println(k, ardValues[k])
         }
     	io.WriteString(h, spMd.Query1(nil, `@entityID`))
     	ardHash = fmt.Sprintf("%.5x", h.Sum(nil))
-    	fmt.Println(ardHash)
 		return
 	}
 
