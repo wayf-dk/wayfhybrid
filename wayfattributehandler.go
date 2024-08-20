@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -560,10 +561,33 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	assertionList := response.Query(nil, "./saml:Assertion")
 	destinationAttributes := response.QueryDashP(assertionList[0], "saml:AttributeStatement", "", nil) // only if there are actually some requested attributes
 
-	if gosaml.DebugSetting(r, "allAttrs") == "1" || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
+    // a simple way to check what comes from the IdP - just send all the attributes
+	h := sha1.New()
+	if gosaml.DebugSetting(r, "allAttrs") == "1" {
 		destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
 		goxml.RmElement(destinationAttributes)
-		return nil, ""
+		attrs := response.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
+		for _, attr := range attrs {
+		    nameAttr, _ := attr.(types.Element).GetAttribute("Name")
+		    name := nameAttr.NodeValue()
+		    vals := response.QueryMulti(attr, "./saml:AttributeValue")
+		    ardValues[name] = vals
+		}
+		// the attrs is originally a map - so they comes out in random order - thus sorting them is required to get same hash for same data
+        keys := make([]string, 0, len(ardValues))
+        for k := range ardValues {
+            keys = append(keys, k)
+        }
+        sort.Strings(keys)
+        for _, k := range keys {
+            io.WriteString(h, k)
+            io.WriteString(h, strings.Join(ardValues[k], "#"))
+            fmt.Println(k, ardValues[k])
+        }
+    	io.WriteString(h, spMd.Query1(nil, `@entityID`))
+    	ardHash = fmt.Sprintf("%.5x", h.Sum(nil))
+    	fmt.Println(ardHash)
+		return
 	}
 
 	spID := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
@@ -605,7 +629,6 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 		}
 	}
 
-	h := sha1.New()
 	for _, requestedAttribute := range requestedAttributeList {
 
 		atd, ok := outgoingAttributeDescriptions[requestedAttribute.name]
