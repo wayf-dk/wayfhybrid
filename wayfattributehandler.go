@@ -221,7 +221,7 @@ func init() {
 		incomingAttributeDescriptions[ad.c14n] = ad
 		outgoingAttributeDescriptions[ad.name] = ad
 		outgoingAttributeDescriptionsByC14n[ad.c14n] = ad
-		prefixes = append(prefixes, ad.name, ad.c14n)
+		prefixes = append(prefixes, regexp.QuoteMeta(ad.name), regexp.QuoteMeta(ad.c14n))
 	}
 	slices.Sort(prefixes)
 	prefixes = slices.Compact(prefixes)
