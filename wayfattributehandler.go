@@ -563,7 +563,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 
     // a simple way to check what comes from the IdP - just send all the attributes
 	h := sha1.New()
-	if gosaml.DebugSetting(r, "allAttrs") == "1" {
+	if gosaml.DebugSetting(r, "allAttrs") == "1"  || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
 		destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
 		goxml.RmElement(destinationAttributes)
 		attrs := response.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
