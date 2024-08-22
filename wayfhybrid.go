@@ -1066,10 +1066,9 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		return
 	}
 
-
 	if request != nil && request.QueryXMLBool(nil, `//*[@Name="nemlogin"]/saml:AttributeValue`) {
-        providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
-        newrequest.QueryDashP(nil, "./@ProviderName", base64.StdEncoding.EncodeToString([]byte(providerName)), nil)
+		providerName := getFirstByAttribute(spMd, "md:SPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
+		newrequest.QueryDashP(nil, "./@ProviderName", base64.StdEncoding.EncodeToString([]byte(providerName)), nil)
 
 		if tmp := hubKribSPMd.Query1(nil, `//wayf:map2IdP`); tmp != "" { // let the SP choose which SSOIndex to use
 			dest := realIDPMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[`+tmp+`][@Binding="`+gosaml.REDIRECT+`"]/@Location`)
