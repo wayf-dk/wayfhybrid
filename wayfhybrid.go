@@ -976,6 +976,15 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 
+	// PHPH can't currently handle entities with both SP and IdP roles, so if a request comes in from an IdP map it to it's twin SP
+	if sp := config.IdP2SPMappping[spMd.Query1(nil, "@entityID")]; sp != "" {
+		spMd, spIndex, err = gosaml.FindInMetadataSets(intExtSP, sp)
+		if err != nil {
+			return
+		}
+		request.QueryDashP(nil, "./saml:Issuer", sp, nil)
+	}
+
 	VirtualIDPID := wayf(w, r, request, spMd, hubBirkMd)
 	if VirtualIDPID == "" {
 		return
