@@ -152,6 +152,7 @@ var (
 		{c14n: "subject-id", name: "subject-id"},
 		{c14n: "subject-id", name: "urn:oasis:names:tc:SAML:attribute:subject-id"},
 		{c14n: "uid", name: "urn:oid:0.9.2342.19200300.100.1.1"},
+		{c14n: "jpegPhoto", name: "urn:oid:0.9.2342.19200300.100.1.60"},
 
 		// Nemlog-in-2
 		{c14n: "pid", name: "dk:gov:saml:attribute:PidNumberIdentifier"},
