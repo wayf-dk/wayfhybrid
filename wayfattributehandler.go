@@ -695,6 +695,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 // Search for RequestedAuthnContext
 func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]string) {
 	const ctx = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:RequestedAuthnContext"
+	var allowedRacs []string
 	theDoc := idpMd
 	rac := theDoc.Query(nil, ctx+"[wayf:Provider='"+spMd.Query1(nil, "/md:EntityDescriptor/@entityID")+"']") // First search Provider-specifically.
 	if len(rac) == 0 {
@@ -703,6 +704,7 @@ func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]s
 	if len(rac) == 0 {
 		theDoc = msg
 		rac = theDoc.Query(nil, "/samlp:AuthnRequest/samlp:RequestedAuthnContext")
+   	    allowedRacs = idpMd.QueryMulti(nil, ctx+"[wayf:Provider='*']/saml:AuthnContextClassRef")
 	}
 	if len(rac) == 0 {
 		theDoc = spMd
@@ -715,11 +717,26 @@ func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]s
 		return
 	}
 	// Pick out ACCRs and a possible Comp in the RAC found:
-	values["RequestedAuthnContextClassRef"] = theDoc.QueryMulti(rac[0], "./saml:AuthnContextClassRef") // We know there must be at least one ACCR, no reason to check.
+	values["RequestedAuthnContextClassRef"] = filterRac(allowedRacs, theDoc.QueryMulti(rac[0], "./saml:AuthnContextClassRef")) // We know there must be at least one ACCR, no reason to check.
 	if comp := theDoc.Query1(rac[0], "./@Comparison"); comp != "" {
 		values["RequestedAuthnContextComparison"] = []string{comp}
 	}
 	return
+}
+
+func filterRac(allowedRacs, racs []string) ([]string) {
+    if len(allowedRacs) == 0 {
+        return racs
+    }
+    tmpRacs := []string{}
+    for _, r := range racs {
+        for _, ir := range allowedRacs {
+            if r == ir {
+                tmpRacs = append(tmpRacs, r)
+            }
+        }
+    }
+    return tmpRacs
 }
 
 func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
