@@ -704,7 +704,9 @@ func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]s
 	if len(rac) == 0 {
 		theDoc = msg
 		rac = theDoc.Query(nil, "/samlp:AuthnRequest/samlp:RequestedAuthnContext")
-   	    allowedRacs = idpMd.QueryMulti(nil, ctx+"[wayf:Provider='*']/saml:AuthnContextClassRef")
+		if len(rac) > 0 {
+       	    allowedRacs = idpMd.QueryMulti(nil, ctx+"[wayf:Provider='*']/saml:AuthnContextClassRef")
+        }
 	}
 	if len(rac) == 0 {
 		theDoc = spMd
