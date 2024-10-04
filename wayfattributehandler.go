@@ -80,8 +80,8 @@ var (
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
 		{c14n: "eduPersonScopedAffiliation", op: "epsa:"},
-		{c14n: "AuthnContextClassRef", op: "xpm:msg://saml:AuthnContextClassRef"},
-		{c14n: "AuthnContextClassRef", op: "append:authenticationmethod"},
+		{c14n: "AuthnContextClassRef", op: "cp:AuthnContextClassRefAttribute"},
+		{c14n: "AuthnContextClassRef", op: "xpm:msg:/samlp:Response/saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef"},
 		{c14n: "commonfederations", op: "commonfederations:"},
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "modstlogonmethod:"},
@@ -110,6 +110,7 @@ var (
 	attributesBase = []attributeDescription{
 		// wayf
 		{c14n: "authenticationmethod", name: "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationmethod"},
+		{c14n: "AuthnContextClassRefAttribute", name: "AuthnContextClassRef"},
 		{c14n: "cn", name: "urn:oid:2.5.4.3"},
 		{c14n: "displayName", name: "urn:oid:2.16.840.1.113730.3.1.241"},
 		{c14n: "eduPersonAffiliation", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.1"},
@@ -264,6 +265,8 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 		}
 	}
 	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
+    fmt.Println(response.PPE(attributeStatement2))
+
 	goxml.RmElement(attributeStatement)
 	return
 }
