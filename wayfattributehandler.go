@@ -265,7 +265,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 		}
 	}
 	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
-    fmt.Println(response.PPE(attributeStatement2))
 
 	goxml.RmElement(attributeStatement)
 	return
