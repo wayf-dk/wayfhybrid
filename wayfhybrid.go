@@ -1289,6 +1289,15 @@ found:
 		if err = Attributesc14n(request, response, virtualIDPMd, spMd); err != nil {
 			return
 		}
+
+		shibscope := idpMd.Query1(nil, "/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
+		attributeStatement := response.Query(nil, `/samlp:Response/saml:Assertion/saml:AttributeStatement[1]`)[0] // Attributes14n would have failed if it was empty ...
+		for _, attribute := range config.AttributeLogList {
+			for _, value := range response.QueryMulti(attributeStatement, "saml:Attribute[@Name='"+attribute+"']/saml:AttributeValue") {
+				log.Println("attrlog:", shibscope, attribute, value)
+			}
+		}
+
 		if err = checkForCommonFederations(response); err != nil {
 			return
 		}
