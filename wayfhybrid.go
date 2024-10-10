@@ -819,6 +819,32 @@ func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 	ard = AttributeReleaseData{IDPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := idpMd.Query1(nil, "@entityID")
 
+	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+	if idp == "https://idp.deic.dk" {
+		acl := `[[{"isMemberOf": ["AIT-DEICI2-29930", "AOR-AOR-DeiC-46055"]}]]`
+		// if acl := idpMd.Query1(nil, xprefix+`accessControlist`); acl != "" {
+		aclLists := [][]map[string][]string{}
+		if err = json.Unmarshal([]byte(acl), &aclLists); err != nil {
+			return
+		}
+		for _, andList := range aclLists {
+			ok := false
+			for _, orList := range andList {
+			okl:
+				for attr, vals := range orList {
+					for _, val := range vals {
+						if ok = response.Query1(attrList, "saml:Attribute[@Name="+strconv.Quote(attr)+"]/saml:AttributeValue[.="+strconv.Quote(val)+"]") != ""; ok {
+							break okl
+						}
+					}
+				}
+			}
+			if !ok {
+				return ard, fmt.Errorf("access denied. acl = %s", acl)
+			}
+		}
+		//	}
+
 	if err = wayfScopeCheck(response, idpMd); err != nil {
 		return
 	}
