@@ -845,6 +845,34 @@ func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		}
 		//	}
 
+		//	if idpMd.QueryXMLBool(nil, xprefix+`changesecuritydomain`) {
+		currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
+		newscope := "deic.dk" // idpMd.Query1(nil, "/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
+
+		for _, attr := range []string{"subsecuritydomain", "securitydomain"} {
+			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+			for i, val := range response.QueryMulti(attrList, path) {
+				response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, currentscope)+newscope, nil)
+			}
+		}
+		cs := "@" + currentscope
+		ns := "@" + newscope
+		for _, attr := range []string{"eduPersonPrincipalName", "eduPersonScopedAffiliation"} { // eduPersonTargetedID
+			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+			for i, val := range response.QueryMulti(attrList, path) {
+				response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, cs)+ns, nil)
+			}
+		}
+		eptidAttributes := []string{"persistent", "eduPersonPrincipalName", "idpPersistentID", "spPersistentID"}
+		vals := map[string][]string{}
+		for _, attr := range eptidAttributes {
+			vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
+		}
+		eptid := eptid(idpMd, spMd, vals)
+		response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, eptid, nil)
+		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
+	}
+
 	if err = wayfScopeCheck(response, idpMd); err != nil {
 		return
 	}
