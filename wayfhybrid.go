@@ -815,13 +815,13 @@ func wayfScopeCheck(response, idpMd *goxml.Xp) (err error) {
 	return
 }
 
-func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk bool) (ard AttributeReleaseData, err error) {
+func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *goxml.Xp, birk bool, r *http.Request) (ard AttributeReleaseData, err error) {
 	ard = AttributeReleaseData{IDPDisplayName: make(map[string]string), SPDisplayName: make(map[string]string), SPDescription: make(map[string]string)}
 	idp := idpMd.Query1(nil, "@entityID")
 
 	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
 	if idp == "https://idp.deic.dk" {
-		acl := `[[{"isMemberOf": ["AIT-DEICI2-29930", "AOR-AOR-DeiC-46055"]}]]`
+		acl := `[[{"isMemberOf": ["AIT-DEICI2-29930", "AOR-AOR-DeiC-46055", "prefix:1:abc:infix:2:def:infix:3::hij:postfix:4"]}]]`
 		// if acl := idpMd.Query1(nil, xprefix+`accessControlist`); acl != "" {
 		aclLists := [][]map[string][]string{}
 		if err = json.Unmarshal([]byte(acl), &aclLists); err != nil {
@@ -843,9 +843,15 @@ func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 				return ard, fmt.Errorf("access denied. acl = %s", acl)
 			}
 		}
-		//	}
+	}
 
+	if idp == "https://idp.deic.dk" {
 		//	if idpMd.QueryXMLBool(nil, xprefix+`changesecuritydomain`) {
+
+		if err = wayfScopeCheck(response, backendIdpMd); err != nil {
+			return
+		}
+
 		currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
 		newscope := "deic.dk" // idpMd.Query1(nil, "/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
 
@@ -873,6 +879,10 @@ func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
 		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
 		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
+	}
+
+	if err = checkForCommonFederations(response); err != nil {
+		return
 	}
 
 	if err = wayfScopeCheck(response, idpMd); err != nil {
@@ -922,6 +932,9 @@ func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 
 func wayfKribHandler(idpMd, spMd, request, response *goxml.Xp) (ard AttributeReleaseData, err error) {
 	// we ignore the qualifiers and use the idp and sp entityIDs
+	if err = checkForCommonFederations(response); err != nil {
+		return
+	}
 	as := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
 	securitydomain := response.Query1(as, "./saml:Attribute[@Name='securitydomain']/saml:AttributeValue")
 	eppn := response.Query1(as, "./saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
@@ -1300,11 +1313,8 @@ found:
 			}
 		}
 
-		if err = checkForCommonFederations(response); err != nil {
-			return
-		}
 		if hubKribSpIndex == 0 { // to the hub itself
-			ard, err = wayfACSServiceHandler(virtualIDPMd, hubMd, spMd, request, response, sRequest.HubBirkIndex == 1)
+			ard, err = wayfACSServiceHandler(idpMd, virtualIDPMd, hubMd, spMd, request, response, sRequest.HubBirkIndex == 1, r)
 		} else { // krib
 			ard, err = wayfKribHandler(virtualIDPMd, spMd, request, response)
 		}
