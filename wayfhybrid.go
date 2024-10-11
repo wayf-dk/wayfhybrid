@@ -871,6 +871,8 @@ func wayfACSServiceHandler(idpMd, hubMd, spMd, request, response *goxml.Xp, birk
 		eptid := eptid(idpMd, spMd, vals)
 		response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, eptid, nil)
 		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
+		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
+		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
 	}
 
 	if err = wayfScopeCheck(response, idpMd); err != nil {
