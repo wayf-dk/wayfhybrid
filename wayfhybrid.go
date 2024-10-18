@@ -169,6 +169,8 @@ func Main() {
 	for _, md := range []*lmdq.MDQ{md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP} {
 		m := webMdMap[md.Table]
 		m.revmd = webMdMap[md.Rev].md
+		webMdMap[md.Table] = m
+		webMdMap[md.Short] = m
 	}
 
 	hashKey, _ := hex.DecodeString(config.SecureCookieHashKey)
