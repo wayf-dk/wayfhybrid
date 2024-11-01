@@ -823,28 +823,27 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 	idp := idpMd.Query1(nil, "@entityID")
 
 	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
-	if idp == "https://idp.deic.dk" {
-		acl := `[[{"isMemberOf": ["AIT-DEICI2-29930", "AOR-AOR-DeiC-46055", "prefix:1:abc:infix:2:def:infix:3::hij:postfix:4"]}]]`
-		// if acl := idpMd.Query1(nil, xprefix+`accessControlist`); acl != "" {
-		aclLists := [][]map[string][]string{}
-		if err = json.Unmarshal([]byte(acl), &aclLists); err != nil {
+	if acl := spMd.Query1(nil, xprefix+`Acl`); acl != "" {
+		var verify func(rule []any) bool
+		verify = func(rule []any) bool {
+			op := rule[0].(string)
+			switch op {
+			case "or":
+				return slices.ContainsFunc(rule[1:], func(x any) bool { return verify(x.([]any)) })
+			case "and":
+				return !slices.ContainsFunc(rule[1:], func(x any) bool { return !verify(x.([]any)) })
+			default:
+				return slices.ContainsFunc(rule[1:], func(x any) bool {
+					return response.Query1(attrList, "saml:Attribute[@Name="+strconv.Quote(op)+"]/saml:AttributeValue[.="+strconv.Quote(x.(string))+"]") != ""
+				})
+			}
+		}
+		aclList := []any{}
+		if err = json.Unmarshal([]byte(acl), &aclList); err != nil {
 			return
 		}
-		for _, andList := range aclLists {
-			ok := false
-			for _, orList := range andList {
-			okl:
-				for attr, vals := range orList {
-					for _, val := range vals {
-						if ok = response.Query1(attrList, "saml:Attribute[@Name="+strconv.Quote(attr)+"]/saml:AttributeValue[.="+strconv.Quote(val)+"]") != ""; ok {
-							break okl
-						}
-					}
-				}
-			}
-			if !ok {
-				return ard, fmt.Errorf("access denied. acl = %s", acl)
-			}
+		if !verify(aclList) {
+			return ard, fmt.Errorf("access denied. acl = %s", acl)
 		}
 	}
 
