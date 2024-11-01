@@ -175,9 +175,9 @@ func Main() {
 	}
 
 	hashKey, _ := hex.DecodeString(config.SecureCookieHashKey)
-	authnRequestCookie = &gosaml.Hm{authnRequestTTL, sha256.New, hashKey}
+	authnRequestCookie = &gosaml.Hm{TTL: authnRequestTTL, Hash: sha256.New, Key: hashKey}
 	gosaml.AuthnRequestCookie = authnRequestCookie
-	sloInfoCookie = &gosaml.Hm{sloInfoTTL, sha256.New, hashKey}
+	sloInfoCookie = &gosaml.Hm{TTL: sloInfoTTL, Hash: sha256.New, Key: hashKey}
 
 	httpMux := http.NewServeMux()
 
