@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -22,6 +21,7 @@ import (
 	"path"
 	"regexp"
 	"runtime/pprof"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -261,7 +261,7 @@ func Main() {
 	}()
 
 	if *config.Test && !*config.Verbose { // stop logging under test from here - functionaltest will wait a few secs so we get the listening on ...
-		log.SetOutput(ioutil.Discard)
+		log.SetOutput(io.Discard)
 	}
 
 	stopCh, closeCh := createChannel()
@@ -451,7 +451,7 @@ func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 // refreshMetadataFeed is responsible for referishing a metadata feed
 func refreshMetadataFeed(mdfeed config.MdFeed) (err error) {
 	dir := path.Dir(mdfeed.Path)
-	tempmddb, err := ioutil.TempFile(dir, "")
+	tempmddb, err := os.CreateTemp(dir, "")
 	if err != nil {
 		return err
 	}
