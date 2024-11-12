@@ -847,8 +847,7 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		}
 	}
 
-	if idp == "https://idp.deic.dk" {
-		//	if idpMd.QueryXMLBool(nil, xprefix+`changesecuritydomain`) {
+	if idpMd.QueryXMLBool(nil, xprefix+`ChangeSecurityDomain`) {
 
 		if err = wayfScopeCheck(response, backendIdpMd); err != nil {
 			return
