@@ -823,7 +823,7 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 	idp := idpMd.Query1(nil, "@entityID")
 
 	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
-	if acl := spMd.Query1(nil, xprefix+`Acl`); acl != "" {
+	if acl := idpMd.Query1(nil, xprefix+`Acl`); acl != "" {
 		var verify func(rule []any) bool
 		verify = func(rule []any) bool {
 			op := rule[0].(string)
