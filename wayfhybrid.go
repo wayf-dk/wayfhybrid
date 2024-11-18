@@ -1290,6 +1290,8 @@ found:
 	var ard AttributeReleaseData
 	doEncrypt := false
 	var id_token map[string]interface{}
+	elementToSign := config.ElementToSign
+	signingType := gosaml.SAMLSign
 
 	if response.Query1(nil, `samlp:Status/samlp:StatusCode/@Value`) == "urn:oasis:names:tc:SAML:2.0:status:Success" {
 		audience := response.Query1(nil, "./saml:Assertion/saml:Conditions/saml:AudienceRestriction/saml:Audience")
@@ -1363,9 +1365,8 @@ found:
 		// record SLO info before converting SAML2 response to other formats
 		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole, sRequest.Protocol)
 
-		elementsToSign := config.ElementsToSign
 		if spMd.QueryXMLBool(nil, xprefix+"saml20.sign.response") {
-			elementsToSign = []string{"/samlp:Response"}
+			elementToSign = "/samlp:Response"
 		}
 
 		// Replace hub issuer if sp wants special hub issuer value and response is sent by the hub (i.e. non-birk):
@@ -1380,11 +1381,10 @@ found:
 		id_token = gosaml.Saml2map(newresponse) // last chance to use a non-encrypted and non-saml1 newresponse
 
 		// We don't mark ws-fed RPs in md - let the request decide - use the same attributenameformat for all attributes
-		signingType := gosaml.SAMLSign
 		if sRequest.Protocol == "wsfed" {
 			newresponse = gosaml.NewWsFedResponse(hubBirkIDPMd, spMd, newresponse)
 			signingType = gosaml.WSFedSign
-			elementsToSign = []string{"./t:RequestedSecurityToken/saml1:Assertion"}
+			elementToSign = "./t:RequestedSecurityToken/saml1:Assertion"
 		}
 
 		if gosaml.DebugSetting(r, "timingError") == "1" {
@@ -1392,8 +1392,8 @@ found:
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:Conditions/@NotOnOrAfter", fakeTime, nil)
 		}
 
-		for _, q := range elementsToSign {
-			err = gosaml.SignResponse(newresponse, q, hubBirkIDPMd, signingMethod, signingType)
+		if elementToSign != "/samlp:Response" {
+			err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType)
 			if err != nil {
 				return err
 			}
@@ -1446,6 +1446,13 @@ found:
 		assertion := newresponse.Query(nil, "saml:Assertion[1]")[0]
 		newresponse.Encrypt(assertion, "saml:EncryptedAssertion", pubs[0].(*rsa.PublicKey), multi[1][0]) // multi[1] is a list of list of Algos for each key
 	}
+
+    if elementToSign == "/samlp:Response" {
+        err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType)
+        if err != nil {
+            return err
+        }
+    }
 
 	responseXML := newresponse.Dump()
 
