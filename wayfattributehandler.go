@@ -121,6 +121,7 @@ var (
 		{c14n: "eduPersonPrincipalName", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.6"},
 		{c14n: "eduPersonScopedAffiliation", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.9"},
 		{c14n: "eduPersonTargetedID", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.10"},
+		{c14n: "eduPersonUniqueId",  name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.13" },
 		{c14n: "entryUUID", name: "entryUUID"},
 		{c14n: "gn", name: "givenName"},
 		{c14n: "gn", name: "urn:oid:2.5.4.42"},
