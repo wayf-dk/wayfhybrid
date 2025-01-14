@@ -121,7 +121,7 @@ var (
 		{c14n: "eduPersonPrincipalName", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.6"},
 		{c14n: "eduPersonScopedAffiliation", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.9"},
 		{c14n: "eduPersonTargetedID", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.10"},
-		{c14n: "eduPersonUniqueId",  name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.13" },
+		{c14n: "eduPersonUniqueId", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.13"},
 		{c14n: "entryUUID", name: "entryUUID"},
 		{c14n: "gn", name: "givenName"},
 		{c14n: "gn", name: "urn:oid:2.5.4.42"},
@@ -230,7 +230,7 @@ func init() {
 	slices.Sort(prefixes)
 	prefixes = slices.Compact(prefixes)
 	slices.Reverse(prefixes)
-	prefixesRegexp :=  strings.Join(prefixes, "|")
+	prefixesRegexp := strings.Join(prefixes, "|")
 	attributePrefixesRegexp = regexp.MustCompile("^(" + prefixesRegexp + ")")
 }
 
@@ -565,30 +565,30 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	assertionList := response.Query(nil, "./saml:Assertion")
 	destinationAttributes := response.QueryDashP(assertionList[0], "saml:AttributeStatement", "", nil) // only if there are actually some requested attributes
 
-    // a simple way to check what comes from the IdP - just send all the attributes
+	// a simple way to check what comes from the IdP - just send all the attributes
 	h := sha1.New()
-	if gosaml.DebugSetting(r, "allAttrs") == "1"  || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
+	if gosaml.DebugSetting(r, "allAttrs") == "1" || spMd.QueryXMLBool(nil, xprefix+"RequestedAttributesEqualsStar") {
 		destinationAttributes.AddPrevSibling(response.CopyNode(sourceResponse.Query(nil, `//saml:AttributeStatement`)[0], 1))
 		goxml.RmElement(destinationAttributes)
 		attrs := response.Query(nil, `//saml:AttributeStatement/saml:Attribute`)
 		for _, attr := range attrs {
-		    nameAttr, _ := attr.(types.Element).GetAttribute("Name")
-		    name := nameAttr.NodeValue()
-		    vals := response.QueryMulti(attr, "./saml:AttributeValue")
-		    ardValues[name] = vals
+			nameAttr, _ := attr.(types.Element).GetAttribute("Name")
+			name := nameAttr.NodeValue()
+			vals := response.QueryMulti(attr, "./saml:AttributeValue")
+			ardValues[name] = vals
 		}
 		// the attrs is originally a map - so they comes out in random order - thus sorting them is required to get same hash for same data
-        keys := make([]string, 0, len(ardValues))
-        for k := range ardValues {
-            keys = append(keys, k)
-        }
-        sort.Strings(keys)
-        for _, k := range keys {
-            io.WriteString(h, k)
-            io.WriteString(h, strings.Join(ardValues[k], "#"))
-        }
-    	io.WriteString(h, spMd.Query1(nil, `@entityID`))
-    	ardHash = fmt.Sprintf("%.5x", h.Sum(nil))
+		keys := make([]string, 0, len(ardValues))
+		for k := range ardValues {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			io.WriteString(h, k)
+			io.WriteString(h, strings.Join(ardValues[k], "#"))
+		}
+		io.WriteString(h, spMd.Query1(nil, `@entityID`))
+		ardHash = fmt.Sprintf("%.5x", h.Sum(nil))
 		return
 	}
 
@@ -708,8 +708,8 @@ func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]s
 		theDoc = msg
 		rac = theDoc.Query(nil, "/samlp:AuthnRequest/samlp:RequestedAuthnContext")
 		if len(rac) > 0 {
-       	    allowedRacs = idpMd.QueryMulti(nil, ctx+"[wayf:Provider='*']/saml:AuthnContextClassRef")
-        }
+			allowedRacs = idpMd.QueryMulti(nil, ctx+"[wayf:Provider='*']/saml:AuthnContextClassRef")
+		}
 	}
 	if len(rac) == 0 {
 		theDoc = spMd
@@ -729,19 +729,19 @@ func findRequestedAuthnContext(idpMd, msg, spMd *goxml.Xp, values map[string][]s
 	return
 }
 
-func filterRac(allowedRacs, racs []string) ([]string) {
-    if len(allowedRacs) == 0 {
-        return racs
-    }
-    tmpRacs := []string{}
-    for _, r := range racs {
-        for _, ir := range allowedRacs {
-            if r == ir {
-                tmpRacs = append(tmpRacs, r)
-            }
-        }
-    }
-    return tmpRacs
+func filterRac(allowedRacs, racs []string) []string {
+	if len(allowedRacs) == 0 {
+		return racs
+	}
+	tmpRacs := []string{}
+	for _, r := range racs {
+		for _, ir := range allowedRacs {
+			if r == ir {
+				tmpRacs = append(tmpRacs, r)
+			}
+		}
+	}
+	return tmpRacs
 }
 
 func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
