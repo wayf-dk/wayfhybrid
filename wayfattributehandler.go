@@ -657,9 +657,19 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 		if !noFilters {
 			filteredValues := []string{}
 			for _, value := range values {
-				if matchRegexpArray(value, f1) && matchRegexpArray(value, f2) && matchRegexpArray(value, f3) {
-					filteredValues = append(filteredValues, value)
+				value = matchRegexpArray(value, f1)
+				if value == "" {
+					continue
 				}
+				value = matchRegexpArray(value, f2)
+				if value == "" {
+					continue
+				}
+				value = matchRegexpArray(value, f3)
+				if value == "" {
+					continue
+				}
+                filteredValues = append(filteredValues, value)
 			}
 			values = filteredValues
 		}
@@ -747,23 +757,34 @@ func filterRac(allowedRacs, racs []string) []string {
 func makeFilters(allowedValues types.NodeList) (regexps []*regexp.Regexp) {
 	regexps = []*regexp.Regexp{}
 	for _, attr := range allowedValues {
-		reg := "^" + strings.Replace(regexp.QuoteMeta(strings.TrimSpace(attr.NodeValue())), "\\*", ".*", -1) + "$"
+		reg := "^" + regexp.QuoteMeta(strings.TrimSpace(attr.NodeValue())) + "$"
+		reg = strings.ReplaceAll(reg, "\\*", ".*")
+		reg = strings.ReplaceAll(reg, "\\(", "(")
+		reg = strings.ReplaceAll(reg, "\\)", ")")
 		regexps = append(regexps, regexp.MustCompile(reg))
 	}
 	return
 }
 
-func matchRegexpArray(item string, regexps []*regexp.Regexp) bool {
+func matchRegexpArray(item string, regexps []*regexp.Regexp) string {
 	if len(regexps) == 0 {
-		return true // no filters => everything allowed
+		return item // no filters => everything allowed
 	}
 	for _, i := range regexps {
-		ok := i.MatchString(item)
-		if ok {
-			return true
+		matches := i.FindAllStringSubmatch(item, -1)
+		switch len(matches) {
+		case 0:
+			continue
+		default:
+			switch len(matches[0]) {
+			case 1:
+				return matches[0][0]
+			default:
+				return strings.Join(matches[0][1:], "")
+			}
 		}
 	}
-	return false
+	return ""
 }
 
 func unique(slice []string) (list []string) {
