@@ -1354,6 +1354,10 @@ found:
 
 		ard.Values, ard.Hash = CopyAttributes(r, response, newresponse, virtualIDPMd, spMd)
 
+        if err = wayfScopeCheck(newresponse, virtualIDPMd); err != nil {
+            return
+        }
+
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
 		nameid := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="nameID"]/saml:AttributeValue`)
