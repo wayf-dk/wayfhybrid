@@ -823,6 +823,11 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 	idp := idpMd.Query1(nil, "@entityID")
 
 	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+	if len(response.QueryMulti2(attrList, "./saml:Attribute[@Name='eduPersonPrincipalName']", "saml:AttributeValue")) != 1  {
+	    err = fmt.Errorf("isRequired: exactly 1 eduPersonPrincipalName")
+	    return
+	}
+
 	if acl := idpMd.Query1(nil, xprefix+`Acl`); acl != "" {
 		var verify func(rule []any) bool
 		verify = func(rule []any) bool {
