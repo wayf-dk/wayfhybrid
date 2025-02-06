@@ -787,38 +787,42 @@ func checkForCommonFederations(response *goxml.Xp) (err error) {
 // if lax is set checks that one of the scopes is a suffix of the domain
 // do not fail if no attributes are found
 
-func scopeCheck(response, idpMd *goxml.Xp, attributes []string, lax bool) (err error) {
- 	as := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
-    scopes := idpMd.QueryMulti(nil, "./md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
-
-    for _, attribute := range attributes {
-        values := response.QueryMulti(as, "./saml:Attribute[@Name='"+attribute+"']/saml:AttributeValue")
-        vals :for _, value := range values {
-            parts := scoped.FindStringSubmatch(value)
-            if len(parts) != 3 {
-                err = fmt.Errorf("not a scoped value: %s", value)
-                return
-            }
-            for _, scope := range scopes {
-                if parts[2] == scope  || (lax && strings.HasSuffix(parts[2], "."+scope)) {
-                    continue vals
-                }
-            }
-            err = fmt.Errorf("security domain '%s' does not match any scopes", parts[2])
-            return
-        }
-    }
-    return nil
+func scopeCheck(values, scopes []string, lax bool) (err error) {
+vals:
+	for _, value := range values {
+		parts := scoped.FindStringSubmatch(value)
+		if len(parts) != 3 {
+			err = fmt.Errorf("not a scoped value: %s", value)
+			return
+		}
+		for _, scope := range scopes {
+			if parts[2] == scope || (lax && strings.HasSuffix(parts[2], "."+scope)) {
+				continue vals
+			}
+		}
+		err = fmt.Errorf("security domain '%s' does not match any scopes", parts[2])
+		return
+	}
+	return nil
 }
 
 func wayfScopeCheck(response, idpMd *goxml.Xp) (err error) {
-    if err = scopeCheck(response, idpMd, config.StrictScopedAttributes, false); err != nil {
-        return err
-    }
-    if err = scopeCheck(response, idpMd, config.LaxScopedAttributes, true); err != nil {
-        return err
-    }
-    return nil
+	as := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+	scopes := idpMd.QueryMulti(nil, "./md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
+	for _, attribute := range config.StrictScopedAttributes {
+		values := response.QueryMulti(as, "./saml:Attribute[@Name='"+attribute+"']/saml:AttributeValue")
+		if err = scopeCheck(values, scopes, false); err != nil {
+			return
+		}
+	}
+
+	for _, attribute := range config.LaxScopedAttributes {
+		values := response.QueryMulti(as, "./saml:Attribute[@Name='"+attribute+"']/saml:AttributeValue")
+		if err = scopeCheck(values, scopes, true); err != nil {
+			return
+		}
+	}
+	return nil
 }
 
 func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *goxml.Xp, birk bool, r *http.Request) (ard AttributeReleaseData, err error) {
@@ -826,9 +830,9 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 	idp := idpMd.Query1(nil, "@entityID")
 
 	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
-	if len(response.QueryMulti(attrList, "./saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")) != 1  {
-	    err = fmt.Errorf("isRequired: exactly 1 eduPersonPrincipalName")
-	    return
+	if len(response.QueryMulti(attrList, "./saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")) != 1 {
+		err = fmt.Errorf("isRequired: exactly 1 eduPersonPrincipalName")
+		return
 	}
 
 	if acl := idpMd.Query1(nil, xprefix+`Acl`); acl != "" {
