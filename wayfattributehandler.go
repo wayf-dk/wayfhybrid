@@ -557,9 +557,10 @@ func yearfromyearandcifferseven(year, c7 int) int {
 }
 
 // CopyAttributes copies the attributes
-func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string) {
+func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string, err error) {
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
+	scopes := idpMd.QueryMulti(nil, "./md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
 	assertionList := response.Query(nil, "./saml:Assertion")
@@ -669,7 +670,7 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 				if value == "" {
 					continue
 				}
-                filteredValues = append(filteredValues, value)
+				filteredValues = append(filteredValues, value)
 			}
 			values = filteredValues
 		}
@@ -686,6 +687,17 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 		}
 		response.QueryDashP(newAttribute, "@FriendlyName", atd.c14n, nil)
 
+		if slices.Contains(config.StrictScopedAttributes, requestedAttribute.name) {
+			if err = scopeCheck(values, scopes, false); err != nil {
+				return
+			}
+		}
+
+		if slices.Contains(config.LaxScopedAttributes, requestedAttribute.name) {
+			if err = scopeCheck(values, scopes, true); err != nil {
+				return
+			}
+		}
 		for _, value := range values {
 			io.WriteString(h, value)
 			ardValues[atd.c14n] = append(ardValues[atd.c14n], value)
