@@ -984,18 +984,18 @@ func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 // VeryVeryPoorMansScopingService handles poor man's scoping
 func VeryVeryPoorMansScopingService(w http.ResponseWriter, r *http.Request) (err error) {
 	r.ParseForm()
-	                                         // never both idplist and entityID at the same time ...
-	cc := http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist")+r.URL.Query().Get("entityID"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10}
+	// never both idplist and entityID at the same time ...
+	cc := http.Cookie{Name: "vvpmss", Value: r.URL.Query().Get("idplist") + r.URL.Query().Get("entityID"), Path: "/", Secure: true, HttpOnly: true, MaxAge: 10}
 	v := cc.String() + "; SameSite=None"
 	w.Header().Add("Set-Cookie", v)
 	w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	w.Header().Set("Content-Type", "text/plain")
 	if ri := r.Form.Get("ri"); ri != "" {
-    	http.Redirect(w, r, ri, http.StatusFound)
-    	return
-    }
-    io.WriteString(w, hostName+"\n")
+		http.Redirect(w, r, ri, http.StatusFound)
+		return
+	}
+	io.WriteString(w, hostName+"\n")
 	return
 }
 
@@ -1355,11 +1355,10 @@ found:
 			newresponse.QueryDashP(nil, "./saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthenticatingAuthority[0]", virtualIDPMd.Query1(nil, "@entityID"), nil)
 		}
 
-		ard.Values, ard.Hash = CopyAttributes(r, response, newresponse, virtualIDPMd, spMd)
-
-        if err = wayfScopeCheck(newresponse, virtualIDPMd); err != nil {
-            return
-        }
+		ard.Values, ard.Hash, err = CopyAttributes(r, response, newresponse, virtualIDPMd, spMd)
+		if err != nil {
+			return
+		}
 
 		nameidElement := newresponse.Query(nil, "./saml:Assertion/saml:Subject/saml:NameID")[0]
 		nameidformat := request.Query1(nil, "./samlp:NameIDPolicy/@Format")
@@ -1469,12 +1468,12 @@ found:
 		newresponse.Encrypt(assertion, "saml:EncryptedAssertion", pubs[0].(*rsa.PublicKey), multi[1][0]) // multi[1] is a list of list of Algos for each key
 	}
 
-    if elementToSign == "/samlp:Response" {
-        err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType)
-        if err != nil {
-            return err
-        }
-    }
+	if elementToSign == "/samlp:Response" {
+		err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType)
+		if err != nil {
+			return err
+		}
+	}
 
 	responseXML := newresponse.Dump()
 
