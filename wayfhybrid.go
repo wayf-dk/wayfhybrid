@@ -1631,7 +1631,8 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 // For now uses cookies to keep the SLOInfo
 func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd, samlOut, outMd *goxml.Xp, role int, protocol string) (sil *gosaml.SLOInfoList, sloinfo *gosaml.SLOInfo, ok, sendResponse bool) {
 	sil = &gosaml.SLOInfoList{}
-	data, _ := session.Get(w, r, sloCookieName, sloInfoCookie)
+	//data, _ := session.Get(w, r, sloCookieName, sloInfoCookie)
+	data := []byte{}
 	sil.Unmarshal(data)
 
 	switch samlIn.QueryString(nil, "local-name(/*)") {
