@@ -1159,7 +1159,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/jwt")
 		w.Write([]byte(signed))
 		return nil
 	}
