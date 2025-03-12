@@ -3,6 +3,7 @@ package wayfhybrid
 import (
 	"context"
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
@@ -10,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -25,6 +27,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -39,6 +42,7 @@ import (
 const (
 	authnRequestTTL = 180
 	sloInfoTTL      = 8 * 3600
+	codeTTL         = 10 * time.Second
 	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
 	ssoCookieName   = "SSO2-"
 	sloCookieName   = "SLO"
@@ -100,6 +104,11 @@ type (
 	webMd struct {
 		md, revmd *lmdq.MDQ
 	}
+
+	claimsInfo struct {
+		claims map[string]any
+		eol    time.Time
+	}
 )
 
 var (
@@ -129,6 +138,8 @@ var (
 
 	webMdMap map[string]webMd
 	client   = &http.Client{}
+
+	claimsMap = sync.Map{}
 )
 
 // Main - start the hybrid
@@ -141,6 +152,8 @@ func Main() {
 
 	tmpl = template.Must(template.New("name").Parse(config.HybridTmpl))
 	gosaml.PostForm = tmpl
+
+	cleanUp(claimsMap)
 
 	metadataUpdateGuard = make(chan int, 1)
 
@@ -1059,6 +1072,98 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 // SSOService handles single sign on requests
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
+	r.ParseForm()
+	// Handle token request
+	// fmt.Println(r.Form)
+	// fmt.Println(r.Header)
+	if r.Form.Get("grant_type") == "authorization_code" {
+		// claims, err := decrypt(r.Form.Get("code"), "")
+		c, ok := claimsMap.LoadAndDelete(r.Form.Get("code"))
+		if !ok {
+			return errors.New("unknown code")
+		}
+		claims := c.(claimsInfo).claims
+		codeChallenge := claims["@codeChallenge"].(string)
+		codeVerifier := r.Form.Get("code_verifier")
+		hashedCodeVerifier := sha256.Sum256([]byte(codeVerifier))
+		pkceOK := codeVerifier != "" && base64.RawURLEncoding.EncodeToString(hashedCodeVerifier[:]) == codeChallenge
+		delete(claims, "@codeChallenge")
+
+		authorisation := r.Header.Get("Authorization")
+		parts := strings.Split(authorisation+" ", " ") // always gets 2 elements
+		authScheme, authParam := parts[0], parts[1]
+
+		basic, _ := base64.StdEncoding.DecodeString(authParam)
+		parts = strings.Split(string(basic)+":", ":")
+		clientId, _ := url.QueryUnescape(parts[0])
+		clientSecret := parts[1]
+
+		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, clientId)
+		if err != nil {
+			return err
+		}
+		mdClientSecret := spMd.Query1(nil, xprefix+"comment")
+		hashedClientSecret := fmt.Sprintf("%x", sha256.Sum256([]byte(clientSecret)))
+		clientOK := authScheme == "basic" && clientId == claims["aud"].(string) && hashedClientSecret == mdClientSecret
+
+		if !(pkceOK || clientOK) {
+			return errors.New("PKCE or client_id check failed")
+		}
+
+		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
+		if claims["iat"].(int64)+60 < time.Now().Unix() {
+			return errors.New("token timeout")
+		}
+
+		//access_token, err := encrypt(claims, "")
+		//if err != nil {
+		//    return err
+		//}
+
+		signed, err := sign(claims)
+		if err != nil {
+			return err
+		}
+
+		code := hostName + rand.Text()
+		claimsMap.Store(code, claimsInfo{claims, time.Now().Add(codeTTL)})
+
+		resp := map[string]string{
+			"access_token": code,
+			"token_type":   "Bearer",
+			"id_token":     signed,
+		}
+		res, err := json.Marshal(&resp)
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(res))
+		return nil
+	} else if authorisation := r.Header.Get("Authorization"); authorisation != "" {
+		parts := strings.Split(authorisation, " ")
+		if parts[0] != "Bearer" {
+			return errors.New("no Bearer token found")
+		}
+
+		c, ok := claimsMap.LoadAndDelete(parts[1])
+		if !ok {
+			return errors.New("unknown accesstoken")
+		}
+		claims := c.(claimsInfo).claims
+		//claims, err := decrypt(parts[1], "")
+		//if err != nil {
+		//    return err
+		//}
+		signed, err := sign(claims)
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(signed))
+		return nil
+	}
+
 	request, spMd, hubBirkMd, relayState, spIndex, hubBirkIndex, err := gosaml.ReceiveAuthnRequest(r, intExtSP, hubExtIDP, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
@@ -1114,6 +1219,26 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	gosaml.NemLog.Log(request, realIDPMd, request.Query1(nil, "@ID"))
 	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, nil)
+	return
+}
+
+func sign(claims map[string]any) (signed string, err error) {
+	hubBirkIDPMd, err := md.Hub.MDQ(config.HubEntityID)
+	if err != nil {
+		return
+	}
+
+	privatekey, _, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
+	if err != nil {
+		return
+	}
+
+	plainJSON, err := json.Marshal(&claims)
+	if err != nil {
+		return
+	}
+
+	signed, _, err = gosaml.JwtSign(plainJSON, privatekey, "RS256")
 	return
 }
 
@@ -1455,6 +1580,7 @@ found:
 		SigAlg:     config.CryptoMethods[signingMethod].SigningMethod,
 		RelayState: relayState,
 		Ard:        template.JS(ardjson),
+		Method:     "post",
 	}
 
 	var signature []byte
@@ -1482,7 +1608,19 @@ found:
 		data.Samlresponse = base64.StdEncoding.EncodeToString(responseXML)
 	case "wsfed":
 		data.Samlresponse = string(responseXML)
-	case "oidc":
+	case "code":
+		id_token["nonce"] = sRequest.RequestID[1:] // remove _ added when we received the request to make it a valid @ID
+		id_token["@codeChallenge"] = sRequest.CodeChallenge
+		data.Code = hostName + rand.Text()
+		claimsMap.Store(data.Code, claimsInfo{id_token, time.Now().Add(codeTTL)})
+		// data.Code, err = encrypt(id_token, "")
+		// if err != nil {
+		//     return
+		// }
+		if sRequest.OIDCBinding == gosaml.OIDCQuery {
+			data.Method = "get"
+		}
+	case "id_token":
 		id_token["nonce"] = sRequest.RequestID[1:] // remove _ added when we received the request to make it a valid @ID
 		json, err := json.Marshal(&id_token)
 		if err != nil {
@@ -1509,6 +1647,32 @@ found:
 
 	data.Signature = base64.RawURLEncoding.EncodeToString(signature)
 	return tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
+}
+
+func encrypt(plain map[string]any, label string) (res string, err error) {
+	plainJSON, err := json.Marshal(&plain)
+	if err != nil {
+		return
+	}
+	compressedJSON := gosaml.Deflate([]byte(plainJSON))
+	_, ciphertext, iv, at, err := goxml.EncryptAESGCM([]byte(compressedJSON), config.AuthzCodeEncKey, []byte(label), 0)
+	res = base64.RawURLEncoding.EncodeToString(append(append(iv, ciphertext...), at...))
+	return
+}
+
+func decrypt(ciphertext string, label string) (claims map[string]any, err error) {
+	cipherslice, err := base64.RawURLEncoding.DecodeString(ciphertext)
+	if err != nil {
+		return
+	}
+	compressedJSON, err := goxml.DecryptAESGCM(config.AuthzCodeEncKey, cipherslice, []byte(label))
+	if err != nil {
+		return
+	}
+	plainJSON := gosaml.Inflate(compressedJSON)
+	claims = map[string]any{}
+	err = json.Unmarshal([]byte(plainJSON), &claims)
+	return
 }
 
 // IDPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
@@ -1716,4 +1880,21 @@ func intersectionNotEmpty(s1, s2 []string) (res bool) {
 		}
 	}
 	return
+}
+
+// rendezvous
+
+func cleanUp(sm sync.Map) {
+	ticker := time.NewTicker(codeTTL)
+	go func() {
+		for {
+			<-ticker.C
+			sm.Range(func(k, v any) bool {
+				if v.(claimsInfo).eol.Before(time.Now()) {
+					sm.Delete(k)
+				}
+				return true
+			})
+		}
+	}()
 }
