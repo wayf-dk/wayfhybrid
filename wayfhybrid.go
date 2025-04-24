@@ -202,6 +202,10 @@ func Main() {
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
 	httpMux.Handle(config.SsoService2, appHandler(SSOService))
+	httpMux.Handle(config.OIDCAuth, appHandler(SSOService))
+	httpMux.Handle(config.OIDCToken, appHandler(OIDCTokenService))
+	httpMux.Handle(config.OIDCUserinfo, appHandler(OIDCUserinfoService))
+
 	httpMux.Handle(config.Idpslo, appHandler(IDPSLOService))
 	httpMux.Handle(config.Idpslo2, appHandler(IDPSLOService))
 	httpMux.Handle(config.Birkslo, appHandler(BirkSLOService))
