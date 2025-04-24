@@ -1077,97 +1077,6 @@ func wayf(w http.ResponseWriter, r *http.Request, request, spMd, idpMd *goxml.Xp
 func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	// Handle token request
-	// fmt.Println(r.Form)
-	// fmt.Println(r.Header)
-	if r.Form.Get("grant_type") == "authorization_code" {
-		// claims, err := decrypt(r.Form.Get("code"), "")
-		c, ok := claimsMap.LoadAndDelete(r.Form.Get("code"))
-		if !ok {
-			return errors.New("unknown code")
-		}
-		claims := c.(claimsInfo).claims
-		codeChallenge := claims["@codeChallenge"].(string)
-		codeVerifier := r.Form.Get("code_verifier")
-		hashedCodeVerifier := sha256.Sum256([]byte(codeVerifier))
-		pkceOK := codeVerifier != "" && base64.RawURLEncoding.EncodeToString(hashedCodeVerifier[:]) == codeChallenge
-		delete(claims, "@codeChallenge")
-
-		authorisation := r.Header.Get("Authorization")
-		parts := strings.Split(authorisation+" ", " ") // always gets 2 elements
-		authScheme, authParam := parts[0], parts[1]
-
-		basic, _ := base64.StdEncoding.DecodeString(authParam)
-		parts = strings.Split(string(basic)+":", ":")
-		clientId, _ := url.QueryUnescape(parts[0])
-		clientSecret := parts[1]
-
-		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, clientId)
-		if err != nil {
-			return err
-		}
-		mdClientSecret := spMd.Query1(nil, xprefix+"comment")
-		hashedClientSecret := fmt.Sprintf("%x", sha256.Sum256([]byte(clientSecret)))
-		clientOK := authScheme == "basic" && clientId == claims["aud"].(string) && hashedClientSecret == mdClientSecret
-
-		if !(pkceOK || clientOK) {
-			return errors.New("PKCE or client_id check failed")
-		}
-
-		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
-		if claims["iat"].(int64)+60 < time.Now().Unix() {
-			return errors.New("token timeout")
-		}
-
-		//access_token, err := encrypt(claims, "")
-		//if err != nil {
-		//    return err
-		//}
-
-		signed, err := sign(claims)
-		if err != nil {
-			return err
-		}
-
-		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims, time.Now().Add(codeTTL)})
-
-		resp := map[string]string{
-			"access_token": code,
-			"token_type":   "Bearer",
-			"id_token":     signed,
-		}
-		res, err := json.Marshal(&resp)
-		if err != nil {
-			return err
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(res))
-		return nil
-	} else if authorisation := r.Header.Get("Authorization"); authorisation != "" {
-		parts := strings.Split(authorisation, " ")
-		if parts[0] != "Bearer" {
-			return errors.New("no Bearer token found")
-		}
-
-		c, ok := claimsMap.LoadAndDelete(parts[1])
-		if !ok {
-			return errors.New("unknown accesstoken")
-		}
-		claims := c.(claimsInfo).claims
-		//claims, err := decrypt(parts[1], "")
-		//if err != nil {
-		//    return err
-		//}
-		signed, err := sign(claims)
-		if err != nil {
-			return err
-		}
-		w.Header().Set("Content-Type", "application/jwt")
-		w.Write([]byte(signed))
-		return nil
-	}
-
 	request, spMd, hubBirkMd, relayState, spIndex, hubBirkIndex, err := gosaml.ReceiveAuthnRequest(r, intExtSP, hubExtIDP, "https://"+r.Host+r.URL.Path)
 	if err != nil {
 		return
@@ -1226,7 +1135,118 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-func sign(claims map[string]any) (signed string, err error) {
+func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
+	defer r.Body.Close()
+	r.ParseForm()
+	if r.Form.Get("grant_type") == "authorization_code" {
+		// claims, err := decrypt(r.Form.Get("code"), "")
+		c, ok := claimsMap.LoadAndDelete(r.Form.Get("code"))
+		if !ok {
+			return errors.New("unknown code")
+		}
+		claims := c.(claimsInfo).claims
+		codeChallenge := claims["@codeChallenge"].(string)
+		codeVerifier := r.Form.Get("code_verifier")
+		hashedCodeVerifier := sha256.Sum256([]byte(codeVerifier))
+		pkceOK := codeVerifier != "" && base64.RawURLEncoding.EncodeToString(hashedCodeVerifier[:]) == codeChallenge
+		delete(claims, "@codeChallenge")
+
+		clientId := r.Form.Get("client_id")
+		clientSecret := r.Form.Get("client_secret")
+        if authorisation := r.Header.Get("Authorization"); authorisation != "" {
+			authParam := strings.Split(authorisation+" ", " ")[1] // always gets 2 elements
+			basic, _ := base64.StdEncoding.DecodeString(authParam)
+			parts := strings.Split(string(basic)+":", ":")
+			clientId, _ = url.QueryUnescape(parts[0])
+			clientSecret = parts[1]
+		}
+
+		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, clientId)
+		if err != nil {
+			return err
+		}
+		mdClientSecret := spMd.Query1(nil, xprefix+"comment")
+		hashedClientSecret := fmt.Sprintf("%x", sha256.Sum256([]byte(clientSecret)))
+		clientOK := clientId == claims["aud"].(string) && hashedClientSecret == mdClientSecret
+
+		if !(pkceOK && clientOK) {
+			return errors.New("PKCE or client_id check failed")
+		}
+
+		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
+		if claims["iat"].(int64)+60 < time.Now().Unix() {
+			return errors.New("token timeout")
+		}
+
+		//access_token, err := encrypt(claims, "")
+		//if err != nil {
+		//    return err
+		//}
+
+		signed, err := signClaims(claims)
+		if err != nil {
+			return err
+		}
+
+		code := hostName + rand.Text()
+		claimsMap.Store(code, claimsInfo{claims, time.Now().Add(codeTTL)})
+
+		resp := map[string]string{
+			"access_token": code,
+			"token_type":   "Bearer",
+			"id_token":     signed,
+		}
+		res, err := json.Marshal(&resp)
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(res))
+		return nil
+
+	}
+	return errors.New("no grant_type parameter found")
+}
+
+func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
+	defer r.Body.Close()
+	r.ParseForm()
+	fmt.Println(r.Form)
+	fmt.Println(r.Header)
+	if authorisation := r.Header.Get("Authorization"); authorisation != "" {
+
+		parts := strings.Split(authorisation, " ")
+		if parts[0] != "Bearer" {
+			return errors.New("no Bearer token found")
+		}
+
+		c, ok := claimsMap.LoadAndDelete(parts[1])
+		if !ok {
+			return errors.New("unknown accesstoken")
+		}
+		claims := c.(claimsInfo).claims
+		//claims, err := decrypt(parts[1], "")
+		//if err != nil {
+		//    return err
+		//}
+
+		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
+		if claims["iat"].(int64)+60 < time.Now().Unix() {
+			return errors.New("token timeout")
+		}
+
+		signed, err := signClaims(claims)
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Type", "application/jwt")
+		w.Write([]byte(signed))
+		return nil
+	}
+	return errors.New("no Authorization header found")
+}
+
+func signClaims(claims map[string]any) (signed string, err error) {
 	hubBirkIDPMd, err := md.Hub.MDQ(config.HubEntityID)
 	if err != nil {
 		return
