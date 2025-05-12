@@ -1252,7 +1252,7 @@ func signClaims(claims map[string]any) (signed string, err error) {
 		return
 	}
 
-	privatekey, _, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
+	privatekey, _, kid, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
 	if err != nil {
 		return
 	}
@@ -1262,7 +1262,7 @@ func signClaims(claims map[string]any) (signed string, err error) {
 		return
 	}
 
-	signed, _, err = gosaml.JwtSign(plainJSON, privatekey, "RS256")
+	signed, _, err = gosaml.JwtSign(plainJSON, privatekey, "RS256", kid)
 	return
 }
 
@@ -1653,11 +1653,11 @@ found:
 			return err
 		}
 
-		privatekey, _, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
+		privatekey, _, kid, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
 		if err != nil {
 			return err
 		}
-		signed_id_token, _, err := gosaml.JwtSign(json, privatekey, "RS256")
+		signed_id_token, _, err := gosaml.JwtSign(json, privatekey, "RS256", kid)
 		if err != nil {
 			return err
 		}
