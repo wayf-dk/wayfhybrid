@@ -1165,7 +1165,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		mdClientSecret := spMd.Query1(nil, xprefix+"comment")
+		mdClientSecret := spMd.Query1(nil, xprefix+"OIDC/wayf:client_secret")
 		hashedClientSecret := fmt.Sprintf("%x", sha256.Sum256([]byte(clientSecret)))
 		clientOK := clientId == claims["aud"].(string) && hashedClientSecret == mdClientSecret
 
