@@ -1169,7 +1169,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		hashedClientSecret := fmt.Sprintf("%x", sha256.Sum256([]byte(clientSecret)))
 		clientOK := clientId == claims["aud"].(string) && hashedClientSecret == mdClientSecret
 
-		if !(pkceOK && clientOK) {
+		if !(pkceOK || clientOK) {
 			return errors.New("PKCE or client_id check failed")
 		}
 
