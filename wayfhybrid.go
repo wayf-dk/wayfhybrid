@@ -1211,8 +1211,6 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	fmt.Println(r.Form)
-	fmt.Println(r.Header)
 	if authorisation := r.Header.Get("Authorization"); authorisation != "" {
 
 		parts := strings.Split(authorisation, " ")
