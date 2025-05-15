@@ -107,6 +107,7 @@ type (
 
 	claimsInfo struct {
 		claims map[string]any
+		debug  string
 		eol    time.Time
 	}
 )
@@ -1145,6 +1146,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("unknown code")
 		}
 		claims := c.(claimsInfo).claims
+		debug := c.(claimsInfo).debug
 		codeChallenge := claims["@codeChallenge"].(string)
 		codeVerifier := r.Form.Get("code_verifier")
 		hashedCodeVerifier := sha256.Sum256([]byte(codeVerifier))
@@ -1189,7 +1191,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims, time.Now().Add(codeTTL)})
+		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, eol: time.Now().Add(codeTTL)})
 
 		resp := map[string]string{
 			"access_token": code,
@@ -1228,10 +1230,10 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 		//    return err
 		//}
 
-		//        if gosaml.DebugSetting(r, "trace") == "1" {
-		plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
-		gosaml.Dump("userinfo_id_token", plainJSON)
-		//        }
+		if gosaml.DebugSetting2(c.(claimsInfo).debug, "trace") == "1" {
+    		plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
+	    	gosaml.Dump("userinfo_id_token", plainJSON)
+		}
 
 		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
 		if claims["iat"].(int64)+60 < time.Now().Unix() {
@@ -1644,8 +1646,12 @@ found:
 	case "code":
 		id_token["nonce"] = sRequest.RequestID[1:] // remove _ added when we received the request to make it a valid @ID
 		id_token["@codeChallenge"] = sRequest.CodeChallenge
+		debug := ""
+		if cookie, err := r.Cookie("debug"); err == nil {
+            debug = cookie.Value
+        }
 		data.Code = hostName + rand.Text()
-		claimsMap.Store(data.Code, claimsInfo{id_token, time.Now().Add(codeTTL)})
+		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL)})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
 		//     return
