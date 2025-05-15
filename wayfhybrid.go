@@ -1153,7 +1153,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		clientId := r.Form.Get("client_id")
 		clientSecret := r.Form.Get("client_secret")
-        if authorisation := r.Header.Get("Authorization"); authorisation != "" {
+		if authorisation := r.Header.Get("Authorization"); authorisation != "" {
 			authParam := strings.Split(authorisation+" ", " ")[1] // always gets 2 elements
 			basic, _ := base64.StdEncoding.DecodeString(authParam)
 			parts := strings.Split(string(basic)+":", ":")
