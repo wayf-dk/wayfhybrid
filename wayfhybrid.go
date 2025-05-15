@@ -1240,15 +1240,11 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("token timeout")
 		}
 
-		//		signed, err := signClaims(claims)
-		//		if err != nil {
-		//			return err
-		//		}
-		signed, err := json.Marshal(&claims)
-		if err != nil {
-			return err
-		}
-		w.Header().Set("Content-Type", "application/json")
+        signed, err := signClaims(claims)
+        if err != nil {
+            return err
+        }
+		w.Header().Set("Content-Type", "application/jwt")
 		w.Write([]byte(signed))
 		return nil
 	}
