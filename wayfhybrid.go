@@ -1190,6 +1190,10 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
+        delete(claims, "nonce")
+        if nonce := r.Form.Get("nonce"); nonce != "" {
+            claims["nonce"] = nonce
+        }
 		code := hostName + rand.Text()
 		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, eol: time.Now().Add(codeTTL)})
 
