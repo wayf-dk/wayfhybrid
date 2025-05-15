@@ -1228,10 +1228,10 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 		//    return err
 		//}
 
-//        if gosaml.DebugSetting(r, "trace") == "1" {
-            plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
-            gosaml.Dump("userinfo_id_token", plainJSON)
-//        }
+		//        if gosaml.DebugSetting(r, "trace") == "1" {
+		plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
+		gosaml.Dump("userinfo_id_token", plainJSON)
+		//        }
 
 		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
 		if claims["iat"].(int64)+60 < time.Now().Unix() {
