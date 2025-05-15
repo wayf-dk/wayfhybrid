@@ -1329,7 +1329,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		}
 	}
 
-	legacyLog("", "SAML2.0 - IDP.SSOService: Incomming Authentication request:", request.Query1(nil, "./saml:Issuer"), virtualIDPID,  "")
+	legacyLog("", "SAML2.0 - IDP.SSOService: Incomming Authentication request:", request.Query1(nil, "./saml:Issuer"), virtualIDPID, "")
 	if hubBirkIndex == 1 {
 		var jsonlog = map[string]string{
 			"action": "receive",
