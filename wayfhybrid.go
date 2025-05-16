@@ -225,7 +225,13 @@ func Main() {
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 
 	fs := http.FileServer(http.FS(config.PublicFiles))
+	suffixes := map[string]string{".jwk": "application/jwk+json", ".well-known/openid-configuration": "application/json"}
 	f := func(w http.ResponseWriter, r *http.Request) (err error) {
+        for suffix, mimetype := range suffixes {
+            if strings.HasSuffix(r.RequestURI, suffix) {
+                w.Header().Set("Content-Type", mimetype)
+            }
+        }
 		fs.ServeHTTP(w, r)
 		return
 	}
