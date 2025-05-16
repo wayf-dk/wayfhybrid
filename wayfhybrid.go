@@ -1650,7 +1650,9 @@ found:
 	case "wsfed":
 		data.Samlresponse = string(responseXML)
 	case "code":
-		id_token["nonce"] = sRequest.RequestID[1:] // remove _ added when we received the request to make it a valid @ID
+	    if sRequest.Nonce != "" {
+    		id_token["nonce"] = sRequest.Nonce
+    	}
 		id_token["@codeChallenge"] = sRequest.CodeChallenge
 		debug := ""
 		if cookie, err := r.Cookie("debug"); err == nil {
@@ -1666,7 +1668,9 @@ found:
 			data.Method = "get"
 		}
 	case "id_token":
-		id_token["nonce"] = sRequest.RequestID[1:] // remove _ added when we received the request to make it a valid @ID
+	    if sRequest.Nonce != "" {
+    		id_token["nonce"] = sRequest.Nonce
+    	}
 		json, err := json.Marshal(&id_token)
 		if err != nil {
 			return err
