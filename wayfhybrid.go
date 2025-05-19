@@ -1213,6 +1213,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
+		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(res))
 		return nil
