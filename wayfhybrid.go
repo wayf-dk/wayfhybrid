@@ -228,11 +228,11 @@ func Main() {
 	fs := http.FileServer(http.FS(config.PublicFiles))
 	suffixes := map[string]string{".jwk": "application/jwk+json", ".well-known/openid-configuration": "application/json"}
 	f := func(w http.ResponseWriter, r *http.Request) (err error) {
-        for suffix, mimetype := range suffixes {
-            if strings.HasSuffix(r.RequestURI, suffix) {
-                w.Header().Set("Content-Type", mimetype)
-            }
-        }
+		for suffix, mimetype := range suffixes {
+			if strings.HasSuffix(r.RequestURI, suffix) {
+				w.Header().Set("Content-Type", mimetype)
+			}
+		}
 		fs.ServeHTTP(w, r)
 		return
 	}
@@ -1197,10 +1197,10 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 
-        delete(claims, "nonce")
-        if nonce := r.Form.Get("nonce"); nonce != "" {
-            claims["nonce"] = nonce
-        }
+		delete(claims, "nonce")
+		if nonce := r.Form.Get("nonce"); nonce != "" {
+			claims["nonce"] = nonce
+		}
 		code := hostName + rand.Text()
 		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL)})
 
@@ -1243,8 +1243,8 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 		//}
 
 		if gosaml.DebugSetting2(c.(claimsInfo).debug, "trace") == "1" {
-    		plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
-	    	gosaml.Dump("userinfo_id_token", plainJSON)
+			plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
+			gosaml.Dump("userinfo_id_token", plainJSON)
 		}
 
 		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
@@ -1668,14 +1668,14 @@ found:
 	case "wsfed":
 		data.Samlresponse = string(responseXML)
 	case "code":
-	    if sRequest.Nonce != "" {
-    		id_token["nonce"] = sRequest.Nonce
-    	}
+		if sRequest.Nonce != "" {
+			id_token["nonce"] = sRequest.Nonce
+		}
 		id_token["@codeChallenge"] = sRequest.CodeChallenge
 		debug := ""
 		if cookie, err := r.Cookie("debug"); err == nil {
-            debug = cookie.Value
-        }
+			debug = cookie.Value
+		}
 		data.Code = hostName + rand.Text()
 		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL)})
 		// data.Code, err = encrypt(id_token, "")
@@ -1686,9 +1686,9 @@ found:
 			data.Method = "get"
 		}
 	case "id_token":
-	    if sRequest.Nonce != "" {
-    		id_token["nonce"] = sRequest.Nonce
-    	}
+		if sRequest.Nonce != "" {
+			id_token["nonce"] = sRequest.Nonce
+		}
 		json, err := json.Marshal(&id_token)
 		if err != nil {
 			return err
