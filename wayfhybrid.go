@@ -1232,7 +1232,7 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("no Bearer token found")
 		}
 
-		c, ok := claimsMap.LoadAndDelete(parts[1])
+		c, ok := claimsMap.Load(parts[1])
 		if !ok {
 			return errors.New("unknown accesstoken")
 		}
