@@ -106,9 +106,10 @@ type (
 	}
 
 	claimsInfo struct {
-		claims map[string]any
-		debug  string
-		eol    time.Time
+		claims    map[string]any
+		client_id string
+		debug     string
+		eol       time.Time
 	}
 )
 
@@ -1201,7 +1202,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
             claims["nonce"] = nonce
         }
 		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, eol: time.Now().Add(codeTTL)})
+		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL)})
 
 		resp := map[string]string{
 			"access_token": code,
@@ -1250,12 +1251,28 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("token timeout")
 		}
 
-        signed, err := signClaims(claims)
-        if err != nil {
-            return err
-        }
-		w.Header().Set("Content-Type", "application/jwt")
-		w.Write([]byte(signed))
+		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, c.(claimsInfo).client_id)
+		if err != nil {
+			return err
+		}
+
+		response_alg := spMd.Query1(nil, xprefix+"OIDC/wayf:userinfo_signed_response_alg")
+
+        if response_alg == "false" {
+	        plain, err := json.Marshal(&claims)
+            if err != nil {
+                return err
+            }
+    		w.Header().Set("Content-Type", "application/json")
+    		w.Write([]byte(plain))
+        } else {
+            signed, err := signClaims(claims)
+            if err != nil {
+                return err
+            }
+    		w.Header().Set("Content-Type", "application/jwt")
+    		w.Write([]byte(signed))
+		}
 		return nil
 	}
 	return errors.New("no Authorization header found")
