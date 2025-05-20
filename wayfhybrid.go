@@ -1204,10 +1204,11 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		code := hostName + rand.Text()
 		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL)})
 
-		resp := map[string]string{
+		resp := map[string]any{
 			"access_token": code,
 			"token_type":   "Bearer",
 			"id_token":     signed,
+			"expires_in":   codeTTL,
 		}
 		res, err := json.Marshal(&resp)
 		if err != nil {
