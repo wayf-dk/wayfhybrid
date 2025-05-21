@@ -1148,9 +1148,10 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 	r.ParseForm()
 	if r.Form.Get("grant_type") == "authorization_code" {
 		// claims, err := decrypt(r.Form.Get("code"), "")
-		c, ok := claimsMap.LoadAndDelete(r.Form.Get("code"))
+		codein := r.Form.Get("code")
+		c, ok := claimsMap.LoadAndDelete(codein)
 		if !ok {
-			return errors.New("unknown code")
+            return fmt.Errorf("unknown code: %s", codein)
 		}
 		claims := c.(claimsInfo).claims
 		debug := c.(claimsInfo).debug
@@ -1208,12 +1209,19 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			"access_token": code,
 			"token_type":   "Bearer",
 			"id_token":     signed,
-			"expires_in":   codeTTL,
+			"expires_in":   10,
 		}
+
 		res, err := json.Marshal(&resp)
 		if err != nil {
 			return err
 		}
+		if gosaml.DebugSetting2(c.(claimsInfo).debug, "trace") == "1" {
+			plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
+			gosaml.Dump("token_id_token", plainJSON)
+			gosaml.Dump("token", res)
+		}
+
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(res))
@@ -1678,6 +1686,7 @@ found:
 			debug = cookie.Value
 		}
 		data.Code = hostName + rand.Text()
+		fmt.Println("code:", spMd.Query1(nil, "@entityID"), data.Code)
 		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL)})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
