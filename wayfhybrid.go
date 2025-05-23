@@ -1011,21 +1011,21 @@ func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error
 	r.ParseForm()
 	location := "https://" + r.Host + r.URL.Path
 	if !strings.HasSuffix(location, ".well-known/openid-configuration") {
-        err = fmt.Errorf("no .well-known/openid-configuration found")
+		err = fmt.Errorf("no .well-known/openid-configuration found")
 	}
-    homeorg := r.PathValue("homeorg")
-    md, _, err := gosaml.FindInMetadataSets(hubExtIDP, homeorg)
-    if err != nil {
-        return err
-    }
-    data := map[string]string{
-        "issuer": md.Query1(nil, "@entityID"),
-        "auth":   md.Query1(nil, "md:IDPSSODescriptor/md:SingleSignOnService/@Location"),
-        "name":   md.Query1(nil, "md:Organization/md:OrganizationName[xml:lang='en']"),
-    }
+	homeorg := r.PathValue("homeorg")
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, homeorg)
+	if err != nil {
+		return err
+	}
+	data := map[string]string{
+		"issuer": md.Query1(nil, "@entityID"),
+		"auth":   md.Query1(nil, "md:IDPSSODescriptor/md:SingleSignOnService/@Location"),
+		"name":   md.Query1(nil, "md:Organization/md:OrganizationName[xml:lang='en']"),
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-    return tmpl.ExecuteTemplate(w, "openid-configuration", data)
+	return tmpl.ExecuteTemplate(w, "openid-configuration", data)
 }
 
 // VeryVeryPoorMansScopingService handles poor man's scoping
@@ -1173,7 +1173,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		codein := r.Form.Get("code")
 		c, ok := claimsMap.LoadAndDelete(codein)
 		if !ok {
-            return fmt.Errorf("unknown code: %s", codein)
+			return fmt.Errorf("unknown code: %s", codein)
 		}
 		claims := c.(claimsInfo).claims
 		debug := c.(claimsInfo).debug
@@ -1290,20 +1290,20 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		response_alg := spMd.Query1(nil, xprefix+"OIDC/wayf:userinfo_signed_response_alg")
 
-        if response_alg == "false" {
-	        plain, err := json.Marshal(&claims)
-            if err != nil {
-                return err
-            }
-    		w.Header().Set("Content-Type", "application/json")
-    		w.Write([]byte(plain))
-        } else {
-            signed, err := signClaims(claims)
-            if err != nil {
-                return err
-            }
-    		w.Header().Set("Content-Type", "application/jwt")
-    		w.Write([]byte(signed))
+		if response_alg == "false" {
+			plain, err := json.Marshal(&claims)
+			if err != nil {
+				return err
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(plain))
+		} else {
+			signed, err := signClaims(claims)
+			if err != nil {
+				return err
+			}
+			w.Header().Set("Content-Type", "application/jwt")
+			w.Write([]byte(signed))
 		}
 		return nil
 	}
