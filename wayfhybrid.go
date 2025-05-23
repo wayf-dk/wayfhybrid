@@ -202,6 +202,7 @@ func Main() {
 
 	httpMux.Handle("/production", appHandler(OkService))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
+	httpMux.Handle(config.OidcConfigurationService, appHandler(OidcConfigurationService))
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
 	httpMux.Handle(config.SsoService2, appHandler(SSOService))
 	httpMux.Handle(config.OIDCAuth, appHandler(SSOService))
@@ -1004,6 +1005,27 @@ func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 		os.Exit(1)
 	}
 	return
+}
+
+func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error) {
+	r.ParseForm()
+	location := "https://" + r.Host + r.URL.Path
+	if !strings.HasSuffix(location, ".well-known/openid-configuration") {
+        err = fmt.Errorf("no .well-known/openid-configuration found")
+	}
+    homeorg := r.PathValue("homeorg")
+    md, _, err := gosaml.FindInMetadataSets(hubExtIDP, homeorg)
+    if err != nil {
+        return err
+    }
+    data := map[string]string{
+        "issuer": md.Query1(nil, "@entityID"),
+        "auth":   md.Query1(nil, "md:IDPSSODescriptor/md:SingleSignOnService/@Location"),
+        "name":   md.Query1(nil, "md:Organization/md:OrganizationName[xml:lang='en']"),
+    }
+
+	w.Header().Set("Content-Type", "application/json")
+    return tmpl.ExecuteTemplate(w, "openid-configuration", data)
 }
 
 // VeryVeryPoorMansScopingService handles poor man's scoping
