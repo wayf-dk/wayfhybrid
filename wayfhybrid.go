@@ -1238,7 +1238,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		if err != nil {
 			return err
 		}
-		if gosaml.DebugSetting2(c.(claimsInfo).debug, "trace") == "1" {
+		if gosaml.DebugSetting2(debug, "trace") == "1" {
 			plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
 			gosaml.Dump("token_id_token", plainJSON)
 			gosaml.Dump("token", res)
