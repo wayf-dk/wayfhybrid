@@ -1021,7 +1021,7 @@ func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error
 	data := map[string]string{
 		"issuer": md.Query1(nil, "@entityID"),
 		"auth":   md.Query1(nil, "md:IDPSSODescriptor/md:SingleSignOnService/@Location"),
-		"name":   md.Query1(nil, "md:Organization/md:OrganizationName[xml:lang='en']"),
+		"name":   md.Query1(nil, `md:Organization/md:OrganizationName[@xml:lang="en"]`),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
