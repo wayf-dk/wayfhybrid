@@ -155,7 +155,7 @@ func Main() {
 	tmpl = template.Must(template.New("name").Parse(config.HybridTmpl))
 	gosaml.PostForm = tmpl
 
-	cleanUp(claimsMap)
+	cleanUp(&claimsMap)
 
 	metadataUpdateGuard = make(chan int, 1)
 
@@ -1983,7 +1983,7 @@ func intersectionNotEmpty(s1, s2 []string) (res bool) {
 
 // rendezvous
 
-func cleanUp(sm sync.Map) {
+func cleanUp(sm *sync.Map) {
 	ticker := time.NewTicker(codeTTL)
 	go func() {
 		for {
