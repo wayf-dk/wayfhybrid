@@ -203,6 +203,7 @@ func Main() {
 	httpMux.Handle("/production", appHandler(OkService))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.OidcConfigurationService, appHandler(OidcConfigurationService))
+	httpMux.Handle(config.OidcConfigurationService2, appHandler(OidcConfigurationService))
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
 	httpMux.Handle(config.SsoService2, appHandler(SSOService))
 	httpMux.Handle(config.OIDCAuth, appHandler(SSOService))
@@ -1014,6 +1015,9 @@ func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error
 		err = fmt.Errorf("no .well-known/openid-configuration found")
 	}
 	homeorg := r.PathValue("homeorg")
+	if homeorg == ""  || homeorg== ".well-known" {
+        homeorg = "https://wayf.wayf.dk"
+	}
 	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, homeorg)
 	if err != nil {
 		return err
