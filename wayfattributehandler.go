@@ -450,6 +450,8 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				"https://auth.prod.statens-sso.dk/realms/Statens_SSO": "username-password-protectedtransport",
 				"https://sso.modst.dk/runtime/":                       "username-password-protected-transport",
 				"https://testsso.modst.dk/runtime/":                   "username-password-protected-transport",
+				"https://statens-sso.oes.dk/runtime/":                 "username-password-protected-transport",
+				"https://statens-sso-test.oes.dk/runtime/":            "username-password-protected-transport",
 			}
 			*v = vals[sp]
 			levels := map[string]string{"3": "two-factor"}
