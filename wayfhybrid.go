@@ -122,6 +122,7 @@ var (
 	dkcprpreg     = regexp.MustCompile(`^urn:mace:terena.org:schac:personalUniqueID:dk:CPR:(\d\d)(\d\d)(\d\d)(\d)\d\d\d$`)
 	oldSafari     = regexp.MustCompile("iPhone.*Version/12.*Safari")
 	acceptHeader  = regexp.MustCompile(`(?i)\s*([a-z]+-?(?:[a-z]+)?)\s*(?:;\s*q=(1|1\.0{0,3}|0|0\.\d{0,3}))?\s*(?:,|$)`)
+	subjectuid    = regexp.MustCompile(`^[A-Za-z0-9=-]+$`)
 
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
 	defaultDigestAndSignatureAlgorithm  = "sha256"
@@ -857,9 +858,14 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 	idp := idpMd.Query1(nil, "@entityID")
 
 	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
-	if len(response.QueryMulti(attrList, "./saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")) != 1 {
+	eppns := response.QueryMulti(attrList, "./saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	if len(eppns) != 1 {
 		err = fmt.Errorf("isRequired: exactly 1 eduPersonPrincipalName")
 		return
+	}
+
+	if !subjectuid.MatchString(response.Query1(attrList, "./saml:Attribute[@Name='uid']/saml:AttributeValue")) {
+		fmt.Println("subjectidproblem:", base64.RawURLEncoding.EncodeToString([]byte(eppns[0])))
 	}
 
 	if acl := idpMd.Query1(nil, xprefix+`Acl`); acl != "" {
