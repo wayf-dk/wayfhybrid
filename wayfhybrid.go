@@ -1015,8 +1015,8 @@ func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error
 		err = fmt.Errorf("no .well-known/openid-configuration found")
 	}
 	homeorg := r.PathValue("homeorg")
-	if homeorg == ""  || homeorg== ".well-known" {
-        homeorg = "https://wayf.wayf.dk"
+	if homeorg == "" || homeorg == ".well-known" {
+		homeorg = "https://wayf.wayf.dk"
 	}
 	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, homeorg)
 	if err != nil {
