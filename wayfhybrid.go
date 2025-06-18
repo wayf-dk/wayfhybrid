@@ -1183,7 +1183,11 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		codein := r.Form.Get("code")
 		c, ok := claimsMap.LoadAndDelete(codein)
 		if !ok {
-			return fmt.Errorf("unknown code: %s", codein)
+			wayfid := ""
+			if cookie, err := r.Cookie("wayfid"); err == nil {
+				wayfid = cookie.Value
+			}
+			return fmt.Errorf("unknown code: %s wayfid=%s", codein, wayfid)
 		}
 		claims := c.(claimsInfo).claims
 		debug := c.(claimsInfo).debug
