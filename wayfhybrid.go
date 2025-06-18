@@ -864,7 +864,7 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		return
 	}
 
-	if !subjectuid.MatchString(response.Query1(attrList, "./saml:Attribute[@Name='uid']/saml:AttributeValue")) {
+	if !subjectuid.MatchString(response.Query1(attrList, "./saml:Attribute[@Name='uid']/saml:AttributeValue")) && config.Prod {
 		fmt.Println("subjectidproblem:", base64.RawURLEncoding.EncodeToString([]byte(eppns[0])))
 	}
 
