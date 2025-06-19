@@ -119,6 +119,7 @@ var (
 		{c14n: "eduPersonEntitlement", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.7"},
 		{c14n: "eduPersonPrimaryAffiliation", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.5"},
 		{c14n: "eduPersonPrincipalName", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.6"},
+		{c14n: "eduPersonPrincipalNamePrior", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.12"},
 		{c14n: "eduPersonScopedAffiliation", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.9"},
 		{c14n: "eduPersonTargetedID", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.10"},
 		{c14n: "eduPersonUniqueId", name: "urn:oid:1.3.6.1.4.1.5923.1.1.1.13"},
@@ -225,6 +226,9 @@ func init() {
 		incomingAttributeDescriptions[ad.c14n] = ad
 		outgoingAttributeDescriptions[ad.name] = ad
 		outgoingAttributeDescriptionsByC14n[ad.c14n] = ad
+		if ad.c14n == "eduPersonPrincipalName" || ad.c14n == "eduPersonPrincipalNamePrior" { // no prefix magic here
+			continue
+		}
 		prefixes = append(prefixes, regexp.QuoteMeta(ad.name), regexp.QuoteMeta(ad.c14n))
 	}
 	slices.Sort(prefixes)
@@ -563,6 +567,13 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 	scopes := idpMd.QueryMulti(nil, "./md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
+	spID := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
+
+	usePrior := idpMd.Query1(nil, xprefix+`eduPersonPrincipalNamePrior[.=`+strconv.Quote(spID)+`]`) != ""
+	prior := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalNamePrior"]/saml:AttributeValue`)
+	if usePrior && len(prior) > 0 {
+		sourceResponse.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue[1]`, prior[0], nil)
+	}
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
 	assertionList := response.Query(nil, "./saml:Assertion")
@@ -595,7 +606,6 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 		return
 	}
 
-	spID := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
 	var spValues, idpValues types.Node
 	if nl := spMd.Query(nil, xprefix+`ValueFilter`); len(nl) > 0 {
 		spValues = nl[0]
