@@ -589,6 +589,10 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
 
+        if scoping == "testidp" {
+    		http.SetCookie(w, &http.Cookie{Name: "testidp", Value: scopedIDP, Domain: "wayf.dk", Path: "/", Secure: true, HttpOnly: false})
+        }
+
 		if scoping == "birk" {
 			idpMd, err = md.ExternalIDP.MDQ(scopedIDP)
 			if err != nil {
