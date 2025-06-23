@@ -568,11 +568,16 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 	scopes := idpMd.QueryMulti(nil, "./md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
 	spID := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
-
-	usePrior := idpMd.Query1(nil, xprefix+`eduPersonPrincipalNamePrior[.=`+strconv.Quote(spID)+`]`) != ""
-	prior := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalNamePrior"]/saml:AttributeValue`)
-	if usePrior && len(prior) > 0 {
-		sourceResponse.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue[1]`, prior[0], nil)
+    prior := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalNamePrior"]/saml:AttributeValue`)
+    if len(prior) > 0  {
+        localScope := scoped.FindStringSubmatch(prior[0])
+        if len(localScope) > 1 {
+            xpx := xprefix+`eduPersonPrincipalNamePrior[wayf:SP=`+strconv.Quote(spID)+` and (wayf:Scope=`+strconv.Quote(localScope[2])+` or not(wayf:Scope))]`
+            usePrior := idpMd.Query1(nil, xpx) != ""
+            if usePrior {
+                sourceResponse.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue[1]`, prior[0], nil)
+            }
+        }
 	}
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
