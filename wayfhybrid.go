@@ -17,6 +17,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/signal"
@@ -1187,11 +1188,12 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		codein := r.Form.Get("code")
 		c, ok := claimsMap.LoadAndDelete(codein)
 		if !ok {
-			wayfid := ""
-			if cookie, err := r.Cookie("wayfid"); err == nil {
-				wayfid = cookie.Value
-			}
-			return fmt.Errorf("unknown code: %s wayfid=%s", codein, wayfid)
+            dump, err := httputil.DumpRequest(r, true)
+            if err != nil {
+                http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
+                return err
+            }
+            return fmt.Errorf("unknown code: %s %q", codein, dump)
 		}
 		claims := c.(claimsInfo).claims
 		debug := c.(claimsInfo).debug
