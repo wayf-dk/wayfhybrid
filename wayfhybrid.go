@@ -1249,7 +1249,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			"access_token": code,
 			"token_type":   "Bearer",
 			"id_token":     signed,
-			"expires_in":   10,
+			"expires_in":   60,
 		}
 
 		res, err := json.Marshal(&resp)
