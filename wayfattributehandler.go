@@ -572,9 +572,14 @@ func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxm
     if len(prior) > 0  {
         localScope := scoped.FindStringSubmatch(prior[0])
         if len(localScope) > 1 {
-            xpx := xprefix+`eduPersonPrincipalNamePrior[wayf:SP=`+strconv.Quote(spID)+` and (wayf:Scope=`+strconv.Quote(localScope[2])+` or not(wayf:Scope))]`
-            usePrior := idpMd.Query1(nil, xpx) != ""
-            if usePrior {
+            scope := localScope[2]
+            xpx := xprefix+`eduPersonPrincipalNamePrior[wayf:ServiceProvider=`+strconv.Quote(spID)+` and (wayf:Scope=`+strconv.Quote(scope)+` or not(wayf:Scope))]`
+            usePrior := idpMd.Query(nil, xpx)
+            if len(usePrior) == 1 {
+                xpx := `./wayf:Scope[.=`+strconv.Quote(scope)+`]/@schacHomeOrganization`
+                if sho := idpMd.Query1(usePrior[0], xpx); sho != "" {
+                    sourceResponse.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="schacHomeOrganization"]/saml:AttributeValue[1]`, sho, nil)
+                }
                 sourceResponse.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue[1]`, prior[0], nil)
             }
         }
