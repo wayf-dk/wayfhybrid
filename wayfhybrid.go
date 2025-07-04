@@ -590,9 +590,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
 
-        if scoping == "testidp" {
-    		http.SetCookie(w, &http.Cookie{Name: "testidp", Value: scopedIDP, Domain: "wayf.dk", Path: "/", Secure: true, HttpOnly: false})
-        }
+		if scoping == "testidp" {
+			http.SetCookie(w, &http.Cookie{Name: "testidp", Value: scopedIDP, Domain: "wayf.dk", Path: "/", Secure: true, HttpOnly: false})
+		}
 
 		if scoping == "birk" {
 			idpMd, err = md.ExternalIDP.MDQ(scopedIDP)
@@ -884,7 +884,8 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 				return !slices.ContainsFunc(rule[1:], func(x any) bool { return !verify(x.([]any)) })
 			default:
 				return slices.ContainsFunc(rule[1:], func(x any) bool {
-					return response.Query1(attrList, "saml:Attribute[@Name="+strconv.Quote(op)+"]/saml:AttributeValue[.="+strconv.Quote(x.(string))+"]") != ""
+					val := response.Query1(attrList, "./saml:Attribute[@Name="+strconv.Quote(op)+"]/saml:AttributeValue[.="+strconv.Quote(x.(string))+"]")
+					return val != ""
 				})
 			}
 		}
@@ -897,45 +898,36 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		}
 	}
 
-	if idpMd.QueryXMLBool(nil, xprefix+`ChangeSecurityDomain`) {
+	prior := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalNamePrior"]/saml:AttributeValue`)
+	if prior != "" {
+		localScope := scoped.FindStringSubmatch(prior)
+		if len(localScope) > 1 {
+			scope := localScope[2]
+			spID := response.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
+			xpx := xprefix + `eduPersonPrincipalNamePrior[wayf:ServiceProvider=` + strconv.Quote(spID) + ` and (wayf:Scope=` + strconv.Quote(scope) + ` or not(wayf:Scope))]`
+			usePrior := idpMd.Query(nil, xpx)
+			if len(usePrior) == 1 {
+				response.QueryDashP(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
+				xpx := xprefix + `eduPersonPrincipalNamePrior/wayf:Scope[.=` + strconv.Quote(scope) + `]/@schacHomeOrganization`
+				schacHomeOrganization := idpMd.Query1(nil, xpx)
+				if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, false); err != nil {
+					return
+				}
+			}
+		}
+	}
 
-		if err = wayfScopeCheck(response, backendIdpMd); err != nil {
+	scope := response.Query1(attrList, "./saml:Attribute[@Name='securitydomain']/saml:AttributeValue")
+	xpx := xprefix + `ChangeScope[.=` + strconv.Quote(scope) + `]/@NewScope`
+	if newscope := idpMd.Query1(nil, xpx); newscope != "" {
+		if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, newscope, "", true); err != nil {
 			return
 		}
-
-		currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
-		newscope := "deic.dk" // idpMd.Query1(nil, "/md:EntityDescriptor/md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
-
-		for _, attr := range []string{"subsecuritydomain", "securitydomain"} {
-			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
-			for i, val := range response.QueryMulti(attrList, path) {
-				response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, currentscope)+newscope, nil)
-			}
-		}
-		cs := "@" + currentscope
-		ns := "@" + newscope
-		for _, attr := range []string{"eduPersonPrincipalName", "eduPersonScopedAffiliation"} { // eduPersonTargetedID
-			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
-			for i, val := range response.QueryMulti(attrList, path) {
-				response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, cs)+ns, nil)
-			}
-		}
-		eptidAttributes := []string{"persistent", "eduPersonPrincipalName", "idpPersistentID", "spPersistentID"}
-		vals := map[string][]string{}
-		for _, attr := range eptidAttributes {
-			vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
-		}
-		eptid := eptid(idpMd, spMd, vals)
-		response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, eptid, nil)
-		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
-		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
-		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
 	}
 
 	if err = checkForCommonFederations(response); err != nil {
 		return
 	}
-
 	if err = wayfScopeCheck(response, idpMd); err != nil {
 		return
 	}
@@ -1188,12 +1180,12 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		codein := r.Form.Get("code")
 		c, ok := claimsMap.LoadAndDelete(codein)
 		if !ok {
-            dump, err := httputil.DumpRequest(r, true)
-            if err != nil {
-                http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
-                return err
-            }
-            return fmt.Errorf("unknown code: %s %q", codein, dump)
+			dump, err := httputil.DumpRequest(r, true)
+			if err != nil {
+				http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
+				return err
+			}
+			return fmt.Errorf("unknown code: %s %q", codein, dump)
 		}
 		claims := c.(claimsInfo).claims
 		debug := c.(claimsInfo).debug

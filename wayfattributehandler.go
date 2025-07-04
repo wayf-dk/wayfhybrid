@@ -562,28 +562,54 @@ func yearfromyearandcifferseven(year, c7 int) int {
 	return year
 }
 
+func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp, newscope, schacHomeOrganization string, setOrganizationName bool) (err error) {
+		if err = wayfScopeCheck(response, backendIdpMd); err != nil {
+			return
+		}
+
+    	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+
+		currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
+
+		for _, attr := range []string{"subsecuritydomain", "securitydomain"} {
+			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+			for i, val := range response.QueryMulti(attrList, path) {
+				response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, currentscope)+newscope, nil)
+			}
+		}
+		ns := "@" + newscope
+		for _, attr := range append(config.StrictScopedAttributes, config.LaxScopedAttributes...)  { // eduPersonTargetedID
+			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+			for i, val := range response.QueryMulti(attrList, path) {
+		    	v, _, _ := strings.Cut(val, "@")
+			    response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", v+ns, nil)
+			}
+		}
+		eptidAttributes := []string{"persistent", "eduPersonPrincipalName", "idpPersistentID", "spPersistentID"}
+		vals := map[string][]string{}
+		for _, attr := range eptidAttributes {
+			vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
+		}
+		eptid := eptid(idpMd, spMd, vals)
+		response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, eptid, nil)
+		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
+
+		if (setOrganizationName) {
+    		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
+    		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
+    	}
+        if schacHomeOrganization != "" {
+            response.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="schacHomeOrganization"]/saml:AttributeValue[1]`, schacHomeOrganization, nil)
+        }
+		return
+}
+
 // CopyAttributes copies the attributes
 func CopyAttributes(r *http.Request, sourceResponse, response, idpMd, spMd *goxml.Xp) (ardValues map[string][]string, ardHash string, err error) {
 	ardValues = make(map[string][]string)
 	base64encodedOut := spMd.QueryXMLBool(nil, xprefix+"base64attributes")
 	scopes := idpMd.QueryMulti(nil, "./md:IDPSSODescriptor/md:Extensions/shibmd:Scope")
 	spID := sourceResponse.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
-    prior := sourceResponse.QueryMulti(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalNamePrior"]/saml:AttributeValue`)
-    if len(prior) > 0  {
-        localScope := scoped.FindStringSubmatch(prior[0])
-        if len(localScope) > 1 {
-            scope := localScope[2]
-            xpx := xprefix+`eduPersonPrincipalNamePrior[wayf:ServiceProvider=`+strconv.Quote(spID)+` and (wayf:Scope=`+strconv.Quote(scope)+` or not(wayf:Scope))]`
-            usePrior := idpMd.Query(nil, xpx)
-            if len(usePrior) == 1 {
-                xpx := `./wayf:Scope[.=`+strconv.Quote(scope)+`]/@schacHomeOrganization`
-                if sho := idpMd.Query1(usePrior[0], xpx); sho != "" {
-                    sourceResponse.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="schacHomeOrganization"]/saml:AttributeValue[1]`, sho, nil)
-                }
-                sourceResponse.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue[1]`, prior[0], nil)
-            }
-        }
-	}
 
 	requestedAttributes := spMd.Query(nil, `./md:SPSSODescriptor/md:AttributeConsumingService[1]/md:RequestedAttribute`)
 	assertionList := response.Query(nil, "./saml:Assertion")
