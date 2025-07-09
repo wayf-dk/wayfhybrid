@@ -1238,7 +1238,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			claims["nonce"] = nonce
 		}
 		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL*time.Seconds)})
+		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL*time.Second)})
 
 		resp := map[string]any{
 			"access_token": code,
