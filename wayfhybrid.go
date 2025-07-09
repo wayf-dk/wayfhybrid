@@ -43,7 +43,7 @@ import (
 const (
 	authnRequestTTL = 180
 	sloInfoTTL      = 8 * 3600
-	codeTTL         = 10 * time.Second
+	codeTTL         = 60
 	xprefix         = "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:"
 	ssoCookieName   = "SSO2-"
 	sloCookieName   = "SLO"
@@ -1237,13 +1237,13 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			claims["nonce"] = nonce
 		}
 		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL)})
+		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL*time.Seconds)})
 
 		resp := map[string]any{
 			"access_token": code,
 			"token_type":   "Bearer",
 			"id_token":     signed,
-			"expires_in":   60,
+			"expires_in":   codeTTL,
 		}
 
 		res, err := json.Marshal(&resp)
