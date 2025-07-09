@@ -898,16 +898,16 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		}
 	}
 
-	prior := response.Query1(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalNamePrior"]/saml:AttributeValue`)
+	prior := response.Query1(attrList, `./saml:Attribute[@Name="eduPersonPrincipalNamePrior"]/saml:AttributeValue`)
 	if prior != "" {
 		localScope := scoped.FindStringSubmatch(prior)
 		if len(localScope) > 1 {
 			scope := localScope[2]
-			spID := response.Query1(nil, `//saml:AttributeStatement/saml:Attribute[@Name="spID"]/saml:AttributeValue`)
+			spID := response.Query1(attrList, `./saml:Attribute[@Name="spID"]/saml:AttributeValue`)
 			xpx := xprefix + `eduPersonPrincipalNamePrior[wayf:ServiceProvider=` + strconv.Quote(spID) + ` and (wayf:Scope=` + strconv.Quote(scope) + ` or not(wayf:Scope))]`
 			usePrior := idpMd.Query(nil, xpx)
 			if len(usePrior) == 1 {
-				response.QueryDashP(nil, `./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
+				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
 				xpx := xprefix + `eduPersonPrincipalNamePrior/wayf:Scope[.=` + strconv.Quote(scope) + `]/@schacHomeOrganization`
 				schacHomeOrganization := idpMd.Query1(nil, xpx)
 				if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, false); err != nil {
@@ -938,14 +938,15 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		arpmap[attrName] = true
 	}
 
-	ard.IDPDisplayName["en"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
-	ard.IDPDisplayName["da"] = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
-	ard.IDPLogo = idpMd.Query1(nil, `md:IDPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
+    uiinfo := idpMd.Query(nil, "./md:IDPSSODescriptor/md:Extensions/mdui:UIInfo")[0]
+	ard.IDPDisplayName["en"] = idpMd.Query1(uiinfo, `/mdui:DisplayName[@xml:lang="en"]`)
+	ard.IDPDisplayName["da"] = idpMd.Query1(uiinfo, `./mdui:DisplayName[@xml:lang="da"]`)
+	ard.IDPLogo = idpMd.Query1(uiinfo, `./mdui:Logo`)
 	ard.IDPEntityID = idp
-	ard.SPDisplayName["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="en"]`)
-	ard.SPDisplayName["da"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:DisplayName[@xml:lang="da"]`)
-	ard.SPDescription["en"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="en"]`)
-	ard.SPDescription["da"] = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Description[@xml:lang="da"]`)
+	ard.SPDisplayName["en"] = spMd.Query1(uiinfo, `./mdui:DisplayName[@xml:lang="en"]`)
+	ard.SPDisplayName["da"] = spMd.Query1(uiinfo, `./mdui:DisplayName[@xml:lang="da"]`)
+	ard.SPDescription["en"] = spMd.Query1(uiinfo, `./mdui:Description[@xml:lang="en"]`)
+	ard.SPDescription["da"] = spMd.Query1(uiinfo, `./mdui:Description[@xml:lang="da"]`)
 	ard.SPLogo = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
 	ard.SPEntityID = spMd.Query1(nil, "@entityID")
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(`+xprefix+`consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
@@ -967,7 +968,7 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		}
 		legacyStatJSONLog(jsonlog)
 	}
-	eppn := response.Query1(nil, "./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
+	eppn := response.Query1(attrList, "./saml:Attribute[@Name='eduPersonPrincipalName']/saml:AttributeValue")
 	hashedEppn := fmt.Sprintf("%x", goxml.Hash(crypto.SHA256, config.SaltForHashedEppn+eppn))
 	legacyStatLog("saml20-idp-SSO", ard.SPEntityID, idp, hashedEppn)
 	return
