@@ -1722,7 +1722,7 @@ found:
 		}
 		data.Code = hostName + rand.Text()
 		fmt.Println("code:", spMd.Query1(nil, "@entityID"), data.Code)
-		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL)})
+		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL*time.Second)})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
 		//     return
@@ -1997,7 +1997,7 @@ func intersectionNotEmpty(s1, s2 []string) (res bool) {
 // rendezvous
 
 func cleanUp(sm *sync.Map) {
-	ticker := time.NewTicker(codeTTL)
+	ticker := time.NewTicker(codeTTL*time.Second)
 	go func() {
 		for {
 			<-ticker.C
