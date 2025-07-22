@@ -938,7 +938,7 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		arpmap[attrName] = true
 	}
 
-    uiinfo := idpMd.Query(nil, "./md:IDPSSODescriptor/md:Extensions/mdui:UIInfo")[0]
+	uiinfo := idpMd.Query(nil, "./md:IDPSSODescriptor/md:Extensions/mdui:UIInfo")[0]
 	ard.IDPDisplayName["en"] = idpMd.Query1(uiinfo, `/mdui:DisplayName[@xml:lang="en"]`)
 	ard.IDPDisplayName["da"] = idpMd.Query1(uiinfo, `./mdui:DisplayName[@xml:lang="da"]`)
 	ard.IDPLogo = idpMd.Query1(uiinfo, `./mdui:Logo`)
@@ -1175,14 +1175,14 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 
 func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
+	dump, dumperr := httputil.DumpRequest(r, true)
 	r.ParseForm()
 	if r.Form.Get("grant_type") == "authorization_code" {
 		// claims, err := decrypt(r.Form.Get("code"), "")
 		codein := r.Form.Get("code")
 		c, ok := claimsMap.LoadAndDelete(codein)
 		if !ok {
-			dump, err := httputil.DumpRequest(r, true)
-			if err != nil {
+			if dumperr != nil {
 				http.Error(w, fmt.Sprint(err), http.StatusInternalServerError)
 				return err
 			}
@@ -1238,7 +1238,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			claims["nonce"] = nonce
 		}
 		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL*time.Second)})
+		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL * time.Second)})
 
 		resp := map[string]any{
 			"access_token": code,
@@ -1722,7 +1722,7 @@ found:
 		}
 		data.Code = hostName + rand.Text()
 		fmt.Println("code:", spMd.Query1(nil, "@entityID"), data.Code)
-		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL*time.Second)})
+		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL * time.Second)})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
 		//     return
@@ -1997,7 +1997,7 @@ func intersectionNotEmpty(s1, s2 []string) (res bool) {
 // rendezvous
 
 func cleanUp(sm *sync.Map) {
-	ticker := time.NewTicker(codeTTL*time.Second)
+	ticker := time.NewTicker(codeTTL * time.Second)
 	go func() {
 		for {
 			<-ticker.C
