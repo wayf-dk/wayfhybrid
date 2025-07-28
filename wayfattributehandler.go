@@ -362,7 +362,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				}
 			}
 		case "eptid":
-			*v = eptid(idpMd, spMd, values)
+			*v = eptid(values)
 		case "cpr":
 			cpr(idpMd, spMd, values)
 		case "epa":
@@ -492,7 +492,7 @@ func eptidforaudience(values map[string][]string, audience string) string {
 	return hex.EncodeToString(append(hash[:]))
 }
 
-func eptid(idpMd, spMd *goxml.Xp, values map[string][]string) string {
+func eptid(values map[string][]string) string {
 	var epid string
 
 	if epid = values["persistent"][0]; epid == "" {
@@ -562,7 +562,7 @@ func yearfromyearandcifferseven(year, c7 int) int {
 	return year
 }
 
-func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp, newscope, schacHomeOrganization string, setOrganizationName bool) (err error) {
+func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp, newscope, schacHomeOrganization, persistentIDPEntityid string, setOrganizationName bool) (err error) {
 		if err = wayfScopeCheck(response, backendIdpMd); err != nil {
 			return
 		}
@@ -590,7 +590,11 @@ func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp,
 		for _, attr := range eptidAttributes {
 			vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
 		}
-		eptid := eptid(idpMd, spMd, vals)
+        if persistentIDPEntityid != "" {
+            vals["idpPersistentID"][0] = persistentIDPEntityid
+        }
+
+		eptid := eptid(vals)
 		response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, eptid, nil)
 		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
 

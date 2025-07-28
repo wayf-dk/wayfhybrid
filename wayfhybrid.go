@@ -908,9 +908,10 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 			usePrior := idpMd.Query(nil, xpx)
 			if len(usePrior) == 1 {
 				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
-				xpx := xprefix + `eduPersonPrincipalNamePrior/wayf:Scope[.=` + strconv.Quote(scope) + `]/@schacHomeOrganization`
-				schacHomeOrganization := idpMd.Query1(nil, xpx)
-				if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, false); err != nil {
+				xpx := xprefix + `eduPersonPrincipalNamePrior/wayf:Scope[.=` + strconv.Quote(scope) + `]/`
+				schacHomeOrganization := idpMd.Query1(nil, xpx+"@schacHomeOrganization")
+				persistentIDPEntityid := idpMd.Query1(nil, xpx+"@persistentIDPEntityID")
+				if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
 					return
 				}
 			}
@@ -920,7 +921,7 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 	scope := response.Query1(attrList, "./saml:Attribute[@Name='securitydomain']/saml:AttributeValue")
 	xpx := xprefix + `ChangeScope[.=` + strconv.Quote(scope) + `]/@NewScope`
 	if newscope := idpMd.Query1(nil, xpx); newscope != "" {
-		if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, newscope, "", true); err != nil {
+		if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, newscope, "", "", true); err != nil {
 			return
 		}
 	}
