@@ -16,6 +16,7 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -206,6 +207,8 @@ func Main() {
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.OidcConfigurationService, appHandler(OidcConfigurationService))
 	httpMux.Handle(config.OidcConfigurationService2, appHandler(OidcConfigurationService))
+	httpMux.Handle(config.OidcJwkService, appHandler(OidcJwkService))
+
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
 	httpMux.Handle(config.SsoService2, appHandler(SSOService))
 	httpMux.Handle(config.OIDCAuth, appHandler(SSOService))
@@ -230,13 +233,7 @@ func Main() {
 	httpMux.Handle(config.Dstiming, appHandler(godiscoveryservice.DSTiming))
 
 	fs := http.FileServer(http.FS(config.PublicFiles))
-	suffixes := map[string]string{".jwk": "application/jwk+json"}
 	f := func(w http.ResponseWriter, r *http.Request) (err error) {
-		for suffix, mimetype := range suffixes {
-			if strings.HasSuffix(r.RequestURI, suffix) {
-				w.Header().Set("Content-Type", mimetype)
-			}
-		}
 		fs.ServeHTTP(w, r)
 		return
 	}
@@ -1013,10 +1010,51 @@ func OkService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
+type (
+	jwk struct {
+		Kty string `json:"kty"`
+		N   string `json:"n"`
+		E   string `json:"e"`
+		Alg string `json:"alg"`
+		Use string `json:"use"`
+		Kid string `json:"kid,omitempty"`
+	}
+	jwks struct {
+		Keys []jwk `json:"keys"`
+	}
+)
+
+func OidcJwkService(w http.ResponseWriter, r *http.Request) (err error) {
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, "https://wayf.wayf.dk")
+	if err != nil {
+		return err
+	}
+
+	keys := jwks{}
+	for _, cert := range md.QueryMulti(nil, "md:IDPSSODescriptor/md:KeyDescriptor/ds:KeyInfo/ds:X509Data/ds:X509Certificate") {
+		kid, publickey, _ := gosaml.PublicKeyInfo(cert)
+		switch pk := publickey.(type) {
+		case *rsa.PublicKey:
+			key := jwk{
+				Kty: "RSA",
+				N:   base64.RawStdEncoding.EncodeToString(pk.N.Bytes()),
+				E:   base64.RawStdEncoding.EncodeToString(big.NewInt(int64(pk.E)).Bytes()),
+				Alg: "RS" + strconv.Itoa(pk.Size()),
+				Use: "sig",
+				Kid: kid,
+			}
+			keys.Keys = append(keys.Keys, key)
+		}
+	}
+	k, _ := json.Marshal(keys)
+	w.Header().Set("Content-Type", "application/jwk+json")
+	w.Write(k)
+	return
+}
+
 func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error) {
 	r.ParseForm()
-	location := "https://" + r.Host + r.URL.Path
-	if !strings.HasSuffix(location, ".well-known/openid-configuration") {
+	if !strings.HasSuffix(r.URL.Path, "/.well-known/openid-configuration") {
 		err = fmt.Errorf("no .well-known/openid-configuration found")
 	}
 	homeorg := r.PathValue("homeorg")
