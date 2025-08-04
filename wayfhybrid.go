@@ -936,16 +936,17 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		arpmap[attrName] = true
 	}
 
-	uiinfo := idpMd.Query(nil, "./md:IDPSSODescriptor/md:Extensions/mdui:UIInfo")[0]
-	ard.IDPDisplayName["en"] = idpMd.Query1(uiinfo, `/mdui:DisplayName[@xml:lang="en"]`)
-	ard.IDPDisplayName["da"] = idpMd.Query1(uiinfo, `./mdui:DisplayName[@xml:lang="da"]`)
-	ard.IDPLogo = idpMd.Query1(uiinfo, `./mdui:Logo`)
+	idpuiinfo := idpMd.Query(nil, "./md:IDPSSODescriptor/md:Extensions/mdui:UIInfo")[0]
+	ard.IDPDisplayName["en"] = idpMd.Query1(idpuiinfo, `./mdui:DisplayName[@xml:lang="en"]`)
+	ard.IDPDisplayName["da"] = idpMd.Query1(idpuiinfo, `./mdui:DisplayName[@xml:lang="da"]`)
+	ard.IDPLogo = idpMd.Query1(idpuiinfo, `./mdui:Logo`)
 	ard.IDPEntityID = idp
-	ard.SPDisplayName["en"] = spMd.Query1(uiinfo, `./mdui:DisplayName[@xml:lang="en"]`)
-	ard.SPDisplayName["da"] = spMd.Query1(uiinfo, `./mdui:DisplayName[@xml:lang="da"]`)
-	ard.SPDescription["en"] = spMd.Query1(uiinfo, `./mdui:Description[@xml:lang="en"]`)
-	ard.SPDescription["da"] = spMd.Query1(uiinfo, `./mdui:Description[@xml:lang="da"]`)
-	ard.SPLogo = spMd.Query1(nil, `md:SPSSODescriptor/md:Extensions/mdui:UIInfo/mdui:Logo`)
+	spuiinfo := spMd.Query(nil, "./md:SPSSODescriptor/md:Extensions/mdui:UIInfo")[0]
+	ard.SPDisplayName["en"] = spMd.Query1(spuiinfo, `./mdui:DisplayName[@xml:lang="en"]`)
+	ard.SPDisplayName["da"] = spMd.Query1(spuiinfo, `./mdui:DisplayName[@xml:lang="da"]`)
+	ard.SPDescription["en"] = spMd.Query1(spuiinfo, `./mdui:Description[@xml:lang="en"]`)
+	ard.SPDescription["da"] = spMd.Query1(spuiinfo, `./mdui:Description[@xml:lang="da"]`)
+	ard.SPLogo = spMd.Query1(spuiinfo, `./mdui:Logo`)
 	ard.SPEntityID = spMd.Query1(nil, "@entityID")
 	ard.BypassConfirmation = idpMd.QueryBool(nil, `count(`+xprefix+`consent.disable[.= `+strconv.Quote(ard.SPEntityID)+`]) > 0`)
 	ard.BypassConfirmation = ard.BypassConfirmation || spMd.QueryXMLBool(nil, xprefix+`consent.disable`)
