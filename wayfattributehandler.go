@@ -83,6 +83,7 @@ var (
 		{c14n: "AuthnContextClassRef", op: "cp:AuthnContextClassRefAttribute"},
 		{c14n: "AuthnContextClassRef", op: "xpm:msg:/samlp:Response/saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef"},
 		{c14n: "commonfederations", op: "commonfederations:"},
+		{c14n: "nameIDPolicy", op: "xpm:req:/samlp:AuthnRequest/samlp:NameIDPolicy/@Format"},
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "modstlogonmethod:"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
@@ -283,7 +284,7 @@ func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string,
 }
 
 func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp, dest types.Node) (err error) {
-	contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg}
+	contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg, "req": request}
 	for _, atd := range atds {
 		opParam := strings.SplitN(atd.op, ":", 2)
 		if len(values[atd.c14n]) == 0 {
@@ -411,7 +412,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "commonfederations":
 			*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
 		case "nameid":
-			switch request.Query1(nil, "./samlp:NameIDPolicy/@Format") { // always prechecked when receiving
+			switch values["nameIDPolicy"][0] { // always prechecked when receiving
 			case gosaml.Persistent:
 				*v = values["eduPersonTargetedID"][0]
 			case gosaml.Email:
@@ -595,8 +596,21 @@ func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp,
         }
 
 		eptid := eptid(vals)
-		response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, eptid, nil)
 		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
+        nameIDPolicy := response.Query1(attrList, "saml:Attribute[@Name='nameIDPolicy']/saml:AttributeValue")
+        nameID := response.Query1(attrList, "./nameID")
+        switch nameIDPolicy {
+        case gosaml.Persistent:
+            nameID = eptid
+        case gosaml.Email:
+            nameID = vals["eduPersonPrincipalName"][0]
+        }
+        switch attr := spMd.Query1(nil, xprefix+"nameIDAttribute"); {
+        case attr == "":
+        default:
+            nameID = response.Query1(attrList, "./"+attr)
+        }
+        response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, nameID, nil)
 
 		if (setOrganizationName) {
     		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
