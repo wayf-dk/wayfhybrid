@@ -108,10 +108,10 @@ type (
 	}
 
 	claimsInfo struct {
+		eol       time.Time
 		claims    map[string]any
 		client_id string
 		debug     string
-		eol       time.Time
 	}
 )
 
@@ -158,7 +158,7 @@ func Main() {
 	tmpl = template.Must(template.New("name").Parse(config.HybridTmpl))
 	gosaml.PostForm = tmpl
 
-	cleanUp(&claimsMap)
+	cleanUpClaimsMap(&claimsMap, codeTTL * time.Second)
 
 	metadataUpdateGuard = make(chan int, 1)
 
@@ -2036,8 +2036,8 @@ func intersectionNotEmpty(s1, s2 []string) (res bool) {
 
 // rendezvous
 
-func cleanUp(sm *sync.Map) {
-	ticker := time.NewTicker(codeTTL * time.Second)
+func cleanUpClaimsMap(sm *sync.Map, ttl time.Duration) {
+	ticker := time.NewTicker(ttl)
 	go func() {
 		for {
 			<-ticker.C
