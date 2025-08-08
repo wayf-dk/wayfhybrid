@@ -83,7 +83,7 @@ var (
 		{c14n: "AuthnContextClassRef", op: "cp:AuthnContextClassRefAttribute"},
 		{c14n: "AuthnContextClassRef", op: "xpm:msg:/samlp:Response/saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef"},
 		{c14n: "commonfederations", op: "commonfederations:"},
-		{c14n: "nameIDPolicy", op: "xpm:req:/samlp:AuthnRequest/samlp:NameIDPolicy/@Format"},
+		{c14n: "nameIDPolicy", op: "xp:req:/samlp:AuthnRequest/samlp:NameIDPolicy/@Format"},
 		{c14n: "nameID", op: "nameid:"},
 		{c14n: "modstlogonmethod", op: "modstlogonmethod:"},
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
