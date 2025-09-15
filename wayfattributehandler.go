@@ -49,6 +49,7 @@ var (
 		{c14n: "nemlogin", op: "eq:Issuer:https://saml.nemlog-in.dk"},
 		{c14n: "eduPersonPrimaryAffiliation", op: "nemlogin:val:member"},
 		{c14n: "organizationName", op: "nemlogin:val:NemLog-in"},
+		{c14n: "organizationName", op: "nemlogin:xp:msg:./saml:Assertion/saml:AttributeStatement/saml:Attribute[@Name=\"https://data.gov.dk/model/core/eid/professional/orgName\"]/saml:AttributeValue"},
 		{c14n: "schacPersonalUniqueID", op: "nemlogin:prefix:urn:mace:terena.org:schac:personalUniqueID:dk:CPR:"},
 		{c14n: "eduPersonPrincipalName", op: "nemlogin:nemloginEppn"},
 		{c14n: "eduPersonPrincipalName", op: "nemlogin:postfix:@sikker-adgang.dk"},
