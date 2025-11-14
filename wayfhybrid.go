@@ -560,12 +560,12 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			data.Set("client_id", "https://"+r.Host)
 			data.Set("redirect_uri", "https://"+r.Host+"/ACS")
 			data.Set("nonce", gosaml.ID())
-			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
+			http.Redirect(w, r, "https://"+config.OIDCAuth+"?"+data.Encode(), http.StatusFound)
 			return
 		} else if protocol == "wsfed" {
 			data.Set("wa", "wsignin1.0")
 			data.Set("wtrealm", "https://"+r.Host)
-			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
+			http.Redirect(w, r, "https://"+config.SsoService3+"?"+data.Encode(), http.StatusFound)
 			return
 		}
 
@@ -602,6 +602,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0)
 
+		newrequest.QueryDashP(nil, "@Destination", "https://wayf.wayf.dk/saml2/idp/SSOService2.php", nil)
+
 		options := []struct {
 			name, path string
 		}{
@@ -610,7 +612,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			{"nameIDPolicy", "./samlp:NameIDPolicy/@Format"},
 			{"requestedauthncontext", "./samlp:RequestedAuthnContext/saml:AuthnContextClassRef[0]"},
 			{"requestedauthncontextcomparison", "./samlp:RequestedAuthnContext/@Comparison"},
-			{"sso", "./@Destination"},
 		}
 
 		for _, option := range options {
@@ -1442,7 +1443,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		}
 	}
 
-	legacyLog("", "SAML2.0 - IDP.SSOService: Incomming Authentication request:", request.Query1(nil, "./saml:Issuer"), virtualIDPID, "")
+	legacyLog("", "SAML2.0 - IDP.SSOService: Incomming Authentication request:", request.Query1(nil, "./saml:Issuer"), virtualIDPID, strconv.Itoa(int(sRequest.SigningKey)))
 	if hubBirkIndex == 1 {
 		var jsonlog = map[string]string{
 			"action": "receive",
@@ -1467,7 +1468,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	}
 	var u *url.URL
 	if flow != "" {
-		u, err = gosaml.SAMLRequest2OIDCRequest(newrequest, relayState, flow, realIDPMd)
+		u, err = gosaml.SAMLRequest2OIDCRequest(newrequest, relayState, flow, "", realIDPMd)
 	} else {
 		u, err = gosaml.SAMLRequest2URL(newrequest, relayState, privatekey, gosaml.DebugSettingWithDefault(r, "idpSigAlg", config.DefaultCryptoMethod))
 	}
@@ -1764,7 +1765,6 @@ found:
 			debug = cookie.Value
 		}
 		data.Code = hostName + rand.Text()
-		fmt.Println("code:", spMd.Query1(nil, "@entityID"), data.Code)
 		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL * time.Second)})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
@@ -1870,7 +1870,11 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	if sloinfo == nil {
 		return fmt.Errorf("No SLO info found")
 	}
-    sloinfo.SigningKey = config.KeySelectionMap[request.Query1(nil, "./@Destination")]
+
+    if slices.ContainsFunc(config.KeySelectionMap, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix)}) {
+        sloinfo.SigningKey = 1
+    }
+
 	if sendResponse && !ok {
 		return fmt.Errorf("SLO failed")
 	} else if sendResponse && sloinfo.Async {
@@ -1956,7 +1960,6 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
 		sloinfo = sil.LogoutRequest(samlIn, inMd.Query1(nil, "@entityID"), uint8(role), protocol)
-		sloinfo.SigningKey = config.KeySelectionMap[samlIn.Query1(nil, "./Destination")]
 		sendResponse = sloinfo.NameID == ""
 	case "LogoutResponse":
 		sloinfo, ok = sil.LogoutResponse(samlIn)
