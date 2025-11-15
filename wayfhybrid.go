@@ -1782,10 +1782,12 @@ found:
 			return err
 		}
 
-		privatekey, kid, err := gosaml.GetPrivateKey(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
-		if err != nil {
-			return err
-		}
+        kid := config.KeyNames[sRequest.SigningKey]
+        privatekey, err := gosaml.PrivateKeyByName(kid, "")
+        if err != nil {
+            return err
+        }
+
 		signed_id_token, _, err := gosaml.JwtSign(json, privatekey, "RS256", kid)
 		if err != nil {
 			return err
