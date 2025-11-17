@@ -602,7 +602,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 
 		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0)
 
-		newrequest.QueryDashP(nil, "@Destination", "https://wayf.wayf.dk/saml2/idp/SSOService2.php", nil)
+		// newrequest.QueryDashP(nil, "@Destination", "https://wayf.wayf.dk/saml2/sso3", nil)
 
 		options := []struct {
 			name, path string
