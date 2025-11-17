@@ -108,10 +108,11 @@ type (
 	}
 
 	claimsInfo struct {
-		eol       time.Time
-		claims    map[string]any
-		client_id string
-		debug     string
+		eol        time.Time
+		claims     map[string]any
+		client_id  string
+		debug      string
+		signingKey uint8
 	}
 )
 
@@ -1232,8 +1233,9 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 			return fmt.Errorf("unknown code: %s %q", codein, dump)
 		}
-		claims := c.(claimsInfo).claims
-		debug := c.(claimsInfo).debug
+		ci := c.(claimsInfo)
+		claims := ci.claims
+		debug := ci.debug
 		codeChallenge := claims["@codeChallenge"].(string)
 		codeVerifier := r.Form.Get("code_verifier")
 		hashedCodeVerifier := sha256.Sum256([]byte(codeVerifier))
@@ -1272,7 +1274,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		//    return err
 		//}
 
-		signed, err := signClaims(claims)
+		signed, err := signClaims(ci)
 		if err != nil {
 			return err
 		}
@@ -1282,7 +1284,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			claims["nonce"] = nonce
 		}
 		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL * time.Second)})
+		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL * time.Second), signingKey: ci.signingKey})
 
 		resp := map[string]any{
 			"access_token": code,
@@ -1324,7 +1326,8 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 		if !ok {
 			return errors.New("unknown accesstoken")
 		}
-		claims := c.(claimsInfo).claims
+		ci := c.(claimsInfo)
+		claims := ci.claims
 		//claims, err := decrypt(parts[1], "")
 		//if err != nil {
 		//    return err
@@ -1355,7 +1358,7 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(plain))
 		} else {
-			signed, err := signClaims(claims)
+			signed, err := signClaims(ci)
 			if err != nil {
 				return err
 			}
@@ -1367,18 +1370,14 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 	return errors.New("no Authorization header found")
 }
 
-func signClaims(claims map[string]any) (signed string, err error) {
-	hubBirkIDPMd, err := md.Hub.MDQ(config.HubEntityID)
+func signClaims(ci claimsInfo) (signed string, err error) {
+	kid := config.KeyNames[ci.signingKey]
+	privatekey, err := gosaml.PrivateKeyByName(kid, "")
 	if err != nil {
 		return
 	}
 
-	privatekey, kid, err := gosaml.GetPrivateKey(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery)
-	if err != nil {
-		return
-	}
-
-	plainJSON, err := json.Marshal(&claims)
+	plainJSON, err := json.Marshal(&ci.claims)
 	if err != nil {
 		return
 	}
@@ -1656,7 +1655,7 @@ found:
 		}
 
 		// record SLO info before converting SAML2 response to other formats
-		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole, sRequest.Protocol)
+		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole, 0, sRequest.Protocol)
 
 		if spMd.QueryXMLBool(nil, xprefix+"saml20.sign.response") {
 			elementToSign = "/samlp:Response"
@@ -1765,7 +1764,7 @@ found:
 			debug = cookie.Value
 		}
 		data.Code = hostName + rand.Text()
-		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL * time.Second)})
+		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL * time.Second), signingKey: sRequest.SigningKey})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
 		//     return
@@ -1782,12 +1781,11 @@ found:
 			return err
 		}
 
-        kid := config.KeyNames[sRequest.SigningKey]
-        privatekey, err := gosaml.PrivateKeyByName(kid, "")
-        if err != nil {
-            return err
-        }
-
+		kid := config.KeyNames[sRequest.SigningKey]
+		privatekey, err := gosaml.PrivateKeyByName(kid, "")
+		if err != nil {
+			return err
+		}
 		signed_id_token, _, err := gosaml.JwtSign(json, privatekey, "RS256", kid)
 		if err != nil {
 			return err
@@ -1866,16 +1864,17 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 	gosaml.NemLog.Log(request, issuerMd, "")
 
+	var signingKey uint8
+	if slices.ContainsFunc(config.KeySelectionMap, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
+		signingKey = 1
+	}
+
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
-	_, sloinfo, ok, sendResponse := SLOInfoHandler(w, r, request, nil, destination, request, nil, role, request.Query1(nil, "./samlp:Extensions/wayf:protocol"))
+	_, sloinfo, ok, sendResponse := SLOInfoHandler(w, r, request, nil, destination, request, nil, role, signingKey, request.Query1(nil, "./samlp:Extensions/wayf:protocol"))
 	if sloinfo == nil {
 		return fmt.Errorf("No SLO info found")
 	}
-
-    if slices.ContainsFunc(config.KeySelectionMap, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix)}) {
-        sloinfo.SigningKey = 1
-    }
 
 	if sendResponse && !ok {
 		return fmt.Errorf("SLO failed")
@@ -1918,16 +1917,11 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
-
-	names, _, _, err := gosaml.PublicKeyInfoByMethod(issMD.QueryMulti(nil, "md:IDPSSODescriptor"+gosaml.SigningCertQuery), x509.RSA)
+	kid := config.KeyNames[sloinfo.SigningKey]
+	privatekey, err := gosaml.PrivateKeyByName(kid, "")
 	if err != nil {
-	    return
+		return goxml.Wrap(err)
 	}
-	signingKey := sloinfo.SigningKey
-    privatekey, err := gosaml.PrivateKeyByName(names[signingKey] , "")
-    if err != nil {
-        return goxml.Wrap(err)
-    }
 
 	algo := config.DefaultCryptoMethod
 	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
@@ -1954,14 +1948,14 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 
 // SLOInfoHandler Saves or retrieves the SLO info relevant to the contents of the samlMessage
 // For now uses cookies to keep the SLOInfo
-func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd, samlOut, outMd *goxml.Xp, role int, protocol string) (sil *gosaml.SLOInfoList, sloinfo *gosaml.SLOInfo, ok, sendResponse bool) {
+func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd, samlOut, outMd *goxml.Xp, role int, signingKey uint8, protocol string) (sil *gosaml.SLOInfoList, sloinfo *gosaml.SLOInfo, ok, sendResponse bool) {
 	sil = &gosaml.SLOInfoList{}
 	data, _ := session.Get(w, r, sloCookieName, sloInfoCookie)
 	sil.Unmarshal(data)
 
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
-		sloinfo = sil.LogoutRequest(samlIn, inMd.Query1(nil, "@entityID"), uint8(role), protocol)
+		sloinfo = sil.LogoutRequest(samlIn, inMd.Query1(nil, "@entityID"), uint8(role), signingKey, protocol)
 		sendResponse = sloinfo.NameID == ""
 	case "LogoutResponse":
 		sloinfo, ok = sil.LogoutResponse(samlIn)
