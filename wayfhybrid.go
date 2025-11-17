@@ -1044,7 +1044,7 @@ func OidcJwkService(w http.ResponseWriter, r *http.Request) (err error) {
 				Kty: "RSA",
 				N:   base64.RawURLEncoding.EncodeToString(pk.N.Bytes()),
 				E:   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pk.E)).Bytes()),
-				Alg: "RS" + strconv.Itoa(pk.Size()),
+				Alg: "RS256",
 				Use: "sig",
 				Kid: kid,
 			}
