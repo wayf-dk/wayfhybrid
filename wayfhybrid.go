@@ -108,11 +108,11 @@ type (
 	}
 
 	claimsInfo struct {
-		eol        time.Time
-		claims     map[string]any
-		client_id  string
-		debug      string
-		signingKey uint8
+		Eol        time.Time
+		Claims     map[string]any
+		ClientId   string
+		Debug      string
+		SigningKey uint8
 	}
 )
 
@@ -1031,7 +1031,7 @@ type (
 )
 
 func OidcJwkService(w http.ResponseWriter, r *http.Request) (err error) {
-	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, "https://wayf.wayf.dk")
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, config.HubEntityID)
 	if err != nil {
 		return err
 	}
@@ -1234,8 +1234,8 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			return fmt.Errorf("unknown code: %s %q", codein, dump)
 		}
 		ci := c.(claimsInfo)
-		claims := ci.claims
-		debug := ci.debug
+		claims := ci.Claims
+		debug := ci.Debug
 		codeChallenge := claims["@codeChallenge"].(string)
 		codeVerifier := r.Form.Get("code_verifier")
 		hashedCodeVerifier := sha256.Sum256([]byte(codeVerifier))
@@ -1269,11 +1269,10 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("token timeout")
 		}
 
-		//access_token, err := encrypt(claims, "")
-		//if err != nil {
-		//    return err
-		//}
-
+		access_token, err := encrypt(ci, "")
+		if err != nil {
+			return err
+		}
 		signed, err := signClaims(ci)
 		if err != nil {
 			return err
@@ -1283,11 +1282,11 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		if nonce := r.Form.Get("nonce"); nonce != "" {
 			claims["nonce"] = nonce
 		}
-		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL * time.Second), signingKey: ci.signingKey})
+		//code := hostName + rand.Text()
+		//claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL * time.Second), signingKey: ci.signingKey})
 
 		resp := map[string]any{
-			"access_token": code,
+			"access_token": access_token,
 			"token_type":   "Bearer",
 			"id_token":     signed,
 			"expires_in":   codeTTL,
@@ -1322,28 +1321,29 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("no Bearer token found")
 		}
 
-		c, ok := claimsMap.Load(parts[1])
-		if !ok {
-			return errors.New("unknown accesstoken")
+		//		c, ok := claimsMap.Load(parts[1])
+		//		if !ok {
+		//			return errors.New("unknown accesstoken")
+		//		}
+		//		ci := c.(claimsInfo)
+		//		claims := ci.claims
+		ci, err := decrypt(parts[1], "")
+		if err != nil {
+			return err
 		}
-		ci := c.(claimsInfo)
-		claims := ci.claims
-		//claims, err := decrypt(parts[1], "")
-		//if err != nil {
-		//    return err
-		//}
+		claims := ci.Claims
 
-		if gosaml.DebugSetting2(c.(claimsInfo).debug, "trace") == "1" {
+		if gosaml.DebugSetting2(ci.Debug, "trace") == "1" {
 			plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
 			gosaml.Dump("userinfo_id_token", plainJSON)
 		}
 
-		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
-		if claims["iat"].(int64)+60 < time.Now().Unix() {
+		if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
+			//if claims["iat"].(int64)+60 < time.Now().Unix() {
 			return errors.New("token timeout")
 		}
 
-		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, c.(claimsInfo).client_id)
+		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, ci.ClientId)
 		if err != nil {
 			return err
 		}
@@ -1371,13 +1371,13 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func signClaims(ci claimsInfo) (signed string, err error) {
-	kid := config.KeyNames[ci.signingKey]
+	kid := config.KeyNames[ci.SigningKey]
 	privatekey, err := gosaml.PrivateKeyByName(kid, "")
 	if err != nil {
 		return
 	}
 
-	plainJSON, err := json.Marshal(&ci.claims)
+	plainJSON, err := json.Marshal(&ci.Claims)
 	if err != nil {
 		return
 	}
@@ -1764,7 +1764,7 @@ found:
 			debug = cookie.Value
 		}
 		data.Code = hostName + rand.Text()
-		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL * time.Second), signingKey: sRequest.SigningKey})
+		claimsMap.Store(data.Code, claimsInfo{Claims: id_token, Debug: debug, Eol: time.Now().Add(codeTTL * time.Second), SigningKey: sRequest.SigningKey})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
 		//     return
@@ -1804,7 +1804,7 @@ found:
 	return tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
 }
 
-func encrypt(plain map[string]any, label string) (res string, err error) {
+func encrypt(plain claimsInfo, label string) (res string, err error) {
 	plainJSON, err := json.Marshal(&plain)
 	if err != nil {
 		return
@@ -1815,7 +1815,7 @@ func encrypt(plain map[string]any, label string) (res string, err error) {
 	return
 }
 
-func decrypt(ciphertext string, label string) (claims map[string]any, err error) {
+func decrypt(ciphertext string, label string) (claimsinfo claimsInfo, err error) {
 	cipherslice, err := base64.RawURLEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return
@@ -1825,8 +1825,8 @@ func decrypt(ciphertext string, label string) (claims map[string]any, err error)
 		return
 	}
 	plainJSON := gosaml.Inflate(compressedJSON)
-	claims = map[string]any{}
-	err = json.Unmarshal([]byte(plainJSON), &claims)
+	claimsinfo = claimsInfo{}
+	err = json.Unmarshal([]byte(plainJSON), &claimsinfo)
 	return
 }
 
@@ -2045,7 +2045,7 @@ func cleanUpClaimsMap(sm *sync.Map, ttl time.Duration) {
 		for {
 			<-ticker.C
 			sm.Range(func(k, v any) bool {
-				if v.(claimsInfo).eol.Before(time.Now()) {
+				if v.(claimsInfo).Eol.Before(time.Now()) {
 					sm.Delete(k)
 				}
 				return true
