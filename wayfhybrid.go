@@ -1981,41 +1981,29 @@ func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	if rawPath = r.URL.RawPath; rawPath == "" {
 		rawPath = r.URL.Path
 	}
-	path := strings.Split(rawPath, "/")[2:] // need a way to do this automatically
-	var xml []byte
-	var en1, en2 string
-	var xp1, xp2 *goxml.Xp
-	switch len(path) {
-	case 3:
-		md, ok := webMdMap[path[1]]
-		if !ok {
-			return fmt.Errorf("Metadata set not found")
-		}
-		en1, _ = url.PathUnescape(path[0])
-		en2, _ = url.PathUnescape(path[2])
-		xp1, _, err = md.md.WebMDQ(en1)
-		if err != nil {
-			return
-		}
-		if en1 == en2 { // hack to allow asking for a specific entity, by using the same entity twice
-			xp2, xml, err = md.md.WebMDQ(en2)
-		} else {
-			xp2, xml, err = md.revmd.WebMDQ(en2)
-		}
-		if err != nil {
-			return err
-		}
-		if !intersectionNotEmpty(xp1.QueryMulti(nil, xprefix+"feds"), xp2.QueryMulti(nil, xprefix+"feds")) {
-			return fmt.Errorf("no common federations")
-		}
-	default:
-		return fmt.Errorf("invalid MDQ path")
+	path := strings.Split(rawPath+"//", "/")[2:]
+	md, ok := webMdMap[path[1]]
+	if !ok {
+		return fmt.Errorf("Metadata set not found")
+	}
+	en1, _ := url.PathUnescape(path[0])
+	en2, _ := url.PathUnescape(path[2])
+	xp, err := md.md.WebMDQ(en1, en2)
+	if err != nil {
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	//w.Header().Set("Content-Encoding", "deflate")
 	//w.Header().Set("ETag", "abcdefg")
-	xml = gosaml.Inflate(xml)
+
+	privatekey, err := gosaml.PrivateKeyByName(config.MetadataKey, "")
+	if err != nil {
+		return
+	}
+
+	err = xp.Sign(nil, xp.Query(nil, "*[1]")[0], privatekey, config.MetadataCert, config.DefaultCryptoMethod)
+	xml := []byte(xp.Dump())
 	w.Header().Set("Content-Length", strconv.Itoa(len(xml)))
 	w.Write(xml)
 	return
