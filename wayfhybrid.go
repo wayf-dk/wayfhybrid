@@ -2003,6 +2003,9 @@ func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 
 	err = xp.Sign(nil, xp.Query(nil, "*[1]")[0], privatekey, config.MetadataCert, config.DefaultCryptoMethod)
+	if err != nil {
+	    return err
+	}
 	xml := []byte(xp.Dump())
 	w.Header().Set("Content-Length", strconv.Itoa(len(xml)))
 	w.Write(xml)
