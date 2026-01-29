@@ -108,10 +108,11 @@ type (
 	}
 
 	claimsInfo struct {
-		eol       time.Time
-		claims    map[string]any
-		client_id string
-		debug     string
+		Eol        time.Time
+		Claims     map[string]any
+		ClientId   string
+		Debug      string
+		SigningKey uint8
 	}
 )
 
@@ -129,7 +130,7 @@ var (
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
 	defaultDigestAndSignatureAlgorithm  = "sha256"
 
-	metadataUpdateGuard chan int
+	metadataUpdateGuard = make(chan int, 1)
 
 	session = wayfHybridSession{}
 
@@ -158,9 +159,7 @@ func Main() {
 	tmpl = template.Must(template.New("name").Parse(config.HybridTmpl))
 	gosaml.PostForm = tmpl
 
-	cleanUpClaimsMap(&claimsMap, codeTTL * time.Second)
-
-	metadataUpdateGuard = make(chan int, 1)
+	cleanUpClaimsMap(&claimsMap, codeTTL*time.Second)
 
 	md.Hub = &lmdq.MDQ{MdDb: config.Hub}
 	md.Internal = &lmdq.MDQ{MdDb: config.Internal}
@@ -172,7 +171,7 @@ func Main() {
 	hubExtIDP = gosaml.MdSets{md.Hub, md.ExternalIDP}
 	hubExtSP = gosaml.MdSets{md.Hub, md.ExternalSP}
 
-	str, err := refreshAllMetadataFeeds(!*config.BypassMdUpdate)
+	str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1)
 	log.Printf("refreshAllMetadataFeeds: %s %v\n", str, err)
 
 	webMdMap = make(map[string]webMd)
@@ -211,15 +210,18 @@ func Main() {
 
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
 	httpMux.Handle(config.SsoService2, appHandler(SSOService))
+	httpMux.Handle(config.SsoService3, appHandler(SSOService))
 	httpMux.Handle(config.OIDCAuth, appHandler(SSOService))
 	httpMux.Handle(config.OIDCToken, appHandler(OIDCTokenService))
 	httpMux.Handle(config.OIDCUserinfo, appHandler(OIDCUserinfoService))
 
 	httpMux.Handle(config.Idpslo, appHandler(IDPSLOService))
 	httpMux.Handle(config.Idpslo2, appHandler(IDPSLOService))
+	httpMux.Handle(config.Idpslo3, appHandler(IDPSLOService))
 	httpMux.Handle(config.Birkslo, appHandler(BirkSLOService))
 	httpMux.Handle(config.Spslo, appHandler(SPSLOService))
 	httpMux.Handle(config.Spslo2, appHandler(SPSLOService))
+	httpMux.Handle(config.Spslo3, appHandler(SPSLOService))
 	httpMux.Handle(config.Kribslo, appHandler(KribSLOService))
 	httpMux.Handle(config.Nemloginslo, appHandler(SPSLOService))
 
@@ -243,7 +245,7 @@ func Main() {
 	httpMux.Handle(config.TestSP2+"/ds/", appHandler(f))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
-	httpMux.Handle(config.Jwt2saml, appHandler(jwt2saml))
+	httpMux.Handle(config.Saml3jwt, appHandler(saml2jwt))
 	httpMux.Handle(config.MDQ, appHandler(MDQWeb))
 
 	httpMux.Handle(config.TestSPSlo, appHandler(testSPService))
@@ -437,14 +439,13 @@ func PProf(w http.ResponseWriter, r *http.Request) (err error) {
 
 // updateMetadataService is service for updating metadata feed
 func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
-	if str, err := refreshAllMetadataFeeds(true); err == nil {
+	if str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1); err == nil {
 		io.WriteString(w, str)
 	}
 	return
 }
 
-// refreshAllMetadataFeeds is responsible for referishing all metadata feed(internal, external)
-func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
+func GetMetadataFeeds(refresh bool) (str string, err error) {
 	if !refresh {
 		return "bypassed", nil
 	}
@@ -457,6 +458,22 @@ func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 					return "", err
 				}
 			}
+			<-metadataUpdateGuard
+			return "Pong", nil
+		}
+	default:
+		{
+			return "Ignored", nil
+		}
+	}
+}
+
+// refreshAllMetadataFeeds is responsible for referishing all metadata feed(internal, external)
+func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
+	GetMetadataFeeds(refresh)
+	select {
+	case metadataUpdateGuard <- 1:
+		{
 			for _, md := range []gosaml.Md{md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP} {
 				err := md.(*lmdq.MDQ).Open()
 				if err != nil {
@@ -558,12 +575,12 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			data.Set("client_id", "https://"+r.Host)
 			data.Set("redirect_uri", "https://"+r.Host+"/ACS")
 			data.Set("nonce", gosaml.ID())
-			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
+			http.Redirect(w, r, "https://"+config.OIDCAuth+"?"+data.Encode(), http.StatusFound)
 			return
 		} else if protocol == "wsfed" {
 			data.Set("wa", "wsignin1.0")
 			data.Set("wtrealm", "https://"+r.Host)
-			http.Redirect(w, r, "https://"+config.SsoService+"?"+data.Encode(), http.StatusFound)
+			http.Redirect(w, r, "https://"+config.SsoService3+"?"+data.Encode(), http.StatusFound)
 			return
 		}
 
@@ -624,7 +641,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		u, err := gosaml.SAMLRequest2URL(newrequest, "", pk, config.DefaultCryptoMethod)
+		u, err := gosaml.SAMLRequest2URL(newrequest, strings.Repeat("z", 100), pk, config.DefaultCryptoMethod)
 		if err != nil {
 			return err
 		}
@@ -658,7 +675,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			return err
 		}
 		if r.Form.Get("logout") == "1" {
-			gosaml.SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, pk, "")
+			gosaml.SloRequest(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, pk, "", strings.Repeat("z", 100))
 		} else {
 			gosaml.SloResponse(w, r, goxml.NewXpFromString(r.Form.Get("response")), spMd, idpMd, pk, gosaml.IDPRole)
 		}
@@ -1026,7 +1043,7 @@ type (
 )
 
 func OidcJwkService(w http.ResponseWriter, r *http.Request) (err error) {
-	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, "https://wayf.wayf.dk")
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, config.HubEntityID)
 	if err != nil {
 		return err
 	}
@@ -1040,7 +1057,7 @@ func OidcJwkService(w http.ResponseWriter, r *http.Request) (err error) {
 				Kty: "RSA",
 				N:   base64.RawURLEncoding.EncodeToString(pk.N.Bytes()),
 				E:   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pk.E)).Bytes()),
-				Alg: "RS" + strconv.Itoa(pk.Size()),
+				Alg: "RS256",
 				Use: "sig",
 				Kid: kid,
 			}
@@ -1228,8 +1245,9 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 			return fmt.Errorf("unknown code: %s %q", codein, dump)
 		}
-		claims := c.(claimsInfo).claims
-		debug := c.(claimsInfo).debug
+		ci := c.(claimsInfo)
+		claims := ci.Claims
+		debug := ci.Debug
 		codeChallenge := claims["@codeChallenge"].(string)
 		codeVerifier := r.Form.Get("code_verifier")
 		hashedCodeVerifier := sha256.Sum256([]byte(codeVerifier))
@@ -1263,12 +1281,12 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("token timeout")
 		}
 
-		//access_token, err := encrypt(claims, "")
-		//if err != nil {
-		//    return err
-		//}
-
-		signed, err := signClaims(claims)
+		ci = claimsInfo{Claims: claims, Debug: debug, ClientId: clientId, Eol: time.Now().Add(codeTTL * time.Second), SigningKey: ci.SigningKey}
+		access_token, err := encrypt(ci, "")
+		if err != nil {
+			return err
+		}
+		signed, err := signClaims(ci)
 		if err != nil {
 			return err
 		}
@@ -1277,11 +1295,11 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		if nonce := r.Form.Get("nonce"); nonce != "" {
 			claims["nonce"] = nonce
 		}
-		code := hostName + rand.Text()
-		claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL * time.Second)})
+		//code := hostName + rand.Text()
+		//claimsMap.Store(code, claimsInfo{claims: claims, debug: debug, client_id: clientId, eol: time.Now().Add(codeTTL * time.Second), signingKey: ci.signingKey})
 
 		resp := map[string]any{
-			"access_token": code,
+			"access_token": access_token,
 			"token_type":   "Bearer",
 			"id_token":     signed,
 			"expires_in":   codeTTL,
@@ -1316,27 +1334,29 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("no Bearer token found")
 		}
 
-		c, ok := claimsMap.Load(parts[1])
-		if !ok {
-			return errors.New("unknown accesstoken")
+		//		c, ok := claimsMap.Load(parts[1])
+		//		if !ok {
+		//			return errors.New("unknown accesstoken")
+		//		}
+		//		ci := c.(claimsInfo)
+		//		claims := ci.claims
+		ci, err := decrypt(parts[1], "")
+		if err != nil {
+			return err
 		}
-		claims := c.(claimsInfo).claims
-		//claims, err := decrypt(parts[1], "")
-		//if err != nil {
-		//    return err
-		//}
+		claims := ci.Claims
 
-		if gosaml.DebugSetting2(c.(claimsInfo).debug, "trace") == "1" {
+		if gosaml.DebugSetting2(ci.Debug, "trace") == "1" {
 			plainJSON, _ := json.MarshalIndent(&claims, "", "    ")
 			gosaml.Dump("userinfo_id_token", plainJSON)
 		}
 
-		//if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
-		if claims["iat"].(int64)+60 < time.Now().Unix() {
+		if int64(claims["iat"].(float64))+60 < time.Now().Unix() { // remember if via json it is float64
+			//if claims["iat"].(int64)+60 < time.Now().Unix() {
 			return errors.New("token timeout")
 		}
 
-		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, c.(claimsInfo).client_id)
+		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, ci.ClientId)
 		if err != nil {
 			return err
 		}
@@ -1351,7 +1371,7 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(plain))
 		} else {
-			signed, err := signClaims(claims)
+			signed, err := signClaims(ci)
 			if err != nil {
 				return err
 			}
@@ -1363,18 +1383,14 @@ func OIDCUserinfoService(w http.ResponseWriter, r *http.Request) (err error) {
 	return errors.New("no Authorization header found")
 }
 
-func signClaims(claims map[string]any) (signed string, err error) {
-	hubBirkIDPMd, err := md.Hub.MDQ(config.HubEntityID)
+func signClaims(ci claimsInfo) (signed string, err error) {
+	kid := config.KeyNames[ci.SigningKey]
+	privatekey, err := gosaml.PrivateKeyByName(kid, "")
 	if err != nil {
 		return
 	}
 
-	privatekey, _, kid, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
-	if err != nil {
-		return
-	}
-
-	plainJSON, err := json.Marshal(&claims)
+	plainJSON, err := json.Marshal(&ci.Claims)
 	if err != nil {
 		return
 	}
@@ -1439,7 +1455,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 		}
 	}
 
-	legacyLog("", "SAML2.0 - IDP.SSOService: Incomming Authentication request:", request.Query1(nil, "./saml:Issuer"), virtualIDPID, "")
+	legacyLog("", "SAML2.0 - IDP.SSOService: Incomming Authentication request:", request.Query1(nil, "./saml:Issuer"), virtualIDPID, strconv.Itoa(int(sRequest.SigningKey)))
 	if hubBirkIndex == 1 {
 		var jsonlog = map[string]string{
 			"action": "receive",
@@ -1464,7 +1480,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 	}
 	var u *url.URL
 	if flow != "" {
-		u, err = gosaml.SAMLRequest2OIDCRequest(newrequest, relayState, flow, realIDPMd)
+		u, err = gosaml.SAMLRequest2OIDCRequest(newrequest, relayState, flow, "", realIDPMd)
 	} else {
 		u, err = gosaml.SAMLRequest2URL(newrequest, relayState, privatekey, gosaml.DebugSettingWithDefault(r, "idpSigAlg", config.DefaultCryptoMethod))
 	}
@@ -1641,6 +1657,9 @@ found:
 				value := newresponse.Query1(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.Rm(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID", value, nil)
+				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
+				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID/@NameQualifier", virtualIDPMd.Query1(nil, "@entityID"), nil)
+				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID/@SPNameQualifier", spMd.Query1(nil, "@entityID"), nil)
 			}
 		}
 
@@ -1652,7 +1671,7 @@ found:
 		}
 
 		// record SLO info before converting SAML2 response to other formats
-		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole, sRequest.Protocol)
+		SLOInfoHandler(w, r, response, idpMd, hubKribSpMd, newresponse, spMd, gosaml.SPRole, 0, sRequest.Protocol)
 
 		if spMd.QueryXMLBool(nil, xprefix+"saml20.sign.response") {
 			elementToSign = "/samlp:Response"
@@ -1682,7 +1701,7 @@ found:
 		}
 
 		if elementToSign != "/samlp:Response" {
-			err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType)
+			err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType, sRequest.SigningKey)
 			if err != nil {
 				return err
 			}
@@ -1699,7 +1718,7 @@ found:
 	} else {
 		newresponse = gosaml.NewErrorResponse(hubBirkIDPMd, spMd, request, response)
 
-		err = gosaml.SignResponse(newresponse, "/samlp:Response", hubBirkIDPMd, signingMethod, gosaml.SAMLSign)
+		err = gosaml.SignResponse(newresponse, "/samlp:Response", hubBirkIDPMd, signingMethod, gosaml.SAMLSign, sRequest.SigningKey)
 		if err != nil {
 			return
 		}
@@ -1738,7 +1757,7 @@ found:
 	}
 
 	if elementToSign == "/samlp:Response" {
-		err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType)
+		err = gosaml.SignResponse(newresponse, elementToSign, hubBirkIDPMd, signingMethod, signingType, sRequest.SigningKey)
 		if err != nil {
 			return err
 		}
@@ -1761,8 +1780,7 @@ found:
 			debug = cookie.Value
 		}
 		data.Code = hostName + rand.Text()
-		fmt.Println("code:", spMd.Query1(nil, "@entityID"), data.Code)
-		claimsMap.Store(data.Code, claimsInfo{claims: id_token, debug: debug, eol: time.Now().Add(codeTTL * time.Second)})
+		claimsMap.Store(data.Code, claimsInfo{Claims: id_token, Debug: debug, Eol: time.Now().Add(codeTTL * time.Second), SigningKey: sRequest.SigningKey})
 		// data.Code, err = encrypt(id_token, "")
 		// if err != nil {
 		//     return
@@ -1779,7 +1797,8 @@ found:
 			return err
 		}
 
-		privatekey, _, kid, err := gosaml.GetPrivateKeyByMethod(hubBirkIDPMd, "md:IDPSSODescriptor"+gosaml.SigningCertQuery, x509.RSA)
+		kid := config.KeyNames[sRequest.SigningKey]
+		privatekey, err := gosaml.PrivateKeyByName(kid, "")
 		if err != nil {
 			return err
 		}
@@ -1801,7 +1820,7 @@ found:
 	return tmpl.ExecuteTemplate(w, "attributeReleaseForm", data)
 }
 
-func encrypt(plain map[string]any, label string) (res string, err error) {
+func encrypt(plain claimsInfo, label string) (res string, err error) {
 	plainJSON, err := json.Marshal(&plain)
 	if err != nil {
 		return
@@ -1812,7 +1831,7 @@ func encrypt(plain map[string]any, label string) (res string, err error) {
 	return
 }
 
-func decrypt(ciphertext string, label string) (claims map[string]any, err error) {
+func decrypt(ciphertext string, label string) (claimsinfo claimsInfo, err error) {
 	cipherslice, err := base64.RawURLEncoding.DecodeString(ciphertext)
 	if err != nil {
 		return
@@ -1822,34 +1841,29 @@ func decrypt(ciphertext string, label string) (claims map[string]any, err error)
 		return
 	}
 	plainJSON := gosaml.Inflate(compressedJSON)
-	claims = map[string]any{}
-	err = json.Unmarshal([]byte(plainJSON), &claims)
+	claimsinfo = claimsInfo{}
+	err = json.Unmarshal([]byte(plainJSON), &claimsinfo)
 	return
 }
 
 // IDPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
 func IDPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.Internal, md.Hub, []gosaml.Md{md.ExternalSP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalIDP}, gosaml.IDPRole, "SLO")
+	return SLOService(w, r, intExtSP, md.Hub, []gosaml.Md{md.ExternalSP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalIDP}, gosaml.IDPRole, "SLO")
 }
 
 // SPSLOService refers to SP single logout service. Takes request as a parameter and returns an error if any
 func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.Internal, md.Hub, []gosaml.Md{md.ExternalIDP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalSP}, gosaml.SPRole, "SLO")
+	return SLOService(w, r, intExtIDP, md.Hub, []gosaml.Md{md.ExternalIDP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalSP}, gosaml.SPRole, "SLO")
 }
 
 // BirkSLOService refers to birk single logout service. Takes request as a parameter and returns an error if any
 func BirkSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.ExternalSP, md.ExternalIDP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.IDPRole, "SLO")
+	return SLOService(w, r, intExtSP, md.ExternalIDP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.IDPRole, "SLO")
 }
 
 // KribSLOService refers to krib single logout service. Takes request as a parameter and returns an error if any
 func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.ExternalIDP, md.ExternalSP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.SPRole, "SLO")
-}
-
-func jwt2saml(w http.ResponseWriter, r *http.Request) (err error) {
-	hubMd, _ := md.Hub.MDQ(config.HubEntityID)
-	return gosaml.Jwt2saml(w, r, md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP, RequestHandler, hubMd)
+	return SLOService(w, r, intExtIDP, md.ExternalSP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.SPRole, "SLO")
 }
 
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
@@ -1857,18 +1871,23 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 // SLOService refers to single logout service. Takes request and issuer and destination metadata sets, role refers to if it as IDP or SP.
-func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destinationMdSet gosaml.Md, finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, role int, tag string) (err error) {
+func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSets, destinationMdSet gosaml.Md, finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, role int, tag string) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	request, issuerMd, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
+	request, issuerMd, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, issuerMdSet, gosaml.MdSets{destinationMdSet}, role)
 	if err != nil {
 		return err
 	}
 	gosaml.NemLog.Log(request, issuerMd, "")
 
+	var signingKey uint8
+	if slices.ContainsFunc(config.KeySelectionList, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
+		signingKey = 1
+	}
+
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
-	_, sloinfo, ok, sendResponse := SLOInfoHandler(w, r, request, nil, destination, request, nil, role, request.Query1(nil, "./samlp:Extensions/wayf:protocol"))
+	_, sloinfo, ok, sendResponse := SLOInfoHandler(w, r, request, nil, destination, request, nil, role, signingKey, request.Query1(nil, "./samlp:Extensions/wayf:protocol"))
 	if sloinfo == nil {
 		return fmt.Errorf("No SLO info found")
 	}
@@ -1914,12 +1933,16 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
-
-	privatekey, _, err := gosaml.GetPrivateKey(issMD, gosaml.Roles[sloinfo.HubRole]+gosaml.SigningCertQuery)
-	if err != nil {
-		return err
+	var privatekey crypto.PrivateKey
+	if config.UseMDkeyMap[iss] {
+		privatekey, _, err = gosaml.GetPrivateKey(issMD, gosaml.Roles[sloinfo.HubRole]+gosaml.SigningCertQuery)
+	} else {
+		kid := config.KeyNames[sloinfo.SigningKey]
+		privatekey, err = gosaml.PrivateKeyByName(kid, "")
 	}
-
+	if err != nil {
+		return goxml.Wrap(err)
+	}
 	algo := config.DefaultCryptoMethod
 	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
@@ -1933,7 +1956,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		}
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case gosaml.POST:
-		err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign)
+		err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign, sloinfo.SigningKey)
 		if err != nil {
 			return err
 		}
@@ -1945,14 +1968,14 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 
 // SLOInfoHandler Saves or retrieves the SLO info relevant to the contents of the samlMessage
 // For now uses cookies to keep the SLOInfo
-func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd, samlOut, outMd *goxml.Xp, role int, protocol string) (sil *gosaml.SLOInfoList, sloinfo *gosaml.SLOInfo, ok, sendResponse bool) {
+func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd, samlOut, outMd *goxml.Xp, role int, signingKey uint8, protocol string) (sil *gosaml.SLOInfoList, sloinfo *gosaml.SLOInfo, ok, sendResponse bool) {
 	sil = &gosaml.SLOInfoList{}
 	data, _ := session.Get(w, r, sloCookieName, sloInfoCookie)
 	sil.Unmarshal(data)
 
 	switch samlIn.QueryString(nil, "local-name(/*)") {
 	case "LogoutRequest":
-		sloinfo = sil.LogoutRequest(samlIn, inMd.Query1(nil, "@entityID"), uint8(role), protocol)
+		sloinfo = sil.LogoutRequest(samlIn, inMd.Query1(nil, "@entityID"), uint8(role), signingKey, protocol)
 		sendResponse = sloinfo.NameID == ""
 	case "LogoutResponse":
 		sloinfo, ok = sil.LogoutResponse(samlIn)
@@ -1988,7 +2011,7 @@ func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	en1, _ := url.PathUnescape(path[0])
 	en2, _ := url.PathUnescape(path[2])
-	xp, err := md.md.WebMDQ(en1, en2)
+	xp, err := md.md.WebMDQ(en1, en2, true)
 	if err != nil {
 		return
 	}
@@ -2004,7 +2027,7 @@ func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 
 	err = xp.Sign(nil, xp.Query(nil, "*[1]")[0], privatekey, config.MetadataCert, config.DefaultCryptoMethod)
 	if err != nil {
-	    return err
+		return err
 	}
 	xml := []byte(xp.Dump())
 	w.Header().Set("Content-Length", strconv.Itoa(len(xml)))
@@ -2033,7 +2056,7 @@ func cleanUpClaimsMap(sm *sync.Map, ttl time.Duration) {
 		for {
 			<-ticker.C
 			sm.Range(func(k, v any) bool {
-				if v.(claimsInfo).eol.Before(time.Now()) {
+				if v.(claimsInfo).Eol.Before(time.Now()) {
 					sm.Delete(k)
 				}
 				return true
