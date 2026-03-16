@@ -918,16 +918,18 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		if len(localScope) > 1 {
 			scope := localScope[2]
 			spID := response.Query1(attrList, `./saml:Attribute[@Name="spID"]/saml:AttributeValue`)
-			xpx := xprefix + `eduPersonPrincipalNamePrior[wayf:ServiceProvider=` + strconv.Quote(spID) + ` and (wayf:Scope=` + strconv.Quote(scope) + ` or not(wayf:Scope))]`
-			usePrior := idpMd.Query(nil, xpx)
+			usePrior := idpMd.Query(nil, xprefix + `eduPersonPrincipalNamePrior/wayf:ServiceProvider[.=` + strconv.Quote(spID) + `]`)
 			if len(usePrior) == 1 {
 				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
-				xpx := xprefix + `eduPersonPrincipalNamePrior/wayf:Scope[.=` + strconv.Quote(scope) + `]/`
-				schacHomeOrganization := idpMd.Query1(nil, xpx+"@schacHomeOrganization")
-				persistentIDPEntityid := idpMd.Query1(nil, xpx+"@persistentIDPEntityID")
-				if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
-					return
-				}
+				var schacHomeOrganization, persistentIDPEntityid string
+                xtrascope := idpMd.Query(usePrior.First(), `following-sibling::wayf:Scope[.=` + strconv.Quote(scope) + `]`)
+                if len(xtrascope) == 1 {
+                    schacHomeOrganization = idpMd.Query1(xtrascope.First(), "@schacHomeOrganization")
+                    persistentIDPEntityid = idpMd.Query1(xtrascope.First(), "@persistentIDPEntityID")
+                }
+                if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
+                    return
+                }
 			}
 		}
 	}
