@@ -399,7 +399,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	starttime := time.Now()
 
 	w.Header().Set("X-Frame-Options", "sameorigin")
-	w.Header().Set("Content-Security-Policy", "frame-ancestors 'self'")
+	//w.Header().Set("Content-Security-Policy", "frame-ancestors 'self' https://wayfsp.wayf.dk")
 	w.Header().Set("X-XSS-Protection", "0")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
@@ -590,16 +590,16 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scopedIDP == "" && idp == "" {
-			data := url.Values{}
-			data.Set("return", "https://"+r.Host+r.RequestURI)
-			data.Set("returnIDParam", "idpentityid")
-			data.Set("entityID", "https://"+r.Host)
-			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-			if discoService == "" {
-				discoService = config.DiscoveryService
-			}
-			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
-			return err
+//			data := url.Values{}
+//			data.Set("return", "https://"+r.Host+r.RequestURI)
+//			data.Set("returnIDParam", "idpentityid")
+//			data.Set("entityID", "https://"+r.Host)
+//			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+//			if discoService == "" {
+//				discoService = config.DiscoveryService
+//			}
+//			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
+//			return err
 		}
 
 		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
@@ -636,12 +636,12 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scoping == "scoping" || scoping == "" {
-			for _, scope := range idpList {
-				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
-			}
+//			for _, scope := range idpList {
+//				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
+//			}
 		}
 
-		u, err := gosaml.SAMLRequest2URL(newrequest, strings.Repeat("z", 100), pk, config.DefaultCryptoMethod)
+		u, err := gosaml.SAMLRequest2URL(newrequest, "", pk, config.DefaultCryptoMethod)
 		if err != nil {
 			return err
 		}
@@ -662,6 +662,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 				q.Set("idplist", scopedIDP)
 			}
 		}
+		q.Set("RelayState", strings.Repeat("z", 50))
 		u.RawQuery = q.Encode()
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return nil
@@ -920,15 +921,15 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 			spID := response.Query1(attrList, `./saml:Attribute[@Name="spID"]/saml:AttributeValue`)
 			usePrior := idpMd.Query(nil, xprefix + `eduPersonPrincipalNamePrior/wayf:ServiceProvider[.=` + strconv.Quote(spID) + `]`)
 			if len(usePrior) == 1 {
-				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
 				var schacHomeOrganization, persistentIDPEntityid string
                 xtrascope := idpMd.Query(usePrior.First(), `following-sibling::wayf:Scope[.=` + strconv.Quote(scope) + `]`)
                 if len(xtrascope) == 1 {
+    				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
                     schacHomeOrganization = idpMd.Query1(xtrascope.First(), "@schacHomeOrganization")
                     persistentIDPEntityid = idpMd.Query1(xtrascope.First(), "@persistentIDPEntityID")
-                }
-                if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
-                    return
+                    if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
+                        return
+                    }
                 }
 			}
 		}
@@ -1882,10 +1883,12 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSet
 	}
 	gosaml.NemLog.Log(request, issuerMd, "")
 
-	var signingKey uint8
+	var signingKey uint8 = 1
+/*
 	if slices.ContainsFunc(config.KeySelectionList, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
 		signingKey = 1
 	}
+*/
 
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
@@ -1940,6 +1943,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSet
 		privatekey, _, err = gosaml.GetPrivateKey(issMD, gosaml.Roles[sloinfo.HubRole]+gosaml.SigningCertQuery)
 	} else {
 		kid := config.KeyNames[sloinfo.SigningKey]
+		fmt.Println("kid", kid)
 		privatekey, err = gosaml.PrivateKeyByName(kid, "")
 	}
 	if err != nil {
@@ -1983,7 +1987,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 		sloinfo, ok = sil.LogoutResponse(samlIn)
 		sendResponse = sloinfo.NameID == ""
 	case "Response":
-		sil.Response(samlIn, inMd.Query1(nil, "@entityID"), idpMd.Query1(nil, "./md:IDPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.SPRole, "") // newer non-saml coming in from our IDPS
+		sil.Response(samlIn, inMd.Query1(nil, "@entityID"), idpMd.Query1(nil, "./md:IDPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.SPRole, "") // never non-saml coming in from our IDPS
 		sil.Response(samlOut, outMd.Query1(nil, "@entityID"), outMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole, protocol)
 	}
 	if sendResponse { // ready to send response - clear cookie
