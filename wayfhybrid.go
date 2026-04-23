@@ -271,7 +271,6 @@ func Main() {
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
 
 	httpMux.Handle(config.EWCredential, appHandler(createWalletCredentialSession))
-	httpMux.Handle(config.EWOffer, appHandler(fetchWalletSession))
 
 	log.Println("listening on ", config.Intf)
 	var s *http.Server
