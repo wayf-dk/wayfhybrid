@@ -114,6 +114,20 @@ type (
 		Debug      string
 		SigningKey uint8
 	}
+	credentialOfferInfo struct {
+		CredentialIssuer           string    `json:"credential_issuer"`
+		CredentialConfigurationIDs []string  `json:"credential_configuration_ids"`
+		Grants                     grants    `json:"grants"`
+		Eol                        time.Time `json:"eol"`
+	}
+
+	grants struct {
+		AuthorizationCode authorizationCode `json:"authorization_code"`
+	}
+
+	authorizationCode struct {
+		IssuerState string `json:"issuer_state"`
+	}
 )
 
 var (
@@ -255,6 +269,9 @@ func Main() {
 	httpMux.Handle(config.TestSP2Slo, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2Acs, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
+
+	httpMux.Handle(config.EWCredential, appHandler(createWalletCredentialSession))
+	httpMux.Handle(config.EWOffer, appHandler(fetchWalletSession))
 
 	log.Println("listening on ", config.Intf)
 	var s *http.Server
@@ -590,16 +607,16 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scopedIDP == "" && idp == "" {
-//			data := url.Values{}
-//			data.Set("return", "https://"+r.Host+r.RequestURI)
-//			data.Set("returnIDParam", "idpentityid")
-//			data.Set("entityID", "https://"+r.Host)
-//			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-//			if discoService == "" {
-//				discoService = config.DiscoveryService
-//			}
-//			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
-//			return err
+			//			data := url.Values{}
+			//			data.Set("return", "https://"+r.Host+r.RequestURI)
+			//			data.Set("returnIDParam", "idpentityid")
+			//			data.Set("entityID", "https://"+r.Host)
+			//			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+			//			if discoService == "" {
+			//				discoService = config.DiscoveryService
+			//			}
+			//			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
+			//			return err
 		}
 
 		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
@@ -636,9 +653,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scoping == "scoping" || scoping == "" {
-//			for _, scope := range idpList {
-//				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
-//			}
+			//			for _, scope := range idpList {
+			//				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
+			//			}
 		}
 
 		u, err := gosaml.SAMLRequest2URL(newrequest, "", pk, config.DefaultCryptoMethod)
@@ -919,18 +936,18 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		if len(localScope) > 1 {
 			scope := localScope[2]
 			spID := response.Query1(attrList, `./saml:Attribute[@Name="spID"]/saml:AttributeValue`)
-			usePrior := idpMd.Query(nil, xprefix + `eduPersonPrincipalNamePrior/wayf:ServiceProvider[.=` + strconv.Quote(spID) + `]`)
+			usePrior := idpMd.Query(nil, xprefix+`eduPersonPrincipalNamePrior/wayf:ServiceProvider[.=`+strconv.Quote(spID)+`]`)
 			if len(usePrior) == 1 {
 				var schacHomeOrganization, persistentIDPEntityid string
-                xtrascope := idpMd.Query(usePrior.First(), `following-sibling::wayf:Scope[.=` + strconv.Quote(scope) + `]`)
-                if len(xtrascope) == 1 {
-    				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
-                    schacHomeOrganization = idpMd.Query1(xtrascope.First(), "@schacHomeOrganization")
-                    persistentIDPEntityid = idpMd.Query1(xtrascope.First(), "@persistentIDPEntityID")
-                    if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
-                        return
-                    }
-                }
+				xtrascope := idpMd.Query(usePrior.First(), `following-sibling::wayf:Scope[.=`+strconv.Quote(scope)+`]`)
+				if len(xtrascope) == 1 {
+					response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
+					schacHomeOrganization = idpMd.Query1(xtrascope.First(), "@schacHomeOrganization")
+					persistentIDPEntityid = idpMd.Query1(xtrascope.First(), "@persistentIDPEntityID")
+					if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
+						return
+					}
+				}
 			}
 		}
 	}
@@ -1884,11 +1901,11 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSet
 	gosaml.NemLog.Log(request, issuerMd, "")
 
 	var signingKey uint8 = 1
-/*
-	if slices.ContainsFunc(config.KeySelectionList, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
-		signingKey = 1
-	}
-*/
+	/*
+		if slices.ContainsFunc(config.KeySelectionList, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
+			signingKey = 1
+		}
+	*/
 
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
@@ -2062,11 +2079,59 @@ func cleanUpClaimsMap(sm *sync.Map, ttl time.Duration) {
 		for {
 			<-ticker.C
 			sm.Range(func(k, v any) bool {
-				if v.(claimsInfo).Eol.Before(time.Now()) {
-					sm.Delete(k)
+				if ci, ok := v.(claimsInfo); ok {
+					if ci.Eol.Before(time.Now()) {
+						sm.Delete(k)
+					}
+				} else if coi, ok := v.(credentialOfferInfo); ok {
+					if coi.Eol.Before(time.Now()) {
+						sm.Delete(k)
+					}
 				}
 				return true
 			})
 		}
 	}()
+}
+
+type walletCredential struct {
+	Issuer                     string   `json:"credential_issuer"`
+	CredentialConfigurationIDs []string `json:"credential_configuration_ids"`
+}
+
+type walletCredentialResponse struct {
+	CredentialOfferUrl string `json:"credential_offer_url"`
+	ExpiresIn          int    `json:"expires_in"`
+}
+
+func createWalletCredentialSession(w http.ResponseWriter, r *http.Request) (err error) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var Wallet walletCredential
+	err = json.NewDecoder(r.Body).Decode(&Wallet)
+	w.WriteHeader(http.StatusCreated)
+
+	offerId := generateOfferID()
+	credentialOfferUrl := Wallet.Issuer + "/offers/" + offerId
+
+	claimsMap.Store(offerId, credentialOfferInfo{
+		CredentialIssuer:           credentialOfferUrl,
+		CredentialConfigurationIDs: Wallet.CredentialConfigurationIDs,
+		Grants:                     grants{AuthorizationCode: authorizationCode{offerId}},
+		Eol:                        time.Now().Add(600 * time.Second),
+	})
+
+	json.NewEncoder(w).Encode(walletCredentialResponse{
+		CredentialOfferUrl: credentialOfferUrl,
+		ExpiresIn:          600,
+	})
+
+	defer r.Body.Close()
+	return
+}
+
+func generateOfferID() string {
+	b := make([]byte, 24)
+	rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
