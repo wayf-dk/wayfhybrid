@@ -271,6 +271,7 @@ func Main() {
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
 
 	httpMux.Handle(config.EWCredential, appHandler(createWalletCredentialSession))
+	httpMux.Handle(config.EWOffer, appHandler(fetchWalletSession))
 
 	log.Println("listening on ", config.Intf)
 	var s *http.Server
@@ -2133,4 +2134,24 @@ func generateOfferID() string {
 	b := make([]byte, 24)
 	rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func fetchWalletSession(w http.ResponseWriter, r *http.Request) (err error) {
+	w.Header().Set("Content-Type", "application/json")
+	offerId := r.PathValue("offerId")
+
+	value, ok := claimsMap.Load(offerId)
+	if !ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	session, ok := value.(credentialOfferInfo) // type assertion
+	if !ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	return json.NewEncoder(w).Encode(session)
 }
