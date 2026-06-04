@@ -1282,6 +1282,16 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		err = fmt.Errorf("no common federations")
 	}
 
+	ssoIndex := 0
+	destination := request.Query1(nil, "./@Destination")
+	// we need to keep track of the index of the SSO Location as the issuer for oidc can be encoded in it e.g. ".../oidc/auth/deic.dk"
+	for i, v := range hubBirkMd.QueryMulti(nil, `./md:IDPSSODescriptor/md:SingleSignOnService/@Location`) {
+		if v == destination {
+			ssoIndex = i
+			break
+		}
+	}
+
 	realIDPMd := virtualIDPMd
 	var hubKribSPMd *goxml.Xp
 	if virtualIDPIndex == 0 { // to internal IDP - also via BIRK
@@ -1315,7 +1325,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 	gosaml.NemLog.Log(request, realIDPMd, request.Query1(nil, "@ID"))
-	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, nil)
+	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, uint8(ssoIndex), nil)
 	return
 }
 
@@ -1507,11 +1517,11 @@ func getFirstByAttribute(xp *goxml.Xp, templ string, vals []string) (res string)
 	return
 }
 
-func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd *goxml.Xp, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex uint8, idPList []string) (err error) {
+func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd *goxml.Xp, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex, ssoIndex uint8, idPList []string) (err error) {
 	// why not use orig request?
 	virtualIDPID := virtualIDPMd.Query1(nil, "./@entityID") // wayf might return domain or hash ...
 	wantRequesterID := realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) || gosaml.DebugSetting(r, "wantRequesterID") != ""
-	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, wantRequesterID, spIndex, hubBirkIndex)
+	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, wantRequesterID, spIndex, hubBirkIndex, ssoIndex)
 	if err != nil {
 		return
 	}
@@ -1853,6 +1863,12 @@ found:
 	}
 
 	responseXML := newresponse.Dump()
+
+	// use the saved ssoIndex to map the SSOService URL back to an issuer
+	sso := hubBirkIDPMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[`+strconv.Itoa(int(sRequest.SSOIndex+1))+`]/@Location`)
+	iss := strings.Replace(sso, config.OIDCAuth, config.Op, 1)
+	iss = strings.Replace(iss, "https://"+config.SsoService3, config.HubEntityID, 1)
+	id_token["iss"] = iss
 
 	switch sRequest.Protocol {
 	default:
