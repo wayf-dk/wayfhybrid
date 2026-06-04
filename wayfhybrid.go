@@ -207,7 +207,8 @@ func Main() {
 	httpMux.Handle("/production", appHandler(OkService))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.OidcConfigurationService, appHandler(OidcConfigurationService))
-	httpMux.Handle(config.OidcConfigurationService2, appHandler(OidcConfigurationService))
+	httpMux.Handle(config.OidcConfigurationService2, appHandler(OidcConfigurationService2))
+	httpMux.Handle(config.OidcConfigurationService3, appHandler(OidcConfigurationService2))
 	httpMux.Handle(config.OidcJwkService, appHandler(OidcJwkService))
 
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
