@@ -573,11 +573,11 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	if len(vals["scoping"]) > 0 {
 		scoping = vals["scoping"][0]
 		protocol = vals["protocol"][0]
-		}
+	}
 
 	if scoping == "vvpmss" {
 
-		}
+	}
 
 	if login && slices.Contains(oidcProtocols, protocol) {
 		oAuth2Config, _, err := readOAuth2Config(scoping, entityID)
@@ -621,9 +621,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			idpMd, err = md.Hub.MDQ(config.HubEntityID)
 		}
 
-			if err != nil {
-				return err
-			}
+		if err != nil {
+			return err
+		}
 
 		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0, 0)
 
@@ -997,18 +997,18 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		if len(localScope) > 1 {
 			scope := localScope[2]
 			spID := response.Query1(attrList, `./saml:Attribute[@Name="spID"]/saml:AttributeValue`)
-			usePrior := idpMd.Query(nil, xprefix + `eduPersonPrincipalNamePrior/wayf:ServiceProvider[.=` + strconv.Quote(spID) + `]`)
+			usePrior := idpMd.Query(nil, xprefix+`eduPersonPrincipalNamePrior/wayf:ServiceProvider[.=`+strconv.Quote(spID)+`]`)
 			if len(usePrior) == 1 {
 				var schacHomeOrganization, persistentIDPEntityid string
-                xtrascope := idpMd.Query(usePrior.First(), `following-sibling::wayf:Scope[.=` + strconv.Quote(scope) + `]`)
-                if len(xtrascope) == 1 {
-    				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
-                    schacHomeOrganization = idpMd.Query1(xtrascope.First(), "@schacHomeOrganization")
-                    persistentIDPEntityid = idpMd.Query1(xtrascope.First(), "@persistentIDPEntityID")
-                    if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
-                        return
-                    }
-                }
+				xtrascope := idpMd.Query(usePrior.First(), `following-sibling::wayf:Scope[.=`+strconv.Quote(scope)+`]`)
+				if len(xtrascope) == 1 {
+					response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
+					schacHomeOrganization = idpMd.Query1(xtrascope.First(), "@schacHomeOrganization")
+					persistentIDPEntityid = idpMd.Query1(xtrascope.First(), "@persistentIDPEntityID")
+					if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
+						return
+					}
+				}
 			}
 		}
 	}
@@ -1990,11 +1990,11 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSet
 	gosaml.NemLog.Log(request, issuerMd, "")
 
 	var signingKey uint8 = 1
-/*
-	if slices.ContainsFunc(config.KeySelectionList, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
-		signingKey = 1
-	}
-*/
+	/*
+		if slices.ContainsFunc(config.KeySelectionList, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
+			signingKey = 1
+		}
+	*/
 
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
