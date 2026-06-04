@@ -33,6 +33,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/oauth2"
+
 	"github.com/wayf-dk/godiscoveryservice"
 	"github.com/wayf-dk/goeleven"
 	"github.com/wayf-dk/gosaml"
@@ -530,92 +532,99 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-	type testSPFormData struct {
+	var vals url.Values
+	cookie, err := r.Cookie("debug")
+	if err == nil {
+		vals, err = url.ParseQuery(cookie.Value)
+		if err == nil {
+			for k, v := range vals {
+				if v[0] != "" && v[0][0] == '[' {
+					var tmp []string
+					if err := json.Unmarshal([]byte(v[0]), &tmp); err == nil {
+						vals[k] = tmp
+					}
+				}
+			}
+			//			fmt.Printf("%#v\n", vals)
+		}
+	}
+
+	var oidcProtocols = []string{"idtoken", "code"}
+	formdata := struct {
 		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP, Marshalled string
 		Code_challenge, AssertionConsumerServiceURL                                            string
 		Messages                                                                               template.HTML
 		AttrValues, DebugValues                                                                []attrValue
-	}
+	}{}
 
 	spMd, err := md.Internal.MDQ("https://" + r.Host)
 	pk, _, _ := gosaml.GetPrivateKey(spMd, "md:SPSSODescriptor"+gosaml.SigningCertQuery)
-	idp := r.Form.Get("idpentityid")
-	login := r.Form.Get("login") == "1"
-	scoping := r.Form.Get("scoping")
-	scopedIDP := r.Form.Get("scopedidp") + r.Form.Get("entityID") + idp // RI says entityID
-	idpList := strings.Split(scopedIDP, ",")
 
-	formdata := testSPFormData{
-		AssertionConsumerServiceURL: "https://" + r.Host + "/ACS",
+	var previousEntityID string
+	entityID := r.Form.Get("entityID")
+	if cookie, err = r.Cookie("entityID"); err == nil {
+		previousEntityID = cookie.Value
 	}
+	http.SetCookie(w, &http.Cookie{Name: "entityID", Value: entityID, Path: "/", Secure: true, HttpOnly: false})
 
-	if r.Form.Get("ds") != "" {
-		data := url.Values{}
-		data.Set("return", "https://"+r.Host+"/?previdplist="+r.Form.Get("scopedidp"))
-		data.Set("returnIDParam", "idpentityid")
-		data.Set("entityID", "https://"+r.Host)
-		discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-		if discoService == "" {
-			discoService = config.DiscoveryService
-		}
-		http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
-	} else if login {
-		data := url.Values{}
-		switch {
-		case len(idpList) == 1 && idpList[0] == "":
-		case len(idpList) == 1:
-			data.Set("idpentityid", scopedIDP)
-		default:
-			data.Set("idplist", scopedIDP)
+	login := r.Form.Get("login") != ""
+	var scoping, protocol string
+	if len(vals["scoping"]) > 0 {
+		scoping = vals["scoping"][0]
+		protocol = vals["protocol"][0]
 		}
 
-		protocol := r.Form.Get("protocol")
-		if protocol == "oidc" {
+	if scoping == "vvpmss" {
+
+		}
+
+	if login && slices.Contains(oidcProtocols, protocol) {
+		oAuth2Config, _, err := readOAuth2Config(scoping, entityID)
+		if err != nil {
+			return err
+		}
+		if protocol == "code" {
+			verifier := oauth2.GenerateVerifier()
+			var auth strings.Builder
+			auth.WriteString(oAuth2Config.AuthCodeURL(verifier, oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier)))
+			if scoping == "param" {
+				auth.WriteString("&idpentityid=" + entityID)
+			}
+			http.Redirect(w, r, auth.String(), http.StatusFound)
+			return nil
+		} else if protocol == "idtoken" {
+			data := url.Values{}
 			data.Set("response_type", "id_token")
-			data.Set("client_id", "https://"+r.Host)
-			data.Set("redirect_uri", "https://"+r.Host+"/ACS")
+			data.Set("client_id", oAuth2Config.ClientID)
+			data.Set("redirect_uri", oAuth2Config.RedirectURL)
 			data.Set("nonce", gosaml.ID())
-			http.Redirect(w, r, "https://"+config.OIDCAuth+"?"+data.Encode(), http.StatusFound)
-			return
-		} else if protocol == "wsfed" {
+			if scoping == "param" {
+				data.Set("idpentityid", entityID)
+			}
+
+			http.Redirect(w, r, oAuth2Config.Endpoint.AuthURL+"?"+data.Encode(), http.StatusFound)
+			return nil
+		}
+	} else if login && protocol == "saml" {
+		if protocol == "wsfed" {
+			data := url.Values{}
 			data.Set("wa", "wsignin1.0")
 			data.Set("wtrealm", "https://"+r.Host)
 			http.Redirect(w, r, "https://"+config.SsoService3+"?"+data.Encode(), http.StatusFound)
 			return
 		}
-
-		idpMd, err := md.Hub.MDQ(config.HubEntityID)
-		if err != nil {
-			return err
-		}
-
-		if scopedIDP == "" && idp == "" {
-//			data := url.Values{}
-//			data.Set("return", "https://"+r.Host+r.RequestURI)
-//			data.Set("returnIDParam", "idpentityid")
-//			data.Set("entityID", "https://"+r.Host)
-//			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-//			if discoService == "" {
-//				discoService = config.DiscoveryService
-//			}
-//			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
-//			return err
-		}
-
-		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
-
-		if scoping == "testidp" {
-			http.SetCookie(w, &http.Cookie{Name: "testidp", Value: scopedIDP, Domain: "wayf.dk", Path: "/", Secure: true, HttpOnly: false})
-		}
-
+		var idpMd *goxml.Xp
 		if scoping == "birk" {
-			idpMd, err = md.ExternalIDP.MDQ(scopedIDP)
+			idpMd, err = md.ExternalIDP.MDQ(entityID)
+		} else {
+			idpMd, err = md.Hub.MDQ(config.HubEntityID)
+		}
+
 			if err != nil {
 				return err
 			}
-		}
 
-		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0)
+		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0, 0)
 
 		options := []struct {
 			name, path string
@@ -635,10 +644,8 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 			}
 		}
 
-		if scoping == "scoping" || scoping == "" {
-//			for _, scope := range idpList {
-//				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
-//			}
+		if scoping == "scoping" {
+			newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", entityID, nil)
 		}
 
 		u, err := gosaml.SAMLRequest2URL(newrequest, "", pk, config.DefaultCryptoMethod)
@@ -654,13 +661,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scoping == "param" {
-			switch len(idpList) {
-			case 0:
-			case 1:
-				q.Set("idpentityid", scopedIDP)
-			default:
-				q.Set("idplist", scopedIDP)
-			}
+			q.Set("idpentityid", entityID)
 		}
 		q.Set("RelayState", strings.Repeat("z", 50))
 		u.RawQuery = q.Encode()
@@ -740,9 +741,46 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		formdata.DebugValues = debugVals
 		formdata.ScopedIDP = response.Query1(nil, "//saml:AuthenticatingAuthority[last()]")
 		formdata.Marshalled = marshalledResponse
+		formdata.RelayState = relayState
+		formdata.ResponsePP = incomingResponseXML
+		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
+	} else if code := r.Form.Get("code"); code != "" {
+		oAuth2Config, userInfoEndpoint, err := readOAuth2Config(scoping, previousEntityID)
+		if err != nil {
+			return err
+		}
+		verifier := r.Form.Get("state") ///  !!!
+		ctx := context.Background()
+		at, err := oAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
+		if err != nil {
+			return errors.New("oauth exchange failed")
+		}
+
+		data := url.Values{}
+		data.Set("client_id", oAuth2Config.ClientID)
+
+		request, _ := http.NewRequest("POST", userInfoEndpoint, strings.NewReader(data.Encode()))
+		request.Header.Add("Authorization", "Bearer "+at.AccessToken)
+		request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := http.DefaultClient.Do(request)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		responsebody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		ui := map[string]any{}
+		err = json.Unmarshal(responsebody, &ui)
+		if err != nil {
+			return err
+		}
+		jsonDump, _ := json.MarshalIndent(ui, "", "    ")
+		formdata.ResponsePP = string(jsonDump)
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else if id_token := r.Form.Get("id_token"); id_token != "" {
-		attrs, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub}, spMd, gosaml.SPEnc, "")
+		attrs, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub, md.ExternalIDP}, spMd, gosaml.SPEnc, "")
 		if err != nil {
 			return goxml.Wrap(err)
 		}
@@ -753,12 +791,51 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	} else if wresult := r.Form.Get("wresult"); wresult != "" {
 		xp := goxml.NewXpFromString(wresult)
 		formdata.ResponsePP = xp.PP()
-		formdata.Protocol = xp.QueryString(nil, "local-name(/*)")
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else {
-		formdata.ScopedIDP = strings.Trim(r.Form.Get("idpentityid")+","+r.Form.Get("previdplist"), " ,")
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	}
+	return
+}
+
+func readOAuth2Config(scoping, entityID string) (oAuth2Config *oauth2.Config, userInfoEndpoint string, err error) {
+	type Opconfig struct {
+		Authorization        string `json:"authorization_endpoint"`
+		Userinfo             string `json:"userinfo_endpoint"`
+		Introspect           string `json:"introspection_endpoint"`
+		Device_authorization string `json:"device_authorization_endpoint"`
+		Token                string `json:"token_endpoint"`
+		Issuer               string `json:"issuer"`
+	}
+	op := Opconfig{}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	var resp *http.Response
+	if scoping == "birk" {
+		resp, err = http.Get("https://wayf.wayf.dk/op/" + lmdq.C14n(entityID)[:10] + "/.well-known/openid-configuration")
+	} else {
+		resp, err = http.Get("https://wayf.wayf.dk/.well-known/openid-configuration")
+	}
+	if err != nil {
+		fmt.Println("Failed ...")
+		return
+	}
+	configJson, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(configJson, &op)
+	if err != nil {
+		fmt.Println("Failed ...")
+		return
+	}
+	oAuth2Config = &oauth2.Config{
+		ClientID:     "https://wayfsp.wayf.dk",
+		Scopes:       []string{"openid", "profile", "email", "entitlements"},
+		RedirectURL:  "https://wayfsp.wayf.dk/ACS",
+		ClientSecret: "",
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  op.Authorization,
+			TokenURL: op.Token,
+		},
+	}
+	userInfoEndpoint = op.Userinfo
 	return
 }
 
@@ -1074,21 +1151,29 @@ func OidcJwkService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error) {
-	r.ParseForm()
-	if !strings.HasSuffix(r.URL.Path, "/.well-known/openid-configuration") {
-		err = fmt.Errorf("no .well-known/openid-configuration found")
-	}
-	homeorg := r.PathValue("homeorg")
-	if homeorg == "" || homeorg == ".well-known" {
-		homeorg = "https://wayf.wayf.dk"
-	}
-	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, homeorg)
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, config.HubEntityID)
 	if err != nil {
 		return err
 	}
 	data := map[string]string{
 		"issuer": md.Query1(nil, "@entityID"),
 		"auth":   md.Query1(nil, "md:IDPSSODescriptor/md:SingleSignOnService/@Location"),
+		"name":   md.Query1(nil, `md:Organization/md:OrganizationName[@xml:lang="en"]`),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return tmpl.ExecuteTemplate(w, "openid-configuration", data)
+}
+
+func OidcConfigurationService2(w http.ResponseWriter, r *http.Request) (err error) {
+	r.ParseForm()
+	iss := r.PathValue("iss")
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, iss)
+	if err != nil {
+		return err
+	}
+	data := map[string]string{
+		"issuer": "https://" + config.Op + iss,
+		"auth":   "https://" + config.OIDCAuth + iss,
 		"name":   md.Query1(nil, `md:Organization/md:OrganizationName[@xml:lang="en"]`),
 	}
 
