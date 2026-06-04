@@ -1943,7 +1943,6 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSet
 		privatekey, _, err = gosaml.GetPrivateKey(issMD, gosaml.Roles[sloinfo.HubRole]+gosaml.SigningCertQuery)
 	} else {
 		kid := config.KeyNames[sloinfo.SigningKey]
-		fmt.Println("kid", kid)
 		privatekey, err = gosaml.PrivateKeyByName(kid, "")
 	}
 	if err != nil {
