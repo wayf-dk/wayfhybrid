@@ -116,6 +116,20 @@ type (
 		Debug      string
 		SigningKey uint8
 	}
+	credentialOfferInfo struct {
+		CredentialIssuer           string    `json:"credential_issuer"`
+		CredentialConfigurationIDs []string  `json:"credential_configuration_ids"`
+		Grants                     grants    `json:"grants"`
+		Eol                        time.Time `json:"eol"`
+	}
+
+	grants struct {
+		AuthorizationCode authorizationCode `json:"authorization_code"`
+	}
+
+	authorizationCode struct {
+		IssuerState string `json:"issuer_state"`
+	}
 )
 
 var (
@@ -258,6 +272,8 @@ func Main() {
 	httpMux.Handle(config.TestSP2Slo, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2Acs, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
+
+	httpMux.Handle(config.EWCredential, appHandler(createWalletCredentialSession))
 
 	log.Println("listening on ", config.Intf)
 	var s *http.Server
@@ -2167,11 +2183,59 @@ func cleanUpClaimsMap(sm *sync.Map, ttl time.Duration) {
 		for {
 			<-ticker.C
 			sm.Range(func(k, v any) bool {
-				if v.(claimsInfo).Eol.Before(time.Now()) {
-					sm.Delete(k)
+				if ci, ok := v.(claimsInfo); ok {
+					if ci.Eol.Before(time.Now()) {
+						sm.Delete(k)
+					}
+				} else if coi, ok := v.(credentialOfferInfo); ok {
+					if coi.Eol.Before(time.Now()) {
+						sm.Delete(k)
+					}
 				}
 				return true
 			})
 		}
 	}()
+}
+
+type walletCredential struct {
+	Issuer                     string   `json:"credential_issuer"`
+	CredentialConfigurationIDs []string `json:"credential_configuration_ids"`
+}
+
+type walletCredentialResponse struct {
+	CredentialOfferUrl string `json:"credential_offer_url"`
+	ExpiresIn          int    `json:"expires_in"`
+}
+
+func createWalletCredentialSession(w http.ResponseWriter, r *http.Request) (err error) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var Wallet walletCredential
+	err = json.NewDecoder(r.Body).Decode(&Wallet)
+	w.WriteHeader(http.StatusCreated)
+
+	offerId := generateOfferID()
+	credentialOfferUrl := Wallet.Issuer + "/offers/" + offerId
+
+	claimsMap.Store(offerId, credentialOfferInfo{
+		CredentialIssuer:           credentialOfferUrl,
+		CredentialConfigurationIDs: Wallet.CredentialConfigurationIDs,
+		Grants:                     grants{AuthorizationCode: authorizationCode{offerId}},
+		Eol:                        time.Now().Add(600 * time.Second),
+	})
+
+	json.NewEncoder(w).Encode(walletCredentialResponse{
+		CredentialOfferUrl: credentialOfferUrl,
+		ExpiresIn:          600,
+	})
+
+	defer r.Body.Close()
+	return
+}
+
+func generateOfferID() string {
+	b := make([]byte, 24)
+	rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
