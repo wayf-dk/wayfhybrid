@@ -114,6 +114,20 @@ type (
 		Debug      string
 		SigningKey uint8
 	}
+	credentialOfferInfo struct {
+		CredentialIssuer           string    `json:"credential_issuer"`
+		CredentialConfigurationIDs []string  `json:"credential_configuration_ids"`
+		Grants                     grants    `json:"grants"`
+		Eol                        time.Time `json:"eol"`
+	}
+
+	grants struct {
+		AuthorizationCode authorizationCode `json:"authorization_code"`
+	}
+
+	authorizationCode struct {
+		IssuerState string `json:"issuer_state"`
+	}
 )
 
 var (
@@ -130,7 +144,7 @@ var (
 	allowedDigestAndSignatureAlgorithms = []string{"sha256", "sha384", "sha512"}
 	defaultDigestAndSignatureAlgorithm  = "sha256"
 
-	metadataUpdateGuard chan int
+	metadataUpdateGuard = make(chan int, 1)
 
 	session = wayfHybridSession{}
 
@@ -160,8 +174,6 @@ func Main() {
 	gosaml.PostForm = tmpl
 
 	cleanUpClaimsMap(&claimsMap, codeTTL*time.Second)
-
-	metadataUpdateGuard = make(chan int, 1)
 
 	md.Hub = &lmdq.MDQ{MdDb: config.Hub}
 	md.Internal = &lmdq.MDQ{MdDb: config.Internal}
@@ -247,6 +259,7 @@ func Main() {
 	httpMux.Handle(config.TestSP2+"/ds/", appHandler(f))
 
 	httpMux.Handle(config.Saml2jwt, appHandler(saml2jwt))
+	httpMux.Handle(config.Saml3jwt, appHandler(saml2jwt))
 	httpMux.Handle(config.MDQ, appHandler(MDQWeb))
 
 	httpMux.Handle(config.TestSPSlo, appHandler(testSPService))
@@ -256,6 +269,8 @@ func Main() {
 	httpMux.Handle(config.TestSP2Slo, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2Acs, appHandler(testSPService))
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
+
+	httpMux.Handle(config.EWCredential, appHandler(createWalletCredentialSession))
 
 	log.Println("listening on ", config.Intf)
 	var s *http.Server
@@ -400,7 +415,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	starttime := time.Now()
 
 	w.Header().Set("X-Frame-Options", "sameorigin")
-	w.Header().Set("Content-Security-Policy", "frame-ancestors 'self'")
+	//w.Header().Set("Content-Security-Policy", "frame-ancestors 'self' https://wayfsp.wayf.dk")
 	w.Header().Set("X-XSS-Protection", "0")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
@@ -446,8 +461,7 @@ func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
 	return
 }
 
-// refreshAllMetadataFeeds is responsible for referishing all metadata feed(internal, external)
-func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
+func GetMetadataFeeds(refresh bool) (str string, err error) {
 	if !refresh {
 		return "bypassed", nil
 	}
@@ -460,6 +474,22 @@ func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
 					return "", err
 				}
 			}
+			<-metadataUpdateGuard
+			return "Pong", nil
+		}
+	default:
+		{
+			return "Ignored", nil
+		}
+	}
+}
+
+// refreshAllMetadataFeeds is responsible for referishing all metadata feed(internal, external)
+func refreshAllMetadataFeeds(refresh bool) (str string, err error) {
+	GetMetadataFeeds(refresh)
+	select {
+	case metadataUpdateGuard <- 1:
+		{
 			for _, md := range []gosaml.Md{md.Hub, md.Internal, md.ExternalIDP, md.ExternalSP} {
 				err := md.(*lmdq.MDQ).Open()
 				if err != nil {
@@ -576,16 +606,16 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scopedIDP == "" && idp == "" {
-			data := url.Values{}
-			data.Set("return", "https://"+r.Host+r.RequestURI)
-			data.Set("returnIDParam", "idpentityid")
-			data.Set("entityID", "https://"+r.Host)
-			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-			if discoService == "" {
-				discoService = config.DiscoveryService
-			}
-			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
-			return err
+			//			data := url.Values{}
+			//			data.Set("return", "https://"+r.Host+r.RequestURI)
+			//			data.Set("returnIDParam", "idpentityid")
+			//			data.Set("entityID", "https://"+r.Host)
+			//			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
+			//			if discoService == "" {
+			//				discoService = config.DiscoveryService
+			//			}
+			//			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
+			//			return err
 		}
 
 		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
@@ -602,8 +632,6 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0)
-
-		// newrequest.QueryDashP(nil, "@Destination", "https://wayf.wayf.dk/saml2/sso3", nil)
 
 		options := []struct {
 			name, path string
@@ -624,9 +652,9 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scoping == "scoping" || scoping == "" {
-			for _, scope := range idpList {
-				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
-			}
+			//			for _, scope := range idpList {
+			//				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
+			//			}
 		}
 
 		u, err := gosaml.SAMLRequest2URL(newrequest, "", pk, config.DefaultCryptoMethod)
@@ -650,6 +678,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 				q.Set("idplist", scopedIDP)
 			}
 		}
+		q.Set("RelayState", strings.Repeat("z", 50))
 		u.RawQuery = q.Encode()
 		http.Redirect(w, r, u.String(), http.StatusFound)
 		return nil
@@ -906,15 +935,17 @@ func wayfACSServiceHandler(backendIdpMd, idpMd, hubMd, spMd, request, response *
 		if len(localScope) > 1 {
 			scope := localScope[2]
 			spID := response.Query1(attrList, `./saml:Attribute[@Name="spID"]/saml:AttributeValue`)
-			xpx := xprefix + `eduPersonPrincipalNamePrior[wayf:ServiceProvider=` + strconv.Quote(spID) + ` and (wayf:Scope=` + strconv.Quote(scope) + ` or not(wayf:Scope))]`
-			usePrior := idpMd.Query(nil, xpx)
+			usePrior := idpMd.Query(nil, xprefix+`eduPersonPrincipalNamePrior/wayf:ServiceProvider[.=`+strconv.Quote(spID)+`]`)
 			if len(usePrior) == 1 {
-				response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
-				xpx := xprefix + `eduPersonPrincipalNamePrior/wayf:Scope[.=` + strconv.Quote(scope) + `]/`
-				schacHomeOrganization := idpMd.Query1(nil, xpx+"@schacHomeOrganization")
-				persistentIDPEntityid := idpMd.Query1(nil, xpx+"@persistentIDPEntityID")
-				if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
-					return
+				var schacHomeOrganization, persistentIDPEntityid string
+				xtrascope := idpMd.Query(usePrior.First(), `following-sibling::wayf:Scope[.=`+strconv.Quote(scope)+`]`)
+				if len(xtrascope) == 1 {
+					response.QueryDashP(attrList, `./saml:Attribute[@Name="eduPersonPrincipalName"]/saml:AttributeValue`, prior, nil)
+					schacHomeOrganization = idpMd.Query1(xtrascope.First(), "@schacHomeOrganization")
+					persistentIDPEntityid = idpMd.Query1(xtrascope.First(), "@persistentIDPEntityID")
+					if err = ChangeScope(r, response, backendIdpMd, idpMd, spMd, scope, schacHomeOrganization, persistentIDPEntityid, false); err != nil {
+						return
+					}
 				}
 			}
 		}
@@ -1269,6 +1300,7 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 			return errors.New("token timeout")
 		}
 
+		ci = claimsInfo{Claims: claims, Debug: debug, ClientId: clientId, Eol: time.Now().Add(codeTTL * time.Second), SigningKey: ci.SigningKey}
 		access_token, err := encrypt(ci, "")
 		if err != nil {
 			return err
@@ -1644,6 +1676,9 @@ found:
 				value := newresponse.Query1(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.Rm(eptidAttr[0], "./saml:AttributeValue")
 				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID", value, nil)
+				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID/@Format", "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent", nil)
+				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID/@NameQualifier", virtualIDPMd.Query1(nil, "@entityID"), nil)
+				newresponse.QueryDashP(eptidAttr[0], "./saml:AttributeValue/saml:NameID/@SPNameQualifier", spMd.Query1(nil, "@entityID"), nil)
 			}
 		}
 
@@ -1832,22 +1867,22 @@ func decrypt(ciphertext string, label string) (claimsinfo claimsInfo, err error)
 
 // IDPSLOService refers to idp single logout service. Takes request as a parameter and returns an error if any
 func IDPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.Internal, md.Hub, []gosaml.Md{md.ExternalSP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalIDP}, gosaml.IDPRole, "SLO")
+	return SLOService(w, r, intExtSP, md.Hub, []gosaml.Md{md.ExternalSP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalIDP}, gosaml.IDPRole, "SLO")
 }
 
 // SPSLOService refers to SP single logout service. Takes request as a parameter and returns an error if any
 func SPSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.Internal, md.Hub, []gosaml.Md{md.ExternalIDP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalSP}, gosaml.SPRole, "SLO")
+	return SLOService(w, r, intExtIDP, md.Hub, []gosaml.Md{md.ExternalIDP, md.Hub}, []gosaml.Md{md.Internal, md.ExternalSP}, gosaml.SPRole, "SLO")
 }
 
 // BirkSLOService refers to birk single logout service. Takes request as a parameter and returns an error if any
 func BirkSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.ExternalSP, md.ExternalIDP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.IDPRole, "SLO")
+	return SLOService(w, r, intExtSP, md.ExternalIDP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.IDPRole, "SLO")
 }
 
 // KribSLOService refers to krib single logout service. Takes request as a parameter and returns an error if any
 func KribSLOService(w http.ResponseWriter, r *http.Request) (err error) {
-	return SLOService(w, r, md.ExternalIDP, md.ExternalSP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.SPRole, "SLO")
+	return SLOService(w, r, intExtIDP, md.ExternalSP, []gosaml.Md{md.Hub}, []gosaml.Md{md.Internal}, gosaml.SPRole, "SLO")
 }
 
 func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
@@ -1855,19 +1890,21 @@ func saml2jwt(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 // SLOService refers to single logout service. Takes request and issuer and destination metadata sets, role refers to if it as IDP or SP.
-func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destinationMdSet gosaml.Md, finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, role int, tag string) (err error) {
+func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSets, destinationMdSet gosaml.Md, finalIssuerMdSets, finalDestinationMdSets []gosaml.Md, role int, tag string) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
-	request, issuerMd, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, gosaml.MdSets{issuerMdSet}, gosaml.MdSets{destinationMdSet}, role)
+	request, issuerMd, destination, relayState, _, _, err := gosaml.ReceiveLogoutMessage(r, issuerMdSet, gosaml.MdSets{destinationMdSet}, role)
 	if err != nil {
 		return err
 	}
 	gosaml.NemLog.Log(request, issuerMd, "")
 
-	var signingKey uint8
-	if slices.ContainsFunc(config.KeySelectionMap, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
-		signingKey = 1
-	}
+	var signingKey uint8 = 1
+	/*
+		if slices.ContainsFunc(config.KeySelectionList, func(prefix string) bool { return strings.HasPrefix(request.Query1(nil, "./@Destination"), prefix) }) {
+			signingKey = 1
+		}
+	*/
 
 	var issMD, destMD, msg *goxml.Xp
 	var binding string
@@ -1917,12 +1954,17 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 	}
 
 	//legacyStatLog("saml20-idp-SLO "+req[role], issuer.Query1(nil, "@entityID"), destination.Query1(nil, "@entityID"), sloinfo.NameID+fmt.Sprintf(" async:%t", async))
-	kid := config.KeyNames[sloinfo.SigningKey]
-	privatekey, err := gosaml.PrivateKeyByName(kid, "")
+	var privatekey crypto.PrivateKey
+	if config.UseMDkeyMap[iss] {
+		privatekey, _, err = gosaml.GetPrivateKey(issMD, gosaml.Roles[sloinfo.HubRole]+gosaml.SigningCertQuery)
+	} else {
+		kid := config.KeyNames[sloinfo.SigningKey]
+		fmt.Println("kid", kid)
+		privatekey, err = gosaml.PrivateKeyByName(kid, "")
+	}
 	if err != nil {
 		return goxml.Wrap(err)
 	}
-
 	algo := config.DefaultCryptoMethod
 	algo = gosaml.DebugSettingWithDefault(r, "idpSigAlg", algo)
 
@@ -1936,7 +1978,7 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet, destination
 		}
 		http.Redirect(w, r, u.String(), http.StatusFound)
 	case gosaml.POST:
-		err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign, signingKey)
+		err = gosaml.SignResponse(msg, "/*[1]", issMD, algo, gosaml.SAMLSign, sloinfo.SigningKey)
 		if err != nil {
 			return err
 		}
@@ -1961,7 +2003,7 @@ func SLOInfoHandler(w http.ResponseWriter, r *http.Request, samlIn, idpMd, inMd,
 		sloinfo, ok = sil.LogoutResponse(samlIn)
 		sendResponse = sloinfo.NameID == ""
 	case "Response":
-		sil.Response(samlIn, inMd.Query1(nil, "@entityID"), idpMd.Query1(nil, "./md:IDPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.SPRole, "") // newer non-saml coming in from our IDPS
+		sil.Response(samlIn, inMd.Query1(nil, "@entityID"), idpMd.Query1(nil, "./md:IDPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.SPRole, "") // never non-saml coming in from our IDPS
 		sil.Response(samlOut, outMd.Query1(nil, "@entityID"), outMd.Query1(nil, "./md:SPSSODescriptor/md:SingleLogoutService/@Location") != "", gosaml.IDPRole, protocol)
 	}
 	if sendResponse { // ready to send response - clear cookie
@@ -1984,41 +2026,32 @@ func MDQWeb(w http.ResponseWriter, r *http.Request) (err error) {
 	if rawPath = r.URL.RawPath; rawPath == "" {
 		rawPath = r.URL.Path
 	}
-	path := strings.Split(rawPath, "/")[2:] // need a way to do this automatically
-	var xml []byte
-	var en1, en2 string
-	var xp1, xp2 *goxml.Xp
-	switch len(path) {
-	case 3:
-		md, ok := webMdMap[path[1]]
-		if !ok {
-			return fmt.Errorf("Metadata set not found")
-		}
-		en1, _ = url.PathUnescape(path[0])
-		en2, _ = url.PathUnescape(path[2])
-		xp1, _, err = md.md.WebMDQ(en1)
-		if err != nil {
-			return
-		}
-		if en1 == en2 { // hack to allow asking for a specific entity, by using the same entity twice
-			xp2, xml, err = md.md.WebMDQ(en2)
-		} else {
-			xp2, xml, err = md.revmd.WebMDQ(en2)
-		}
-		if err != nil {
-			return err
-		}
-		if !intersectionNotEmpty(xp1.QueryMulti(nil, xprefix+"feds"), xp2.QueryMulti(nil, xprefix+"feds")) {
-			return fmt.Errorf("no common federations")
-		}
-	default:
-		return fmt.Errorf("invalid MDQ path")
+	path := strings.Split(rawPath+"//", "/")[2:]
+	md, ok := webMdMap[path[1]]
+	if !ok {
+		return fmt.Errorf("Metadata set not found")
+	}
+	en1, _ := url.PathUnescape(path[0])
+	en2, _ := url.PathUnescape(path[2])
+	xp, err := md.md.WebMDQ(en1, en2, true)
+	if err != nil {
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/samlmetadata+xml")
 	//w.Header().Set("Content-Encoding", "deflate")
 	//w.Header().Set("ETag", "abcdefg")
-	xml = gosaml.Inflate(xml)
+
+	privatekey, err := gosaml.PrivateKeyByName(config.MetadataKey, "")
+	if err != nil {
+		return
+	}
+
+	err = xp.Sign(nil, xp.Query(nil, "*[1]")[0], privatekey, config.MetadataCert, config.DefaultCryptoMethod)
+	if err != nil {
+		return err
+	}
+	xml := []byte(xp.Dump())
 	w.Header().Set("Content-Length", strconv.Itoa(len(xml)))
 	w.Write(xml)
 	return
@@ -2045,11 +2078,59 @@ func cleanUpClaimsMap(sm *sync.Map, ttl time.Duration) {
 		for {
 			<-ticker.C
 			sm.Range(func(k, v any) bool {
-				if v.(claimsInfo).Eol.Before(time.Now()) {
-					sm.Delete(k)
+				if ci, ok := v.(claimsInfo); ok {
+					if ci.Eol.Before(time.Now()) {
+						sm.Delete(k)
+					}
+				} else if coi, ok := v.(credentialOfferInfo); ok {
+					if coi.Eol.Before(time.Now()) {
+						sm.Delete(k)
+					}
 				}
 				return true
 			})
 		}
 	}()
+}
+
+type walletCredential struct {
+	Issuer                     string   `json:"credential_issuer"`
+	CredentialConfigurationIDs []string `json:"credential_configuration_ids"`
+}
+
+type walletCredentialResponse struct {
+	CredentialOfferUrl string `json:"credential_offer_url"`
+	ExpiresIn          int    `json:"expires_in"`
+}
+
+func createWalletCredentialSession(w http.ResponseWriter, r *http.Request) (err error) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var Wallet walletCredential
+	err = json.NewDecoder(r.Body).Decode(&Wallet)
+	w.WriteHeader(http.StatusCreated)
+
+	offerId := generateOfferID()
+	credentialOfferUrl := Wallet.Issuer + "/offers/" + offerId
+
+	claimsMap.Store(offerId, credentialOfferInfo{
+		CredentialIssuer:           credentialOfferUrl,
+		CredentialConfigurationIDs: Wallet.CredentialConfigurationIDs,
+		Grants:                     grants{AuthorizationCode: authorizationCode{offerId}},
+		Eol:                        time.Now().Add(600 * time.Second),
+	})
+
+	json.NewEncoder(w).Encode(walletCredentialResponse{
+		CredentialOfferUrl: credentialOfferUrl,
+		ExpiresIn:          600,
+	})
+
+	defer r.Body.Close()
+	return
+}
+
+func generateOfferID() string {
+	b := make([]byte, 24)
+	rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
 }
