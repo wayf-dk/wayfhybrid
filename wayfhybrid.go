@@ -1357,10 +1357,14 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		clientSecret := r.Form.Get("client_secret")
 		if authorisation := r.Header.Get("Authorization"); authorisation != "" {
 			authParam := strings.Split(authorisation+" ", " ")[1] // always gets 2 elements
-			basic, _ := base64.StdEncoding.DecodeString(authParam)
-			parts := strings.Split(string(basic)+":", ":")
-			clientId, _ = url.QueryUnescape(parts[0])
-			clientSecret = parts[1]
+			tmp, err := base64.StdEncoding.DecodeString(authParam)
+			if err != nil {
+				return err
+			}
+			basic := string(tmp)
+			i := strings.LastIndex(string(basic), ":")
+			clientId, _ = url.QueryUnescape(basic[:i])
+			clientSecret = basic[i+1:]
 		}
 
 		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, clientId)
