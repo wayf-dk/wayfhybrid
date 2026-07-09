@@ -654,7 +654,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		for _, option := range options {
-			for _, val := range r.Form[option.name] {
+			for _, val := range vals[option.name] {
 				if val != "" {
 					newrequest.QueryDashP(nil, option.path, val, nil)
 				}
