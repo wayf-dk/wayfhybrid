@@ -107,6 +107,7 @@ var (
 		{c14n: "RequestedAuthnContext", op: "requestedAuthnContext:"},
 		{c14n: "idpEntityID", op: "xp:idp:@entityID"},
 		{c14n: "nemlogin", op: "eq:idpEntityID:https://nemlogin.wayf.dk"},
+		{c14n: "nemlogin", op: "eq:idpEntityID:https://nemlog-in.wayf.dk"},
 	}
 
 	attributesBase = []attributeDescription{
