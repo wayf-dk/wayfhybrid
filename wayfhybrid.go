@@ -273,6 +273,7 @@ func Main() {
 	httpMux.Handle(config.EWCredential, appHandler(createWalletCredentialSession))
 	httpMux.Handle(config.EWOffer, appHandler(fetchWalletSession))
 	httpMux.Handle(config.EWCredentialIssuerMetaData, appHandler(WalletIssuerMetadata))
+	httpMux.Handle(config.EWOAuthAuthorizationServer, appHandler(WalletOauthAuthrizationServiceMetadata))
 
 	log.Println("listening on ", config.Intf)
 	var s *http.Server
@@ -2212,6 +2213,25 @@ func WalletIssuerMetadata(w http.ResponseWriter, r *http.Request) error {
 				"claims": claimsAdvertisement,
 			},
 		},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(meta)
+}
+
+func WalletOauthAuthrizationServiceMetadata(w http.ResponseWriter, r *http.Request) error {
+	https := "https://"
+	issuer := https + r.Host + "/wallet/wallet-issuer"
+	meta := map[string]any{
+		"issuer":                                issuer,
+		"authorization_endpoint":                https + config.OIDCAuth,
+		"token_endpoint":                        https + config.OIDCToken,
+		"jwks_uri":                              https + config.OidcJwkService,
+		"scopes_supported":                      []string{"EduPersonCredential"},
+		"response_type_supported":               []string{"code"},
+		"grant_types_supported":                 []string{"authorization_code"},
+		"code_challenge_methods_supported":      []string{"S256"},
+		"token_endpoint_auth_methods_supported": []string{"none"},
+		"require_pushed_authorization_requests": false,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(meta)
