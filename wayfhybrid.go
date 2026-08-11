@@ -271,6 +271,9 @@ func Main() {
 	httpMux.Handle(config.TestSP2+"/", appHandler(testSPService)) // need a root "/" for routing
 
 	httpMux.Handle(config.EWCredential, appHandler(createWalletCredentialSession))
+	httpMux.Handle(config.EWOffer, appHandler(fetchWalletSession))
+	httpMux.Handle(config.EWCredentialIssuerMetaData, appHandler(WalletIssuerMetadata))
+	httpMux.Handle(config.EWOAuthAuthorizationServer, appHandler(WalletOauthAuthrizationServiceMetadata))
 
 	log.Println("listening on ", config.Intf)
 	var s *http.Server
@@ -2133,4 +2136,103 @@ func generateOfferID() string {
 	b := make([]byte, 24)
 	rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func fetchWalletSession(w http.ResponseWriter, r *http.Request) (err error) {
+	w.Header().Set("Content-Type", "application/json")
+	offerId := r.PathValue("offerId")
+
+	value, ok := claimsMap.Load(offerId)
+	if !ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	session, ok := value.(credentialOfferInfo) // type assertion
+	if !ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+
+	return json.NewEncoder(w).Encode(session)
+}
+
+// ─── /.well-known/openid-credential-issuer ────────────────────────────────────
+
+func walletIssuerRequestedAttributes() ([]string, error) {
+	spMd, err := walletIssuerSPMd()
+	if err != nil {
+		return nil, err
+	}
+	return spMd.QueryMulti(nil,
+		`./md:SPSSODescriptor/md:AttributeConsumingService/md:RequestedAttribute/@Name`), nil
+}
+
+func walletIssuerSPMd() (*goxml.Xp, error) {
+	spMd, err := md.ExternalSP.MDQ(config.WalletIssuerEntityID)
+	if err != nil {
+		return nil, fmt.Errorf("wallet issuer SP not found in ExternalSP metadata (%s): %w",
+			config.WalletIssuerEntityID, err)
+	}
+	return spMd, nil
+}
+
+// WalletIssuerMetadata serves the OID4VCI discovery document.
+// The claims advertisement is derived from the wallet-issuer SP's
+// RequestedAttributes in md.ExternalSP, keeping it automatically consistent
+// with the hub's attribute release policy — no separate list to maintain.
+func WalletIssuerMetadata(w http.ResponseWriter, r *http.Request) error {
+	https := "https://"
+	issuer := https + r.Host + "/wallet/wallet-issuer"
+
+	// Derive the claims advertisement from SP metadata RequestedAttributes.
+	// If the metadata cannot be read we omit the claims field rather than
+	// failing the entire discovery request — wallets can still proceed.
+	claimsAdvertisement := map[string]any{}
+	if names, err := walletIssuerRequestedAttributes(); err == nil {
+		for _, name := range names {
+			claimsAdvertisement[name] = map[string]any{"sd": true}
+		}
+	}
+
+	meta := map[string]any{
+		"issuer":                            issuer,
+		"credential_issuer":                 issuer,
+		"credential_endpoint":               issuer + "/credential",
+		"token_endpoint":                    https + config.OIDCToken,
+		"authorization_endpoint":            https + config.OIDCAuth,
+		"jwks_uri":                          https + config.OidcJwkService,
+		"dpop_signing_alg_values_supported": []string{"ES256", "ES384", "RS256"},
+		"credential_configurations_supported": map[string]any{
+			"EduPersonCredential": map[string]any{
+				"format": "vc+sd-jwt",
+				"vct":    "EduPersonCredential",
+				"cryptographic_binding_methods_supported": []string{"jwk"},
+				"credential_signing_alg_values_supported": []string{"RS256"},
+				"claims": claimsAdvertisement,
+			},
+		},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(meta)
+}
+
+func WalletOauthAuthrizationServiceMetadata(w http.ResponseWriter, r *http.Request) error {
+	https := "https://"
+	issuer := https + r.Host + "/wallet/wallet-issuer"
+	meta := map[string]any{
+		"issuer":                                issuer,
+		"authorization_endpoint":                https + config.OIDCAuth,
+		"token_endpoint":                        https + config.OIDCToken,
+		"jwks_uri":                              https + config.OidcJwkService,
+		"scopes_supported":                      []string{"EduPersonCredential"},
+		"response_type_supported":               []string{"code"},
+		"grant_types_supported":                 []string{"authorization_code"},
+		"code_challenge_methods_supported":      []string{"S256"},
+		"token_endpoint_auth_methods_supported": []string{"none"},
+		"require_pushed_authorization_requests": false,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(meta)
 }
