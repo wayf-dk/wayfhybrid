@@ -223,7 +223,7 @@ var (
 		{c14n: "oioCprIal", name: "https://data.gov.dk/model/core/nsis/cpr_ial"},
 		{c14n: "oioAllowQualifiedSigning", name: "https://data.gov.dk/model/core/eid/allowQualifiedSigning"},
 
-        {c14n: "schacCountryOfCitizenship", name: "eidasNationality"},
+		{c14n: "schacCountryOfCitizenship", name: "eidasNationality"},
 	}
 
 	attributenameFormats = map[string]string{
@@ -345,20 +345,20 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			}
 		case "replace":
 			if *v == "" {
-			    params := strings.Split(opParam[1], ":")
-			    if len(values[params[0]]) > 0 {
-    				*v = strings.ReplaceAll(values[params[0]][0], params[1], params[2])
-    			}
+				params := strings.Split(opParam[1], ":")
+				if len(values[params[0]]) > 0 {
+					*v = strings.ReplaceAll(values[params[0]][0], params[1], params[2])
+				}
 			}
 		case "substr":
 			if *v == "" {
-			    params := strings.Split(opParam[1], ":")
-			    low, _ := strconv.Atoi(params[1])
-			    high, _ := strconv.Atoi(params[2])
+				params := strings.Split(opParam[1], ":")
+				low, _ := strconv.Atoi(params[1])
+				high, _ := strconv.Atoi(params[2])
 
-                if len(values[params[0]]) > 0 && len(values[params[0]][0]) > high {
-    				*v = values[params[0]][0][low:high]
-    			}
+				if len(values[params[0]]) > 0 && len(values[params[0]][0]) > high {
+					*v = values[params[0]][0][low:high]
+				}
 			}
 		case "displayname":
 			if *v == "" && len(values["cn"]) != 0 {
@@ -464,8 +464,8 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				*v = "CVR:" + cvr[0] + "-RID:" + rid[0]
 			} else if len(pid) > 0 {
 				*v = "PID:" + pid[0]
-            } else if len(eidasPersonIdentifier) > 0 {
-                *v = "PID:" + strings.Replace(eidasPersonIdentifier[0], "/", "-", 2)
+			} else if len(eidasPersonIdentifier) > 0 {
+				*v = "PID:" + strings.Replace(eidasPersonIdentifier[0], "/", "-", 2)
 			} else {
 				return fmt.Errorf("No person identitfier values")
 			}
@@ -557,7 +557,7 @@ func eptidforaudience(values map[string][]string, audience string) string {
 func eptid(values map[string][]string) string {
 	if values["krib"][0] == "true" && values["persistent"][0] != "" {
 		return values["persistent"][0]
-		}
+	}
 	epid := values["eduPersonPrincipalName"][0]
 	matches := scoped.FindStringSubmatch(epid)
 	if len(matches) != 3 {
@@ -620,63 +620,63 @@ func yearfromyearandcifferseven(year, c7 int) int {
 }
 
 func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp, newscope, schacHomeOrganization, persistentIDPEntityid string, setOrganizationName bool) (err error) {
-		if err = wayfScopeCheck(response, backendIdpMd); err != nil {
-			return
-		}
+	if err = wayfScopeCheck(response, backendIdpMd); err != nil {
+		return
+	}
 
-    	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
 
-		currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
+	currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
 
-		for _, attr := range []string{"subsecuritydomain", "securitydomain"} {
-			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
-			for i, val := range response.QueryMulti(attrList, path) {
-				response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, currentscope)+newscope, nil)
-			}
+	for _, attr := range []string{"subsecuritydomain", "securitydomain"} {
+		path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+		for i, val := range response.QueryMulti(attrList, path) {
+			response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, currentscope)+newscope, nil)
 		}
-		ns := "@" + newscope
-		for _, attr := range append(config.StrictScopedAttributes, config.LaxScopedAttributes...)  { // eduPersonTargetedID
-			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
-			for i, val := range response.QueryMulti(attrList, path) {
-		    	v, _, _ := strings.Cut(val, "@")
-			    response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", v+ns, nil)
-			}
+	}
+	ns := "@" + newscope
+	for _, attr := range append(config.StrictScopedAttributes, config.LaxScopedAttributes...) { // eduPersonTargetedID
+		path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+		for i, val := range response.QueryMulti(attrList, path) {
+			v, _, _ := strings.Cut(val, "@")
+			response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", v+ns, nil)
 		}
-		eptidAttributes := []string{"persistent", "eduPersonPrincipalName", "idpPersistentID", "spPersistentID"}
-		vals := map[string][]string{}
-		for _, attr := range eptidAttributes {
-			vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
-		}
-        if persistentIDPEntityid != "" {
-            vals["idpPersistentID"][0] = persistentIDPEntityid
-        }
+	}
+	eptidAttributes := []string{"persistent", "eduPersonPrincipalName", "idpPersistentID", "spPersistentID"}
+	vals := map[string][]string{}
+	for _, attr := range eptidAttributes {
+		vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
+	}
+	if persistentIDPEntityid != "" {
+		vals["idpPersistentID"][0] = persistentIDPEntityid
+	}
 	vals["krib"] = []string{""}
 
-		eptid := eptid(vals)
-		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
-        nameIDPolicy := response.Query1(attrList, "saml:Attribute[@Name='nameIDPolicy']/saml:AttributeValue")
-        nameID := response.Query1(attrList, "./nameID")
-        switch nameIDPolicy {
-        case gosaml.Persistent:
-            nameID = eptid
-        case gosaml.Email:
-            nameID = vals["eduPersonPrincipalName"][0]
-        }
-        switch attr := spMd.Query1(nil, xprefix+"nameIDAttribute"); {
-        case attr == "":
-        default:
-            nameID = response.Query1(attrList, "./"+attr)
-        }
-        response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, nameID, nil)
+	eptid := eptid(vals)
+	response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
+	nameIDPolicy := response.Query1(attrList, "saml:Attribute[@Name='nameIDPolicy']/saml:AttributeValue")
+	nameID := response.Query1(attrList, "./nameID")
+	switch nameIDPolicy {
+	case gosaml.Persistent:
+		nameID = eptid
+	case gosaml.Email:
+		nameID = vals["eduPersonPrincipalName"][0]
+	}
+	switch attr := spMd.Query1(nil, xprefix+"nameIDAttribute"); {
+	case attr == "":
+	default:
+		nameID = response.Query1(attrList, "./"+attr)
+	}
+	response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, nameID, nil)
 
 	if setOrganizationName {
-    		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
-    		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
-    	}
-        if schacHomeOrganization != "" {
-            response.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="schacHomeOrganization"]/saml:AttributeValue[1]`, schacHomeOrganization, nil)
-        }
-		return
+		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
+		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
+	}
+	if schacHomeOrganization != "" {
+		response.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="schacHomeOrganization"]/saml:AttributeValue[1]`, schacHomeOrganization, nil)
+	}
+	return
 }
 
 // CopyAttributes copies the attributes
