@@ -549,7 +549,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-	var vals url.Values
+	vals := url.Values{"protocol": []string{"saml"}, "scoping": []string{"param"}}
 	cookie, err := r.Cookie("debug")
 	if err == nil {
 		vals, err = url.ParseQuery(cookie.Value)
