@@ -1853,6 +1853,7 @@ found:
 		return goxml.Wrap(err)
 	}
 
+	gosaml.DumpFileIfTracing(r, response)
 	gosaml.DumpFileIfTracing(r, newresponse)
 
 	data := gosaml.Formdata{
@@ -1866,7 +1867,6 @@ found:
 
 	var signature []byte
 
-	gosaml.DumpFileIfTracing(r, newresponse)
 	multi := spMd.QueryMultiMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery, []string{".", "../../../md:EncryptionMethod/@Algorithm"})
 	_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(goxml.Flatten(multi[0]), x509.RSA)
 
