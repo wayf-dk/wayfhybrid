@@ -281,7 +281,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 		return fmt.Errorf("No AttributeStatement")
 	}
 	values := map[string][]string{}
-	attributeStatement2 := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	attributeStatement := attributeStatementList[0]
 	sourceAttributes := response.Query(attributeStatement, `./saml:Attribute`)
 
@@ -304,7 +303,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 			values[atd.c14n] = append(values[atd.c14n], tmpValues...)
 		}
 	}
-	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
+	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
 
 	goxml.RmElement(attributeStatement)
 	return
@@ -313,11 +312,11 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 // RequestHandler - runs attributeOpsHandler for requestAttributesBase and returns the result as values
 func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string, err error) {
 	values = map[string][]string{}
-	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd, request.QueryDashP(nil, `/saml:AttributeStatement`, "", nil))
+	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd)
 	return
 }
 
-func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp, dest types.Node) (err error) {
+func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp) (err error) {
 	contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg, "req": request}
 	for _, atd := range atds {
 		opParam := strings.SplitN(atd.op, ":", 2)
@@ -534,6 +533,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		}
 	}
 
+	dest := msg.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[0]`, "", nil)
 	for basic, vals := range values {
 		seen := map[string]bool{}
 		for _, val := range vals {
