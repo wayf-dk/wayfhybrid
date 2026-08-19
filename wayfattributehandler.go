@@ -72,11 +72,13 @@ var (
 		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
 		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "hub", op: "eq:Issuer:https://wayf.wayf.dk"},
+		{c14n: "krib", op: "xpbool:msg:boolean(@Destination[starts-with(., 'https://krib.wayf.dk/')])"},
 		{c14n: "persistent", op: "persistent:"},
 		{c14n: "displayName", op: "displayname:"},
 		{c14n: "eduPersonTargetedID", op: "eptid:"},
 		{c14n: "gn", op: "gn:"},
 		{c14n: "sn", op: "sn:"},
+		{c14n: "cn", op: "cn:"},
 		{c14n: "pairwise-id", name: "pairwise-id", op: "pairwise-id:"},
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
@@ -90,6 +92,8 @@ var (
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
 		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
 		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
+		{c14n: "schacDateOfBirth", op: "replace:eidasDateOfBirth:-:"},
+		{c14n: "schacYearOfBirth", op: "substr:eidasDateOfBirth:0:4"},
 	}
 
 	requestAttributesBase = []attributeDescription{
@@ -192,6 +196,34 @@ var (
 		{c14n: "modstlogonmethod", name: "https://modst.dk/sso/claims/logonmethod"},
 		{c14n: "sn", name: "https://modst.dk/sso/claims/surname"},
 		{c14n: "gn", name: "https://modst.dk/sso/claims/givenname"},
+
+		// eIDAS
+		{c14n: "eidasPersonIdentifier", name: "http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier"},
+		{c14n: "eidasCurrentFamilyName", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentFamilyName"},
+		{c14n: "sn", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentFamilyName"},
+		{c14n: "eidasCurrentGivenName", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentGivenName"},
+		{c14n: "gn", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentGivenName"},
+		{c14n: "eidasDateOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/DateOfBirth"},
+		{c14n: "eidasNationality", name: "http://eidas.europa.eu/attributes/naturalperson/Nationality"},
+
+		{c14n: "eidasCountryOfResidence", name: "http://eidas.europa.eu/attributes/naturalperson/CountryOfResidence"},
+		{c14n: "eidasCurrentAddress", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentAddress"},
+		{c14n: "eidasBirthName", name: "http://eidas.europa.eu/attributes/naturalperson/BirthName"},
+		{c14n: "eidasPlaceOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/PlaceOfBirth"},
+		{c14n: "eidasCountryOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/CountryOfBirth"},
+		{c14n: "eidasTownOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/TownOfBirth"},
+		{c14n: "eidasGender", name: "http://eidas.europa.eu/attributes/naturalperson/Gender"},
+		{c14n: "eidasPhoneNumber", name: "http://eidas.europa.eu/attributes/naturalperson/PhoneNumber"},
+		{c14n: "eidasEmailAddress", name: "http://eidas.europa.eu/attributes/naturalperson/EmailAddress"},
+		{c14n: "eidasLoA", name: "https://data.gov.dk/model/core/eidas/loa"},
+		{c14n: "eidasMemberState", name: "https://data.gov.dk/model/core/eid/eidas/memberState"},
+		{c14n: "oioAttributeProfile", name: "https://data.gov.dk/concept/core/eid/profile"},
+		{c14n: "oioProvider", name: "https://data.gov.dk/concept/core/eid/provider"},
+		{c14n: "oioGenericLoA", name: "https://data.gov.dk/concept/core/loa"},
+		{c14n: "oioCprIal", name: "https://data.gov.dk/model/core/nsis/cpr_ial"},
+		{c14n: "oioAllowQualifiedSigning", name: "https://data.gov.dk/model/core/eid/allowQualifiedSigning"},
+
+        {c14n: "schacCountryOfCitizenship", name: "eidasNationality"},
 	}
 
 	attributenameFormats = map[string]string{
@@ -312,6 +344,23 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if *v != "" {
 				*v = *v + opParam[1]
 			}
+		case "replace":
+			if *v == "" {
+			    params := strings.Split(opParam[1], ":")
+			    if len(values[params[0]]) > 0 {
+    				*v = strings.ReplaceAll(values[params[0]][0], params[1], params[2])
+    			}
+			}
+		case "substr":
+			if *v == "" {
+			    params := strings.Split(opParam[1], ":")
+			    low, _ := strconv.Atoi(params[1])
+			    high, _ := strconv.Atoi(params[2])
+
+                if len(values[params[0]]) > 0 && len(values[params[0]][0]) > high {
+    				*v = values[params[0]][0][low:high]
+    			}
+			}
 		case "displayname":
 			if *v == "" && len(values["cn"]) != 0 {
 				*v = values["cn"][0]
@@ -326,6 +375,10 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				names := strings.Fields(values["cn"][0])
 				*v = strings.Join(names[0:len(names)-1], " ")
 			}
+		case "cn":
+			if *v == "" && len(values["gn"]) > 0 && len(values["sn"]) > 0 {
+				*v = values["gn"][0] + " " + values["sn"][0]
+			}
 		case "xidp":
 			*v = idpMd.Query1(nil, xprefix+opParam[1])
 		case "xp":
@@ -337,6 +390,9 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "xpm":
 			opParam = strings.SplitN(opParam[1], ":", 2)
 			values[atd.c14n] = append(values[atd.c14n], contextMap[opParam[0]].QueryMulti(nil, opParam[1])...)
+		case "xpbool":
+			opParam = strings.SplitN(opParam[1], ":", 2)
+			*v = strconv.FormatBool(contextMap[opParam[0]].QueryBool(nil, opParam[1]))
 		case "securitydomain":
 			eppns := values["eduPersonPrincipalName"]
 			if len(eppns) > 0 {
@@ -404,12 +460,15 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			rid := values["rid"]
 			cvr := values["cvr"]
 			pid := values["pid"]
+			eidasPersonIdentifier := values["eidasPersonIdentifier"]
 			if len(rid) > 0 && len(cvr) > 0 {
 				*v = "CVR:" + cvr[0] + "-RID:" + rid[0]
 			} else if len(pid) > 0 {
 				*v = "PID:" + pid[0]
+            } else if len(eidasPersonIdentifier) > 0 {
+                *v = "PID:" + strings.Replace(eidasPersonIdentifier[0], "/", "-", 2)
 			} else {
-				return fmt.Errorf("No pid or rid and cvr values")
+				return fmt.Errorf("No person identitfier values")
 			}
 		case "commonfederations":
 			*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
@@ -496,15 +555,10 @@ func eptidforaudience(values map[string][]string, audience string) string {
 }
 
 func eptid(values map[string][]string) string {
-	var epid string
-
-	if epid = values["persistent"][0]; epid == "" {
-		if len(values["eduPersonPrincipalName"]) == 0 {
-			return ""
+	if values["krib"][0] == "true" && values["persistent"][0] != "" {
+		return values["persistent"][0]
 		}
-		epid = values["eduPersonPrincipalName"][0]
-	}
-
+	epid := values["eduPersonPrincipalName"][0]
 	matches := scoped.FindStringSubmatch(epid)
 	if len(matches) != 3 {
 		return ""
@@ -596,6 +650,7 @@ func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp,
         if persistentIDPEntityid != "" {
             vals["idpPersistentID"][0] = persistentIDPEntityid
         }
+	vals["krib"] = []string{""}
 
 		eptid := eptid(vals)
 		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
@@ -614,7 +669,7 @@ func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp,
         }
         response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, nameID, nil)
 
-		if (setOrganizationName) {
+	if setOrganizationName {
     		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
     		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
     	}
