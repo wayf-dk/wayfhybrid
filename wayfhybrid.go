@@ -1302,7 +1302,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 	destination := request.Query1(nil, "./@Destination")
 	// we need to keep track of the index of the SSO Location as the issuer for oidc can be encoded in it e.g. ".../oidc/auth/deic.dk"
 	for i, v := range hubBirkMd.QueryMulti(nil, `./md:IDPSSODescriptor/md:SingleSignOnService/@Location`) {
-		if strings.HasPrefix(destination, config.OIDCAuthLocation) &&  v == destination {
+		if strings.HasPrefix(destination, config.OIDCAuthLocation) && v == destination {
 			ssoIndex = i
 			break
 		}
@@ -1889,8 +1889,8 @@ found:
 	iss := strings.Replace(sso, config.OIDCAuth, config.Op, 1)
 	iss = strings.Replace(iss, "https://"+config.SsoService3, config.HubEntityID, 1)
 	if sRequest.SSOIndex != 0 {
-    	id_token["iss"] = iss
-    }
+		id_token["iss"] = iss
+	}
 
 	switch sRequest.Protocol {
 	default:
