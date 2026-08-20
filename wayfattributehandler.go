@@ -465,7 +465,9 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			} else if len(pid) > 0 {
 				*v = "PID:" + pid[0]
 			} else if len(eidasPersonIdentifier) > 0 {
-				*v = "PID:" + strings.Replace(eidasPersonIdentifier[0], "/", "-", 2)
+                re := regexp.MustCompile(`[^[:alnum:]]`)
+                epid := strings.Replace(eidasPersonIdentifier[0], "/", "-", 2)
+                *v = "PID:" + epid[:6] + re.ReplaceAllStringFunc(epid[6:], eidasHex)
 			} else {
 				return fmt.Errorf("No person identitfier values")
 			}
@@ -931,4 +933,13 @@ func unique(slice []string) (list []string) {
 		}
 	}
 	return
+}
+
+func eidasHex(f string) string {
+	switch f {
+	case "-":
+		return "--"
+	default:
+		return "-" + hex.EncodeToString([]byte(f))
+	}
 }
