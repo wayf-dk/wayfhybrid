@@ -241,6 +241,7 @@ func Main() {
 	httpMux.Handle(config.Spslo3, appHandler(SPSLOService))
 	httpMux.Handle(config.Kribslo, appHandler(KribSLOService))
 	httpMux.Handle(config.Nemloginslo, appHandler(SPSLOService))
+	httpMux.Handle(config.Nemloginslo4, appHandler(SPSLOService))
 
 	httpMux.Handle(config.Acs, appHandler(ACSService))
 	httpMux.Handle(config.Acs2, appHandler(ACSService))
