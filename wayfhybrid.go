@@ -187,7 +187,7 @@ func Main() {
 	hubExtIDP = gosaml.MdSets{md.Hub, md.ExternalIDP}
 	hubExtSP = gosaml.MdSets{md.Hub, md.ExternalSP}
 
-	str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1)
+	str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1) // bypass md update on specific servers - only when starting
 	log.Printf("refreshAllMetadataFeeds: %s %v\n", str, err)
 
 	webMdMap = make(map[string]webMd)
@@ -459,7 +459,7 @@ func PProf(w http.ResponseWriter, r *http.Request) (err error) {
 
 // updateMetadataService is service for updating metadata feed
 func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
-	if str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1); err == nil {
+	if str, err := refreshAllMetadataFeeds(true); err == nil { // all servers can update md when pinged
 		io.WriteString(w, str)
 	}
 	return
