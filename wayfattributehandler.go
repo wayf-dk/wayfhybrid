@@ -94,6 +94,8 @@ var (
 		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
 		{c14n: "schacDateOfBirth", op: "replace:eidasDateOfBirth:-:"},
 		{c14n: "schacYearOfBirth", op: "substr:eidasDateOfBirth:0:4"},
+		{c14n: "modstUserID", op: "cp:eduPersonPrincipalName"},
+		{c14n: "modstUserID", op: "modstUserIDIsMail:"},
 	}
 
 	requestAttributesBase = []attributeDescription{
@@ -186,7 +188,8 @@ var (
 
 		// Modst specials
 		{c14n: "eduPersonPrincipalName", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"},
-		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid"},
+		//      {c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid"},
+		{c14n: "modstUserID", name: "https://modst.dk/sso/claims/userid"},
 		//		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid"},
 		{c14n: "entryUUID", name: "https://modst.dk/sso/claims/uniqueid"},
 		{c14n: "oioCvrNumberIdentifier", name: "https://modst.dk/sso/claims/cvr"},
@@ -499,6 +502,11 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "europeanStudentIdentifier":
 			if idpMd.QueryXMLBool(nil, xprefix+"addESI") {
 				*v = "urn:schac:personalUniqueCode:int:esi:" + values["schacHomeOrganization"][0] + ":" + eptidforaudience(values, "europeanStudentIdentifier")
+			}
+		case "modstUserIDIsMail":
+			if idpMd.QueryXMLBool(nil, xprefix+"modstUserIDIsMail") && len(values["mail"]) > 0 {
+			//if true {
+				values[atd.c14n] = values["mail"][:1]
 			}
 		case "loaLimiter":
 			levels := map[string]string{"": "", "3": "3", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are errors, blanks are ok
