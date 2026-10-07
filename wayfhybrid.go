@@ -1561,6 +1561,13 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 			// before, _ := newrequest.Query(nil, "./samlp:NameIDPolicy")[0].NextSibling() // NameIDPolicy always there, NextSibling returns nil of none, and then Conditions after NameIDIPolicy anyway
 			// newrequest.QueryDashP(nil, "saml:Conditions/saml:OneTimeUse", "", before)
 		}
+		if oioProfiles := spMd.QueryMulti(nil, xprefix+"oioProfile"); len(oioProfiles) > 0 {
+		    issuerElement, _ := newrequest.Query(nil, "./saml:Issuer").First().NextSibling()
+			for _, profile := range oioProfiles {
+				newrequest.QueryDashP(nil, "./samlp:Extensions/nl:RequestedAttributeProfiles/nl:Profile[0]", profile, issuerElement)
+				issuerElement = nil
+			}
+		}
 	}
 
 	if virtualIDPMd.QueryXMLBool(nil, xprefix+`forceAuthn`) && spMd.QueryXMLBool(nil, xprefix+`forceAuthn`) {
