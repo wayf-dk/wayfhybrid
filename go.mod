@@ -1,6 +1,6 @@
 module github.com/wayf-dk/wayfhybrid
 
-go 1.24.11
+go 1.25.0
 
 require (
 	github.com/wayf-dk/go-libxml2 v0.0.0-20240227081341-0086175c2fd4
@@ -9,6 +9,7 @@ require (
 	github.com/wayf-dk/gosaml v0.0.0-20240228091111-7bcd141f879d
 	github.com/wayf-dk/goxml v0.0.0-20240226131044-6b837b25feb7
 	github.com/wayf-dk/lmdq v0.0.0-20240226132521-4385378ef6b2
+	golang.org/x/oauth2 v0.36.0
 	x.config v0.0.0-00010101000000-000000000000
 )
 
