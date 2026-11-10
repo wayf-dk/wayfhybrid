@@ -1565,7 +1565,7 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 			// newrequest.QueryDashP(nil, "saml:Conditions/saml:OneTimeUse", "", before)
 		}
 		if oioProfiles := spMd.QueryMulti(nil, xprefix+"oioProfile"); len(oioProfiles) > 0 {
-		    issuerElement, _ := newrequest.Query(nil, "./saml:Issuer").First().NextSibling()
+			issuerElement, _ := newrequest.Query(nil, "./saml:Issuer").First().NextSibling()
 			for _, profile := range oioProfiles {
 				newrequest.QueryDashP(nil, "./samlp:Extensions/nl:RequestedAttributeProfiles/nl:Profile[0]", profile, issuerElement)
 				issuerElement = nil
@@ -2342,7 +2342,7 @@ func WalletOauthAuthrizationServiceMetadata(w http.ResponseWriter, r *http.Reque
 		"token_endpoint":                        https + config.OIDCToken,
 		"jwks_uri":                              https + config.OidcJwkService,
 		"scopes_supported":                      []string{"EduPersonCredential"},
-		"response_type_supported":               []string{"code"},
+		"response_types_supported":              []string{"code"},
 		"grant_types_supported":                 []string{"authorization_code"},
 		"code_challenge_methods_supported":      []string{"S256"},
 		"token_endpoint_auth_methods_supported": []string{"none"},
