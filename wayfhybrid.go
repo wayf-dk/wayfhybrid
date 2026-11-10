@@ -33,6 +33,8 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/oauth2"
+
 	"github.com/wayf-dk/godiscoveryservice"
 	"github.com/wayf-dk/goeleven"
 	"github.com/wayf-dk/gosaml"
@@ -185,7 +187,7 @@ func Main() {
 	hubExtIDP = gosaml.MdSets{md.Hub, md.ExternalIDP}
 	hubExtSP = gosaml.MdSets{md.Hub, md.ExternalSP}
 
-	str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1)
+	str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1) // bypass md update on specific servers - only when starting
 	log.Printf("refreshAllMetadataFeeds: %s %v\n", str, err)
 
 	webMdMap = make(map[string]webMd)
@@ -219,7 +221,8 @@ func Main() {
 	httpMux.Handle("/production", appHandler(OkService))
 	httpMux.Handle(config.Vvpmss, appHandler(VeryVeryPoorMansScopingService))
 	httpMux.Handle(config.OidcConfigurationService, appHandler(OidcConfigurationService))
-	httpMux.Handle(config.OidcConfigurationService2, appHandler(OidcConfigurationService))
+	httpMux.Handle(config.OidcConfigurationService2, appHandler(OidcConfigurationService2))
+	httpMux.Handle(config.OidcConfigurationService3, appHandler(OidcConfigurationService2))
 	httpMux.Handle(config.OidcJwkService, appHandler(OidcJwkService))
 
 	httpMux.Handle(config.SsoService, appHandler(SSOService))
@@ -238,11 +241,12 @@ func Main() {
 	httpMux.Handle(config.Spslo3, appHandler(SPSLOService))
 	httpMux.Handle(config.Kribslo, appHandler(KribSLOService))
 	httpMux.Handle(config.Nemloginslo, appHandler(SPSLOService))
+	httpMux.Handle(config.Nemloginslo4, appHandler(SPSLOService))
 
 	httpMux.Handle(config.Acs, appHandler(ACSService))
 	httpMux.Handle(config.Acs2, appHandler(ACSService))
-	httpMux.Handle(config.NemloginAcs, appHandler(ACSService))
 	httpMux.Handle(config.NemloginAcs3, appHandler(ACSService))
+	httpMux.Handle(config.NemloginAcs4, appHandler(ACSService))
 	httpMux.Handle(config.Birk, appHandler(SSOService))
 	httpMux.Handle(config.Krib, appHandler(ACSService))
 	httpMux.Handle(config.Dsbackend, appHandler(godiscoveryservice.DSBackend))
@@ -458,7 +462,7 @@ func PProf(w http.ResponseWriter, r *http.Request) (err error) {
 
 // updateMetadataService is service for updating metadata feed
 func updateMetadataService(w http.ResponseWriter, r *http.Request) (err error) {
-	if str, err := refreshAllMetadataFeeds(slices.Index(config.BypassMdUpdateList, hostName) == -1); err == nil {
+	if str, err := refreshAllMetadataFeeds(true); err == nil { // all servers can update md when pinged
 		io.WriteString(w, str)
 	}
 	return
@@ -549,92 +553,99 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	defer r.Body.Close()
 	r.ParseForm()
 
-	type testSPFormData struct {
+	vals := url.Values{"protocol": []string{"saml"}, "scoping": []string{"param"}}
+	cookie, err := r.Cookie("debug")
+	if err == nil {
+		vals, err = url.ParseQuery(cookie.Value)
+		if err == nil {
+			for k, v := range vals {
+				if v[0] != "" && v[0][0] == '[' {
+					var tmp []string
+					if err := json.Unmarshal([]byte(v[0]), &tmp); err == nil {
+						vals[k] = tmp
+					}
+				}
+			}
+			//			fmt.Printf("%#v\n", vals)
+		}
+	}
+
+	var oidcProtocols = []string{"idtoken", "code"}
+	formdata := struct {
 		Protocol, RelayState, ResponsePP, Issuer, Destination, External, ScopedIDP, Marshalled string
 		Code_challenge, AssertionConsumerServiceURL                                            string
 		Messages                                                                               template.HTML
 		AttrValues, DebugValues                                                                []attrValue
-	}
+	}{}
 
 	spMd, err := md.Internal.MDQ("https://" + r.Host)
 	pk, _, _ := gosaml.GetPrivateKey(spMd, "md:SPSSODescriptor"+gosaml.SigningCertQuery)
-	idp := r.Form.Get("idpentityid")
-	login := r.Form.Get("login") == "1"
-	scoping := r.Form.Get("scoping")
-	scopedIDP := r.Form.Get("scopedidp") + r.Form.Get("entityID") + idp // RI says entityID
-	idpList := strings.Split(scopedIDP, ",")
 
-	formdata := testSPFormData{
-		AssertionConsumerServiceURL: "https://" + r.Host + "/ACS",
+	var previousEntityID string
+	entityID := r.Form.Get("entityID")
+	if cookie, err = r.Cookie("entityID"); err == nil {
+		previousEntityID = cookie.Value
+	}
+	http.SetCookie(w, &http.Cookie{Name: "entityID", Value: entityID, Path: "/", Secure: true, HttpOnly: false})
+
+	login := r.Form.Get("login") != ""
+	var scoping, protocol string
+	if len(vals["scoping"]) > 0 {
+		scoping = vals["scoping"][0]
+		protocol = vals["protocol"][0]
 	}
 
-	if r.Form.Get("ds") != "" {
-		data := url.Values{}
-		data.Set("return", "https://"+r.Host+"/?previdplist="+r.Form.Get("scopedidp"))
-		data.Set("returnIDParam", "idpentityid")
-		data.Set("entityID", "https://"+r.Host)
-		discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-		if discoService == "" {
-			discoService = config.DiscoveryService
-		}
-		http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
-	} else if login {
-		data := url.Values{}
-		switch {
-		case len(idpList) == 1 && idpList[0] == "":
-		case len(idpList) == 1:
-			data.Set("idpentityid", scopedIDP)
-		default:
-			data.Set("idplist", scopedIDP)
-		}
+	if scoping == "vvpmss" {
 
-		protocol := r.Form.Get("protocol")
-		if protocol == "oidc" {
+	}
+
+	if login && slices.Contains(oidcProtocols, protocol) {
+		oAuth2Config, _, err := readOAuth2Config(scoping, entityID)
+		if err != nil {
+			return err
+		}
+		if protocol == "code" {
+			verifier := oauth2.GenerateVerifier()
+			var auth strings.Builder
+			auth.WriteString(oAuth2Config.AuthCodeURL(verifier, oauth2.AccessTypeOffline, oauth2.S256ChallengeOption(verifier)))
+			if scoping == "param" {
+				auth.WriteString("&idpentityid=" + entityID)
+			}
+			http.Redirect(w, r, auth.String(), http.StatusFound)
+			return nil
+		} else if protocol == "idtoken" {
+			data := url.Values{}
 			data.Set("response_type", "id_token")
-			data.Set("client_id", "https://"+r.Host)
-			data.Set("redirect_uri", "https://"+r.Host+"/ACS")
+			data.Set("client_id", oAuth2Config.ClientID)
+			data.Set("redirect_uri", oAuth2Config.RedirectURL)
 			data.Set("nonce", gosaml.ID())
-			http.Redirect(w, r, "https://"+config.OIDCAuth+"?"+data.Encode(), http.StatusFound)
-			return
-		} else if protocol == "wsfed" {
+			if scoping == "param" {
+				data.Set("idpentityid", entityID)
+			}
+
+			http.Redirect(w, r, oAuth2Config.Endpoint.AuthURL+"?"+data.Encode(), http.StatusFound)
+			return nil
+		}
+	} else if login && protocol == "saml" {
+		if protocol == "wsfed" {
+			data := url.Values{}
 			data.Set("wa", "wsignin1.0")
 			data.Set("wtrealm", "https://"+r.Host)
 			http.Redirect(w, r, "https://"+config.SsoService3+"?"+data.Encode(), http.StatusFound)
 			return
 		}
+		var idpMd *goxml.Xp
+		if scoping == "birk" {
+			idpMd, err = md.ExternalIDP.MDQ(entityID)
+		} else {
+			idpMd, err = md.Hub.MDQ(config.HubEntityID)
+		}
 
-		idpMd, err := md.Hub.MDQ(config.HubEntityID)
 		if err != nil {
 			return err
 		}
 
-		if scopedIDP == "" && idp == "" {
-			//			data := url.Values{}
-			//			data.Set("return", "https://"+r.Host+r.RequestURI)
-			//			data.Set("returnIDParam", "idpentityid")
-			//			data.Set("entityID", "https://"+r.Host)
-			//			discoService := spMd.Query1(nil, "/md:EntityDescriptor/md:Extensions/wayf:wayf/wayf:discoveryService")
-			//			if discoService == "" {
-			//				discoService = config.DiscoveryService
-			//			}
-			//			http.Redirect(w, r, discoService+data.Encode(), http.StatusFound)
-			//			return err
-		}
-
-		http.SetCookie(w, &http.Cookie{Name: "idpentityID", Value: idp, Path: "/", Secure: true, HttpOnly: false})
-
-		if scoping == "testidp" {
-			http.SetCookie(w, &http.Cookie{Name: "testidp", Value: scopedIDP, Domain: "wayf.dk", Path: "/", Secure: true, HttpOnly: false})
-		}
-
-		if scoping == "birk" {
-			idpMd, err = md.ExternalIDP.MDQ(scopedIDP)
-			if err != nil {
-				return err
-			}
-		}
-
-		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0)
+		newrequest, _, _ := gosaml.NewAuthnRequest(nil, spMd, idpMd, "", nil, "", false, 0, 0, 0)
 
 		options := []struct {
 			name, path string
@@ -647,17 +658,15 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		for _, option := range options {
-			for _, val := range r.Form[option.name] {
+			for _, val := range vals[option.name] {
 				if val != "" {
 					newrequest.QueryDashP(nil, option.path, val, nil)
 				}
 			}
 		}
 
-		if scoping == "scoping" || scoping == "" {
-			//			for _, scope := range idpList {
-			//				newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", scope, nil)
-			//			}
+		if scoping == "scoping" {
+			newrequest.QueryDashP(nil, "./samlp:Scoping/samlp:IDPList/samlp:IDPEntry/@ProviderID", entityID, nil)
 		}
 
 		u, err := gosaml.SAMLRequest2URL(newrequest, "", pk, config.DefaultCryptoMethod)
@@ -673,13 +682,7 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 
 		if scoping == "param" {
-			switch len(idpList) {
-			case 0:
-			case 1:
-				q.Set("idpentityid", scopedIDP)
-			default:
-				q.Set("idplist", scopedIDP)
-			}
+			q.Set("idpentityid", entityID)
 		}
 		q.Set("RelayState", strings.Repeat("z", 50))
 		u.RawQuery = q.Encode()
@@ -759,9 +762,46 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 		formdata.DebugValues = debugVals
 		formdata.ScopedIDP = response.Query1(nil, "//saml:AuthenticatingAuthority[last()]")
 		formdata.Marshalled = marshalledResponse
+		formdata.RelayState = relayState
+		formdata.ResponsePP = incomingResponseXML
+		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
+	} else if code := r.Form.Get("code"); code != "" {
+		oAuth2Config, userInfoEndpoint, err := readOAuth2Config(scoping, previousEntityID)
+		if err != nil {
+			return err
+		}
+		verifier := r.Form.Get("state") ///  !!!
+		ctx := context.Background()
+		at, err := oAuth2Config.Exchange(ctx, code, oauth2.VerifierOption(verifier))
+		if err != nil {
+			return errors.New("oauth exchange failed")
+		}
+
+		data := url.Values{}
+		data.Set("client_id", oAuth2Config.ClientID)
+
+		request, _ := http.NewRequest("POST", userInfoEndpoint, strings.NewReader(data.Encode()))
+		request.Header.Add("Authorization", "Bearer "+at.AccessToken)
+		request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := http.DefaultClient.Do(request)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		responsebody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		ui := map[string]any{}
+		err = json.Unmarshal(responsebody, &ui)
+		if err != nil {
+			return err
+		}
+		jsonDump, _ := json.MarshalIndent(ui, "", "    ")
+		formdata.ResponsePP = string(jsonDump)
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else if id_token := r.Form.Get("id_token"); id_token != "" {
-		attrs, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub}, spMd, gosaml.SPEnc, "")
+		attrs, _, err := gosaml.JwtVerify(id_token, gosaml.MdSets{md.Hub, md.ExternalIDP}, spMd, gosaml.SPEnc, "")
 		if err != nil {
 			return goxml.Wrap(err)
 		}
@@ -772,12 +812,51 @@ func testSPService(w http.ResponseWriter, r *http.Request) (err error) {
 	} else if wresult := r.Form.Get("wresult"); wresult != "" {
 		xp := goxml.NewXpFromString(wresult)
 		formdata.ResponsePP = xp.PP()
-		formdata.Protocol = xp.QueryString(nil, "local-name(/*)")
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	} else {
-		formdata.ScopedIDP = strings.Trim(r.Form.Get("idpentityid")+","+r.Form.Get("previdplist"), " ,")
 		return tmpl.ExecuteTemplate(w, "testSPForm", formdata)
 	}
+	return
+}
+
+func readOAuth2Config(scoping, entityID string) (oAuth2Config *oauth2.Config, userInfoEndpoint string, err error) {
+	type Opconfig struct {
+		Authorization        string `json:"authorization_endpoint"`
+		Userinfo             string `json:"userinfo_endpoint"`
+		Introspect           string `json:"introspection_endpoint"`
+		Device_authorization string `json:"device_authorization_endpoint"`
+		Token                string `json:"token_endpoint"`
+		Issuer               string `json:"issuer"`
+	}
+	op := Opconfig{}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	var resp *http.Response
+	if scoping == "birk" {
+		resp, err = http.Get("https://wayf.wayf.dk/op/" + lmdq.C14n(entityID)[:10] + "/.well-known/openid-configuration")
+	} else {
+		resp, err = http.Get("https://wayf.wayf.dk/.well-known/openid-configuration")
+	}
+	if err != nil {
+		fmt.Println("Failed ...")
+		return
+	}
+	configJson, _ := io.ReadAll(resp.Body)
+	err = json.Unmarshal(configJson, &op)
+	if err != nil {
+		fmt.Println("Failed ...")
+		return
+	}
+	oAuth2Config = &oauth2.Config{
+		ClientID:     "https://wayfsp.wayf.dk",
+		Scopes:       []string{"openid", "profile", "email", "entitlements"},
+		RedirectURL:  "https://wayfsp.wayf.dk/ACS",
+		ClientSecret: "",
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  op.Authorization,
+			TokenURL: op.Token,
+		},
+	}
+	userInfoEndpoint = op.Userinfo
 	return
 }
 
@@ -1093,21 +1172,29 @@ func OidcJwkService(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func OidcConfigurationService(w http.ResponseWriter, r *http.Request) (err error) {
-	r.ParseForm()
-	if !strings.HasSuffix(r.URL.Path, "/.well-known/openid-configuration") {
-		err = fmt.Errorf("no .well-known/openid-configuration found")
-	}
-	homeorg := r.PathValue("homeorg")
-	if homeorg == "" || homeorg == ".well-known" {
-		homeorg = "https://wayf.wayf.dk"
-	}
-	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, homeorg)
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, config.HubEntityID)
 	if err != nil {
 		return err
 	}
 	data := map[string]string{
 		"issuer": md.Query1(nil, "@entityID"),
 		"auth":   md.Query1(nil, "md:IDPSSODescriptor/md:SingleSignOnService/@Location"),
+		"name":   md.Query1(nil, `md:Organization/md:OrganizationName[@xml:lang="en"]`),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return tmpl.ExecuteTemplate(w, "openid-configuration", data)
+}
+
+func OidcConfigurationService2(w http.ResponseWriter, r *http.Request) (err error) {
+	r.ParseForm()
+	iss := r.PathValue("iss")
+	md, _, err := gosaml.FindInMetadataSets(hubExtIDP, iss)
+	if err != nil {
+		return err
+	}
+	data := map[string]string{
+		"issuer": "https://" + config.Op + iss,
+		"auth":   "https://" + config.OIDCAuth + iss,
 		"name":   md.Query1(nil, `md:Organization/md:OrganizationName[@xml:lang="en"]`),
 	}
 
@@ -1215,6 +1302,16 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		err = fmt.Errorf("no common federations")
 	}
 
+	ssoIndex := 0
+	destination := request.Query1(nil, "./@Destination")
+	// we need to keep track of the index of the SSO Location as the issuer for oidc can be encoded in it e.g. ".../oidc/auth/deic.dk"
+	for i, v := range hubBirkMd.QueryMulti(nil, `./md:IDPSSODescriptor/md:SingleSignOnService/@Location`) {
+		if strings.HasPrefix(destination, config.OIDCAuthLocation) && v == destination {
+			ssoIndex = i
+			break
+		}
+	}
+
 	realIDPMd := virtualIDPMd
 	var hubKribSPMd *goxml.Xp
 	if virtualIDPIndex == 0 { // to internal IDP - also via BIRK
@@ -1248,7 +1345,7 @@ func SSOService(w http.ResponseWriter, r *http.Request) (err error) {
 		}
 	}
 	gosaml.NemLog.Log(request, realIDPMd, request.Query1(nil, "@ID"))
-	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, nil)
+	err = sendRequestToIDP(w, r, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd, relayState, ssoCookieName, "", config.Domain, spIndex, hubBirkIndex, uint8(ssoIndex), nil)
 	return
 }
 
@@ -1280,10 +1377,14 @@ func OIDCTokenService(w http.ResponseWriter, r *http.Request) (err error) {
 		clientSecret := r.Form.Get("client_secret")
 		if authorisation := r.Header.Get("Authorization"); authorisation != "" {
 			authParam := strings.Split(authorisation+" ", " ")[1] // always gets 2 elements
-			basic, _ := base64.StdEncoding.DecodeString(authParam)
-			parts := strings.Split(string(basic)+":", ":")
-			clientId, _ = url.QueryUnescape(parts[0])
-			clientSecret = parts[1]
+			tmp, err := base64.StdEncoding.DecodeString(authParam)
+			if err != nil {
+				return err
+			}
+			basic := string(tmp)
+			i := strings.LastIndex(string(basic), ":")
+			clientId, _ = url.QueryUnescape(basic[:i])
+			clientSecret = basic[i+1:]
 		}
 
 		spMd, _, err := gosaml.FindInMetadataSets(intExtSP, clientId)
@@ -1440,11 +1541,11 @@ func getFirstByAttribute(xp *goxml.Xp, templ string, vals []string) (res string)
 	return
 }
 
-func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd *goxml.Xp, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex uint8, idPList []string) (err error) {
+func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hubKribSPMd, realIDPMd, virtualIDPMd *goxml.Xp, relayState, prefix, altAcs, domain string, spIndex, hubBirkIndex, ssoIndex uint8, idPList []string) (err error) {
 	// why not use orig request?
 	virtualIDPID := virtualIDPMd.Query1(nil, "./@entityID") // wayf might return domain or hash ...
 	wantRequesterID := realIDPMd.QueryXMLBool(nil, xprefix+`wantRequesterID`) || gosaml.DebugSetting(r, "wantRequesterID") != ""
-	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, wantRequesterID, spIndex, hubBirkIndex)
+	newrequest, sRequest, err := gosaml.NewAuthnRequest(request, hubKribSPMd, realIDPMd, virtualIDPID, idPList, altAcs, wantRequesterID, spIndex, hubBirkIndex, ssoIndex)
 	if err != nil {
 		return
 	}
@@ -1462,6 +1563,13 @@ func sendRequestToIDP(w http.ResponseWriter, r *http.Request, request, spMd, hub
 			newrequest.QueryDashP(nil, "./@ForceAuthn", "true", nil)
 			// before, _ := newrequest.Query(nil, "./samlp:NameIDPolicy")[0].NextSibling() // NameIDPolicy always there, NextSibling returns nil of none, and then Conditions after NameIDIPolicy anyway
 			// newrequest.QueryDashP(nil, "saml:Conditions/saml:OneTimeUse", "", before)
+		}
+		if oioProfiles := spMd.QueryMulti(nil, xprefix+"oioProfile"); len(oioProfiles) > 0 {
+		    issuerElement, _ := newrequest.Query(nil, "./saml:Issuer").First().NextSibling()
+			for _, profile := range oioProfiles {
+				newrequest.QueryDashP(nil, "./samlp:Extensions/nl:RequestedAttributeProfiles/nl:Profile[0]", profile, issuerElement)
+				issuerElement = nil
+			}
 		}
 	}
 
@@ -1756,6 +1864,7 @@ found:
 		return goxml.Wrap(err)
 	}
 
+	gosaml.DumpFileIfTracing(r, response)
 	gosaml.DumpFileIfTracing(r, newresponse)
 
 	data := gosaml.Formdata{
@@ -1769,7 +1878,6 @@ found:
 
 	var signature []byte
 
-	gosaml.DumpFileIfTracing(r, newresponse)
 	multi := spMd.QueryMultiMulti(nil, "./md:SPSSODescriptor"+gosaml.EncryptionCertQuery, []string{".", "../../../md:EncryptionMethod/@Algorithm"})
 	_, _, pubs, _ := gosaml.PublicKeyInfoByMethod(goxml.Flatten(multi[0]), x509.RSA)
 
@@ -1786,6 +1894,14 @@ found:
 	}
 
 	responseXML := newresponse.Dump()
+
+	// use the saved ssoIndex to map the SSOService URL back to an issuer
+	sso := hubBirkIDPMd.Query1(nil, `./md:IDPSSODescriptor/md:SingleSignOnService[`+strconv.Itoa(int(sRequest.SSOIndex+1))+`]/@Location`)
+	iss := strings.Replace(sso, config.OIDCAuth, config.Op, 1)
+	iss = strings.Replace(iss, "https://"+config.SsoService3, config.HubEntityID, 1)
+	if sRequest.SSOIndex != 0 {
+		id_token["iss"] = iss
+	}
 
 	switch sRequest.Protocol {
 	default:
@@ -1962,7 +2078,6 @@ func SLOService(w http.ResponseWriter, r *http.Request, issuerMdSet gosaml.MdSet
 		privatekey, _, err = gosaml.GetPrivateKey(issMD, gosaml.Roles[sloinfo.HubRole]+gosaml.SigningCertQuery)
 	} else {
 		kid := config.KeyNames[sloinfo.SigningKey]
-		fmt.Println("kid", kid)
 		privatekey, err = gosaml.PrivateKeyByName(kid, "")
 	}
 	if err != nil {

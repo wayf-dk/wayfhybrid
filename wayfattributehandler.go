@@ -72,11 +72,13 @@ var (
 		{c14n: "securitydomain", op: "securitydomain:ku.dk"},
 		{c14n: "subsecuritydomain", op: "subsecuritydomain:"},
 		{c14n: "hub", op: "eq:Issuer:https://wayf.wayf.dk"},
+		{c14n: "krib", op: "xpbool:msg:boolean(@Destination[starts-with(., 'https://krib.wayf.dk/')])"},
 		{c14n: "persistent", op: "persistent:"},
 		{c14n: "displayName", op: "displayname:"},
 		{c14n: "eduPersonTargetedID", op: "eptid:"},
 		{c14n: "gn", op: "gn:"},
 		{c14n: "sn", op: "sn:"},
+		{c14n: "cn", op: "cn:"},
 		{c14n: "pairwise-id", name: "pairwise-id", op: "pairwise-id:"},
 		{c14n: "schacPersonalUniqueID", op: "cpr:"},
 		{c14n: "eduPersonAffiliation", op: "epa:"},
@@ -90,6 +92,10 @@ var (
 		{c14n: "norEduPersonNIN", op: "norEduPersonNIN:"},
 		{c14n: "europeanStudentIdentifier", op: "europeanStudentIdentifier:"},
 		{c14n: "schacPersonalUniqueCode", op: "append:europeanStudentIdentifier"},
+		{c14n: "schacDateOfBirth", op: "replace:eidasDateOfBirth:-:"},
+		{c14n: "schacYearOfBirth", op: "substr:eidasDateOfBirth:0:4"},
+		{c14n: "modstUserID", op: "cp:eduPersonPrincipalName"},
+		{c14n: "modstUserID", op: "modstUserIDIsMail:"},
 	}
 
 	requestAttributesBase = []attributeDescription{
@@ -107,6 +113,7 @@ var (
 		{c14n: "RequestedAuthnContext", op: "requestedAuthnContext:"},
 		{c14n: "idpEntityID", op: "xp:idp:@entityID"},
 		{c14n: "nemlogin", op: "eq:idpEntityID:https://nemlogin.wayf.dk"},
+		{c14n: "nemlogin", op: "eq:idpEntityID:https://nemlog-in.wayf.dk"},
 	}
 
 	attributesBase = []attributeDescription{
@@ -181,7 +188,8 @@ var (
 
 		// Modst specials
 		{c14n: "eduPersonPrincipalName", name: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"},
-		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid"},
+		//      {c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/userid"},
+		{c14n: "modstUserID", name: "https://modst.dk/sso/claims/userid"},
 		//		{c14n: "eduPersonPrincipalName", name: "https://modst.dk/sso/claims/uniqueid"},
 		{c14n: "entryUUID", name: "https://modst.dk/sso/claims/uniqueid"},
 		{c14n: "oioCvrNumberIdentifier", name: "https://modst.dk/sso/claims/cvr"},
@@ -191,6 +199,34 @@ var (
 		{c14n: "modstlogonmethod", name: "https://modst.dk/sso/claims/logonmethod"},
 		{c14n: "sn", name: "https://modst.dk/sso/claims/surname"},
 		{c14n: "gn", name: "https://modst.dk/sso/claims/givenname"},
+
+		// eIDAS
+		{c14n: "eidasPersonIdentifier", name: "http://eidas.europa.eu/attributes/naturalperson/PersonIdentifier"},
+		{c14n: "eidasCurrentFamilyName", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentFamilyName"},
+		{c14n: "sn", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentFamilyName"},
+		{c14n: "eidasCurrentGivenName", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentGivenName"},
+		{c14n: "gn", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentGivenName"},
+		{c14n: "eidasDateOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/DateOfBirth"},
+		{c14n: "eidasNationality", name: "http://eidas.europa.eu/attributes/naturalperson/Nationality"},
+
+		{c14n: "eidasCountryOfResidence", name: "http://eidas.europa.eu/attributes/naturalperson/CountryOfResidence"},
+		{c14n: "eidasCurrentAddress", name: "http://eidas.europa.eu/attributes/naturalperson/CurrentAddress"},
+		{c14n: "eidasBirthName", name: "http://eidas.europa.eu/attributes/naturalperson/BirthName"},
+		{c14n: "eidasPlaceOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/PlaceOfBirth"},
+		{c14n: "eidasCountryOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/CountryOfBirth"},
+		{c14n: "eidasTownOfBirth", name: "http://eidas.europa.eu/attributes/naturalperson/TownOfBirth"},
+		{c14n: "eidasGender", name: "http://eidas.europa.eu/attributes/naturalperson/Gender"},
+		{c14n: "eidasPhoneNumber", name: "http://eidas.europa.eu/attributes/naturalperson/PhoneNumber"},
+		{c14n: "eidasEmailAddress", name: "http://eidas.europa.eu/attributes/naturalperson/EmailAddress"},
+		{c14n: "eidasLoA", name: "https://data.gov.dk/model/core/eidas/loa"},
+		{c14n: "eidasMemberState", name: "https://data.gov.dk/model/core/eid/eidas/memberState"},
+		{c14n: "oioAttributeProfile", name: "https://data.gov.dk/concept/core/eid/profile"},
+		{c14n: "oioProvider", name: "https://data.gov.dk/concept/core/eid/provider"},
+		{c14n: "oioGenericLoA", name: "https://data.gov.dk/concept/core/loa"},
+		{c14n: "oioCprIal", name: "https://data.gov.dk/model/core/nsis/cpr_ial"},
+		{c14n: "oioAllowQualifiedSigning", name: "https://data.gov.dk/model/core/eid/allowQualifiedSigning"},
+
+		{c14n: "schacCountryOfCitizenship", name: "eidasNationality"},
 	}
 
 	attributenameFormats = map[string]string{
@@ -248,7 +284,6 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 		return fmt.Errorf("No AttributeStatement")
 	}
 	values := map[string][]string{}
-	attributeStatement2 := response.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[2]`, "", nil)
 	attributeStatement := attributeStatementList[0]
 	sourceAttributes := response.Query(attributeStatement, `./saml:Attribute`)
 
@@ -271,7 +306,7 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 			values[atd.c14n] = append(values[atd.c14n], tmpValues...)
 		}
 	}
-	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd, attributeStatement2)
+	err = attributeOpsHandler(values, internalAttributesBase, request, response, idpMd, spMd)
 
 	goxml.RmElement(attributeStatement)
 	return
@@ -280,11 +315,11 @@ func Attributesc14n(request, response, idpMd, spMd *goxml.Xp) (err error) {
 // RequestHandler - runs attributeOpsHandler for requestAttributesBase and returns the result as values
 func RequestHandler(request, idpMd, spMd *goxml.Xp) (values map[string][]string, err error) {
 	values = map[string][]string{}
-	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd, request.QueryDashP(nil, `/saml:AttributeStatement`, "", nil))
+	attributeOpsHandler(values, requestAttributesBase, request, request, idpMd, spMd)
 	return
 }
 
-func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp, dest types.Node) (err error) {
+func attributeOpsHandler(values map[string][]string, atds []attributeDescription, request, msg, idpMd, spMd *goxml.Xp) (err error) {
 	contextMap := map[string]*goxml.Xp{"idp": idpMd, "sp": spMd, "msg": msg, "req": request}
 	for _, atd := range atds {
 		opParam := strings.SplitN(atd.op, ":", 2)
@@ -311,6 +346,23 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			if *v != "" {
 				*v = *v + opParam[1]
 			}
+		case "replace":
+			if *v == "" {
+				params := strings.Split(opParam[1], ":")
+				if len(values[params[0]]) > 0 {
+					*v = strings.ReplaceAll(values[params[0]][0], params[1], params[2])
+				}
+			}
+		case "substr":
+			if *v == "" {
+				params := strings.Split(opParam[1], ":")
+				low, _ := strconv.Atoi(params[1])
+				high, _ := strconv.Atoi(params[2])
+
+				if len(values[params[0]]) > 0 && len(values[params[0]][0]) > high {
+					*v = values[params[0]][0][low:high]
+				}
+			}
 		case "displayname":
 			if *v == "" && len(values["cn"]) != 0 {
 				*v = values["cn"][0]
@@ -325,6 +377,10 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 				names := strings.Fields(values["cn"][0])
 				*v = strings.Join(names[0:len(names)-1], " ")
 			}
+		case "cn":
+			if *v == "" && len(values["gn"]) > 0 && len(values["sn"]) > 0 {
+				*v = values["gn"][0] + " " + values["sn"][0]
+			}
 		case "xidp":
 			*v = idpMd.Query1(nil, xprefix+opParam[1])
 		case "xp":
@@ -336,6 +392,9 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "xpm":
 			opParam = strings.SplitN(opParam[1], ":", 2)
 			values[atd.c14n] = append(values[atd.c14n], contextMap[opParam[0]].QueryMulti(nil, opParam[1])...)
+		case "xpbool":
+			opParam = strings.SplitN(opParam[1], ":", 2)
+			*v = strconv.FormatBool(contextMap[opParam[0]].QueryBool(nil, opParam[1]))
 		case "securitydomain":
 			eppns := values["eduPersonPrincipalName"]
 			if len(eppns) > 0 {
@@ -403,12 +462,17 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 			rid := values["rid"]
 			cvr := values["cvr"]
 			pid := values["pid"]
+			eidasPersonIdentifier := values["eidasPersonIdentifier"]
 			if len(rid) > 0 && len(cvr) > 0 {
 				*v = "CVR:" + cvr[0] + "-RID:" + rid[0]
 			} else if len(pid) > 0 {
 				*v = "PID:" + pid[0]
+			} else if len(eidasPersonIdentifier) > 0 {
+                re := regexp.MustCompile(`[^[:alnum:]]`)
+                epid := strings.Replace(eidasPersonIdentifier[0], "/", "-", 2)
+                *v = "PID:" + epid[:6] + re.ReplaceAllStringFunc(epid[6:], eidasHex)
 			} else {
-				return fmt.Errorf("No pid or rid and cvr values")
+				return fmt.Errorf("No person identitfier values")
 			}
 		case "commonfederations":
 			*v = strconv.FormatBool(intersectionNotEmpty(values["idpfeds"], values["spfeds"]) || values["hub"][0] == "true")
@@ -438,6 +502,11 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		case "europeanStudentIdentifier":
 			if idpMd.QueryXMLBool(nil, xprefix+"addESI") {
 				*v = "urn:schac:personalUniqueCode:int:esi:" + values["schacHomeOrganization"][0] + ":" + eptidforaudience(values, "europeanStudentIdentifier")
+			}
+		case "modstUserIDIsMail":
+			if idpMd.QueryXMLBool(nil, xprefix+"modstUserIDIsMail") && len(values["mail"]) > 0 {
+			//if true {
+				values[atd.c14n] = values["mail"][:1]
 			}
 		case "loaLimiter":
 			levels := map[string]string{"": "", "3": "3", "Substantial": "Substantial", "High": "Substantial"} // always downgrade High to Substantial, non-key values are errors, blanks are ok
@@ -474,6 +543,7 @@ func attributeOpsHandler(values map[string][]string, atds []attributeDescription
 		}
 	}
 
+	dest := msg.QueryDashP(nil, `/saml:Assertion/saml:AttributeStatement[0]`, "", nil)
 	for basic, vals := range values {
 		seen := map[string]bool{}
 		for _, val := range vals {
@@ -495,15 +565,10 @@ func eptidforaudience(values map[string][]string, audience string) string {
 }
 
 func eptid(values map[string][]string) string {
-	var epid string
-
-	if epid = values["persistent"][0]; epid == "" {
-		if len(values["eduPersonPrincipalName"]) == 0 {
-			return ""
-		}
-		epid = values["eduPersonPrincipalName"][0]
+	if values["krib"][0] == "true" && values["persistent"][0] != "" {
+		return values["persistent"][0]
 	}
-
+	epid := values["eduPersonPrincipalName"][0]
 	matches := scoped.FindStringSubmatch(epid)
 	if len(matches) != 3 {
 		return ""
@@ -565,62 +630,63 @@ func yearfromyearandcifferseven(year, c7 int) int {
 }
 
 func ChangeScope(r *http.Request, response, backendIdpMd, idpMd, spMd *goxml.Xp, newscope, schacHomeOrganization, persistentIDPEntityid string, setOrganizationName bool) (err error) {
-		if err = wayfScopeCheck(response, backendIdpMd); err != nil {
-			return
-		}
-
-    	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
-
-		currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
-
-		for _, attr := range []string{"subsecuritydomain", "securitydomain"} {
-			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
-			for i, val := range response.QueryMulti(attrList, path) {
-				response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, currentscope)+newscope, nil)
-			}
-		}
-		ns := "@" + newscope
-		for _, attr := range append(config.StrictScopedAttributes, config.LaxScopedAttributes...)  { // eduPersonTargetedID
-			path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
-			for i, val := range response.QueryMulti(attrList, path) {
-		    	v, _, _ := strings.Cut(val, "@")
-			    response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", v+ns, nil)
-			}
-		}
-		eptidAttributes := []string{"persistent", "eduPersonPrincipalName", "idpPersistentID", "spPersistentID"}
-		vals := map[string][]string{}
-		for _, attr := range eptidAttributes {
-			vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
-		}
-        if persistentIDPEntityid != "" {
-            vals["idpPersistentID"][0] = persistentIDPEntityid
-        }
-
-		eptid := eptid(vals)
-		response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
-        nameIDPolicy := response.Query1(attrList, "saml:Attribute[@Name='nameIDPolicy']/saml:AttributeValue")
-        nameID := response.Query1(attrList, "./nameID")
-        switch nameIDPolicy {
-        case gosaml.Persistent:
-            nameID = eptid
-        case gosaml.Email:
-            nameID = vals["eduPersonPrincipalName"][0]
-        }
-        switch attr := spMd.Query1(nil, xprefix+"nameIDAttribute"); {
-        case attr == "":
-        default:
-            nameID = response.Query1(attrList, "./"+attr)
-        }
-        response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, nameID, nil)
-
-		if (setOrganizationName) {
-    		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
-    		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
-    	}
-        if schacHomeOrganization != "" {
-            response.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="schacHomeOrganization"]/saml:AttributeValue[1]`, schacHomeOrganization, nil)
-        }
+	if err = wayfScopeCheck(response, backendIdpMd); err != nil {
 		return
+	}
+
+	attrList := response.Query(nil, "./saml:Assertion/saml:AttributeStatement")[0]
+
+	currentscope := response.Query1(attrList, `saml:Attribute[@Name='securitydomain']/saml:AttributeValue`)
+
+	for _, attr := range []string{"subsecuritydomain", "securitydomain"} {
+		path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+		for i, val := range response.QueryMulti(attrList, path) {
+			response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", strings.TrimSuffix(val, currentscope)+newscope, nil)
+		}
+	}
+	ns := "@" + newscope
+	for _, attr := range append(config.StrictScopedAttributes, config.LaxScopedAttributes...) { // eduPersonTargetedID
+		path := `saml:Attribute[@Name=` + strconv.Quote(attr) + `]/saml:AttributeValue`
+		for i, val := range response.QueryMulti(attrList, path) {
+			v, _, _ := strings.Cut(val, "@")
+			response.QueryDashP(attrList, path+"["+strconv.Itoa(i+1)+"]", v+ns, nil)
+		}
+	}
+	eptidAttributes := []string{"persistent", "eduPersonPrincipalName", "idpPersistentID", "spPersistentID"}
+	vals := map[string][]string{}
+	for _, attr := range eptidAttributes {
+		vals[attr] = []string{response.Query1(attrList, `saml:Attribute[@Name=`+strconv.Quote(attr)+`]/saml:AttributeValue`)} // blank values attributes are not copied to response, eptid computation needs "persistent"
+	}
+	if persistentIDPEntityid != "" {
+		vals["idpPersistentID"][0] = persistentIDPEntityid
+	}
+	vals["krib"] = []string{""}
+
+	eptid := eptid(vals)
+	response.QueryDashP(attrList, `saml:Attribute[@Name='eduPersonTargetedID']/saml:AttributeValue[1]`, eptid, nil)
+	nameIDPolicy := response.Query1(attrList, "saml:Attribute[@Name='nameIDPolicy']/saml:AttributeValue")
+	nameID := response.Query1(attrList, "./nameID")
+	switch nameIDPolicy {
+	case gosaml.Persistent:
+		nameID = eptid
+	case gosaml.Email:
+		nameID = vals["eduPersonPrincipalName"][0]
+	}
+	switch attr := spMd.Query1(nil, xprefix+"nameIDAttribute"); {
+	case attr == "":
+	default:
+		nameID = response.Query1(attrList, "./"+attr)
+	}
+	response.QueryDashP(attrList, `saml:Attribute[@Name='nameID']/saml:AttributeValue[1]`, nameID, nil)
+
+	if setOrganizationName {
+		organizationName := getFirstByAttribute(idpMd, "md:IDPSSODescriptor//mdui:DisplayName[@xml:lang=$]", getAcceptHeaderItems(r, "Accept-Language", []string{"en", "da"}))
+		response.QueryDashP(attrList, `saml:Attribute[@Name='organizationName']/saml:AttributeValue[1]`, organizationName, nil)
+	}
+	if schacHomeOrganization != "" {
+		response.QueryDashP(nil, `//saml:AttributeStatement/saml:Attribute[@Name="schacHomeOrganization"]/saml:AttributeValue[1]`, schacHomeOrganization, nil)
+	}
+	return
 }
 
 // CopyAttributes copies the attributes
@@ -875,4 +941,13 @@ func unique(slice []string) (list []string) {
 		}
 	}
 	return
+}
+
+func eidasHex(f string) string {
+	switch f {
+	case "-":
+		return "--"
+	default:
+		return "-" + hex.EncodeToString([]byte(f))
+	}
 }
